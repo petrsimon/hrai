@@ -11,6 +11,10 @@ import hraiLogo from '../../../static/hrai/hrai-dragon-mark-256.png';
 import styles from './hrai-panel.css';
 
 const MAX_HINT_RUNG = 5;
+const PANEL_DEFAULT_WIDTH = 256;
+const PANEL_MIN_WIDTH = 224;
+const PANEL_MAX_WIDTH = 512;
+const PANEL_KEYBOARD_STEP = 16;
 const BLOCK_SLOT_PLACEHOLDER = '\u25BE';
 
 const messages = defineMessages({
@@ -63,6 +67,11 @@ const messages = defineMessages({
         id: 'gui.hrai.blockOpcode',
         defaultMessage: 'Block {label}, category {category}',
         description: 'accessibility label for a block opcode chip in a tutor message'
+    },
+    resizePanel: {
+        id: 'gui.aria.resizeHraiPanel',
+        defaultMessage: 'Resize hrai panel',
+        description: 'accessibility label for the hrai panel resize handle'
     }
 });
 
@@ -252,6 +261,8 @@ const HraiPanel = ({
 }) => {
     const intl = useIntl();
     const [draft, setDraft] = useState('');
+    const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT_WIDTH);
+    const resizeState = useRef(null);
     const messagesEndRef = useRef(null);
 
     const formatBlockReference = useCallback(alias => intl.formatMessage(
@@ -300,6 +311,60 @@ const HraiPanel = ({
         onHint();
     }, [onHint]);
 
+    const handleResizeStart = useCallback(event => {
+        if (event.button !== 0) {
+            return;
+        }
+        event.preventDefault();
+        resizeState.current = {
+            startX: event.clientX,
+            startWidth: panelWidth
+        };
+    }, [panelWidth]);
+
+    const handleResizeMove = useCallback(event => {
+        if (!resizeState.current) {
+            return;
+        }
+        const nextWidth = resizeState.current.startWidth -
+            (event.clientX - resizeState.current.startX);
+        setPanelWidth(Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, nextWidth)));
+    }, []);
+
+    const handleResizeEnd = useCallback(() => {
+        resizeState.current = null;
+    }, []);
+
+    const handleResizeKeyDown = useCallback(event => {
+        let delta = 0;
+        if (event.key === 'ArrowLeft') {
+            delta = PANEL_KEYBOARD_STEP;
+        } else if (event.key === 'ArrowRight') {
+            delta = -PANEL_KEYBOARD_STEP;
+        } else if (event.key === 'Home') {
+            event.preventDefault();
+            setPanelWidth(PANEL_MIN_WIDTH);
+            return;
+        } else if (event.key === 'End') {
+            event.preventDefault();
+            setPanelWidth(PANEL_MAX_WIDTH);
+            return;
+        }
+        if (delta !== 0) {
+            event.preventDefault();
+            setPanelWidth(width => Math.max(PANEL_MIN_WIDTH, Math.min(PANEL_MAX_WIDTH, width + delta)));
+        }
+    }, []);
+
+    useEffect(() => {
+        document.addEventListener('pointermove', handleResizeMove);
+        document.addEventListener('pointerup', handleResizeEnd);
+        return () => {
+            document.removeEventListener('pointermove', handleResizeMove);
+            document.removeEventListener('pointerup', handleResizeEnd);
+        };
+    }, [handleResizeEnd, handleResizeMove]);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
     }, [chatMessages, isThinking]);
@@ -317,7 +382,20 @@ const HraiPanel = ({
             element="aside"
             role="complementary"
             aria-label={intl.formatMessage(messages.panelLabel)}
+            style={{width: `${panelWidth}px`}}
         >
+            <div
+                className={styles.resizeHandle}
+                role="separator"
+                tabIndex="0"
+                aria-label={intl.formatMessage(messages.resizePanel)}
+                aria-orientation="vertical"
+                aria-valuemin={PANEL_MIN_WIDTH}
+                aria-valuemax={PANEL_MAX_WIDTH}
+                aria-valuenow={panelWidth}
+                onPointerDown={handleResizeStart}
+                onKeyDown={handleResizeKeyDown}
+            />
             <h2 className={styles.title}>
                 <img
                     className={styles.logo}
