@@ -490,7 +490,7 @@ class MenuBar extends React.Component {
                                 onClick={this.props.onOpenHraiLessons}
                             >
                                 <img
-                                    className={styles.helpIcon}
+                                    className={styles.hraiLessonsIcon}
                                     src={hraiMark}
                                     alt=""
                                 />

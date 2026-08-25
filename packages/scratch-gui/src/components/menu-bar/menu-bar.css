@@ -172,7 +172,15 @@
     margin: 0 .25rem 0 0;
 }
 
-[dir="rtl"] .help-icon {
+.hrai-lessons-icon {
+    width: $menu-bar-button-size;
+    height: $menu-bar-button-size;
+    margin: 0 .25rem 0 0;
+    object-fit: contain;
+}
+
+[dir="rtl"] .help-icon,
+[dir="rtl"] .hrai-lessons-icon {
     margin: 0 0 0 .25rem;
 }
 
@@ -238,7 +246,7 @@
         display: none;
     }
 
-    .help-icon {
+    .help-icon, .hrai-lessons-icon {
         margin-right: 0;
     }
 }
