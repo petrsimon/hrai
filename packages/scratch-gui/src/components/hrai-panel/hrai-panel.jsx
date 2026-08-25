@@ -20,7 +20,7 @@ const BLOCK_SLOT_PLACEHOLDER = '\u25BE';
 const messages = defineMessages({
     panelLabel: {
         id: 'gui.aria.hraiPanel',
-        defaultMessage: 'hrai panel',
+        defaultMessage: 'panel hrai',
         description: 'accessibility label for the hrai tutor chat panel'
     },
     title: {
@@ -30,17 +30,17 @@ const messages = defineMessages({
     },
     messageListLabel: {
         id: 'gui.hrai.messageListLabel',
-        defaultMessage: 'Conversation with hrai',
+        defaultMessage: 'Konverzace s hrai',
         description: 'accessibility label for the hrai message list'
     },
     inputLabel: {
         id: 'gui.hrai.inputLabel',
-        defaultMessage: 'Message to hrai',
+        defaultMessage: 'Zpráva pro hrai',
         description: 'label for the hrai chat input field'
     },
     sendButton: {
         id: 'gui.hrai.sendButton',
-        defaultMessage: 'Send',
+        defaultMessage: 'Odeslat',
         description: 'button to send a message to hrai'
     },
     hintButton: {
@@ -55,22 +55,22 @@ const messages = defineMessages({
     },
     thinking: {
         id: 'gui.hrai.thinking',
-        defaultMessage: 'hrai is thinking…',
+        defaultMessage: 'hrai přemýšlí…',
         description: 'quiet indicator shown while hrai is preparing a reply'
     },
     blockReference: {
         id: 'gui.hrai.blockReference',
-        defaultMessage: 'Go to block {alias}',
+        defaultMessage: 'Přejít na blok {alias}',
         description: 'accessibility label for a clickable block reference in a tutor message'
     },
     blockOpcode: {
         id: 'gui.hrai.blockOpcode',
-        defaultMessage: 'Block {label}, category {category}',
+        defaultMessage: 'Blok {label}, kategorie {category}',
         description: 'accessibility label for a block opcode chip in a tutor message'
     },
     resizePanel: {
         id: 'gui.aria.resizeHraiPanel',
-        defaultMessage: 'Resize hrai panel',
+        defaultMessage: 'Změnit velikost panelu hrai',
         description: 'accessibility label for the hrai panel resize handle'
     }
 });

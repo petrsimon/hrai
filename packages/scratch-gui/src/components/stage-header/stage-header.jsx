@@ -80,12 +80,12 @@ const messages = defineMessages({
         id: 'gui.stageHeader.fullscreenControl'
     },
     hraiAssistantOn: {
-        defaultMessage: 'Turn off hrai assistant',
+        defaultMessage: 'Vypnout asistenta hrai',
         description: 'Button to hide the hrai assistant panel',
         id: 'gui.stageHeader.hraiAssistantOn'
     },
     hraiAssistantOff: {
-        defaultMessage: 'Turn on hrai assistant',
+        defaultMessage: 'Zapnout asistenta hrai',
         description: 'Button to show the hrai assistant panel',
         id: 'gui.stageHeader.hraiAssistantOff'
     }
