@@ -13,6 +13,13 @@ export interface Turn {
     text: string;
 }
 
+export interface LessonPromptContext {
+    title: string;
+    goal: string;
+    instruction: string;
+    success: string;
+}
+
 import { paletteForPrompt } from "./palette.ts";
 
 /**
@@ -23,8 +30,8 @@ import { paletteForPrompt } from "./palette.ts";
  * looked like it worked while offering the child nothing new for pressing the button.
  */
 const RUNG_INSTRUCTIONS = [
-    "2. Toto je nápověda úrovně 1: polož otázku o tom, co má postava dělat. Nejmenuj žádný blok ani kategorii.",
-    "2. Toto je nápověda úrovně 2: polož konkrétnější otázku o tom, co se má stát dřív a co potom. Stále nejmenuj blok ani kategorii.",
+    "2. Toto je nápověda úrovně 1: odpověz na otázku a dej jeden malý konkrétní další úkol. Nejmenuj nový blok ani kategorii. Neodpovídej pouze další otázkou.",
+    "2. Toto je nápověda úrovně 2: vysvětli, co se má stát dřív a co potom, a dej jeden konkrétní další úkol. Stále nejmenuj nový blok ani kategorii.",
     "2. Toto je nápověda úrovně 3: řekni, ve které kategorii v editoru se má dítě dívat (například Události). Ještě neříkej, který blok to je.",
     "2. Toto je nápověda úrovně 4: napiš kód konkrétního bloku ze seznamu níže (například event_whenkeypressed) a řekni, v jaké je kategorii. Kód bloku musíš napsat vždy, panel ho dítěti ukáže jako obrázek bloku. Neříkej, kam přesně ho má dítě připojit.",
     "2. Toto je nápověda úrovně 5: napiš kód bloku ze seznamu níže (například motion_movesteps) a popiš slovy, kam ho dítě má připojit. Kód bloku musíš napsat vždy, panel ho dítěti ukáže jako obrázek bloku. Nikdy nevypisuj celý hotový scénář.",
@@ -36,21 +43,18 @@ const RUNG_INSTRUCTIONS = [
  * Deliberately Czech: the first learner is Czech, and asking a 14B to hold register
  * instructions in one language while answering in another measurably degrades both.
  * @param rung How far up the hint ladder the learner has climbed; 1 is the gentlest.
- * @param lessonGoal The active lesson goal, when a lesson is running.
+ * @param lesson The active lesson stage, when a lesson is running.
  * @returns Standing instructions for the tutor model.
  */
-export function systemPrompt(rung = 1, lessonGoal?: string): string {
-    const selectionGuidance = lessonGoal?.toLowerCase().includes("friendly soldier") &&
-        lessonGoal.toLowerCase().includes("click") ? [
-        "U kroku výběru rozlišuj dvě věci: kliknutí na postavu v seznamu jen vybere postavu pro úpravy; kliknutí na postavu při spuštěném projektu musí spustit její chování.",
-        "Když dítě říká, že už postavu vybralo v editoru, vysvětli tento rozdíl a nekládej znovu stejnou otázku.",
-    ] : [];
+export function systemPrompt(rung = 1, lesson?: LessonPromptContext): string {
     return [
         "Jsi hrai, trpělivý učitel programování ve Scratchi. Učíš dítě, kterému je 8 let.",
-        ...(lessonGoal ? [
-            `AKTIVNÍ KROK LEKCE: ${lessonGoal}`,
-            "Veď dítě k tomuto kroku, ale neříkej řešení celé lekce.",
-            ...selectionGuidance,
+        ...(lesson ? [
+            `AKTIVNÍ KROK: ${lesson.title}`,
+            `CO DÍTĚ STAVÍ: ${lesson.goal}`,
+            `TEĎ MÁ UDĚLAT: ${lesson.instruction}`,
+            `KROK JE HOTOVÝ, KDYŽ: ${lesson.success}`,
+            "Veď dítě aktivně k tomuto kroku. Když tápe, vysvětli význam a připomeň jeden nejbližší úkol. Neplánuj jinou funkci hry.",
         ] : []),
         "",
         "PRAVIDLA:",
@@ -58,7 +62,8 @@ export function systemPrompt(rung = 1, lessonGoal?: string): string {
         RUNG_INSTRUCTIONS[Math.min(Math.max(rung, 1), 5) - 1],
         "5. Piš česky, krátkými větami, slovy, kterým rozumí osmileté dítě. Nejvýše 3 věty.",
         "6. Buď povzbudivý, nikdy nevytýkej chybu.",
-        "7. Navazuj na poslední odpověď dítěte. Pokud dítě tvrdí, že něco udělalo, řekni, co v projektu DATA potvrzuje nebo co ještě chybí; neopakuj stejnou otázku.",
+        "7. Navazuj na poslední odpověď dítěte. Pokud dítě tvrdí, že něco udělalo, porovnej to s projektem a podmínkou hotového kroku. Neopakuj stejnou otázku.",
+        "8. Polož otázku jen tehdy, když bez odpovědi dítěte opravdu nelze určit další úkol.",
         "",
         "DOSTUPNÉ BLOKY (kód = český název, seskupené podle kategorie v editoru):",
         paletteForPrompt(),

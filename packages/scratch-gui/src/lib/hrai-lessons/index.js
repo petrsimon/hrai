@@ -104,8 +104,10 @@ const lessons = [
         goal: 'Vyber své vojáky a poraz více nepřátel, než jich na konci zůstane.',
         concepts: 'kliknutí · proměnné · dosah · poškození · klony · čas',
         stages: [
-            'Připrav vojáky s mečem a lukem na bojišti.',
-            'Vyber vlastního vojáka a označ ho.',
+            'Prohlédni si připravené bojiště a oba týmy.',
+            'Přidej modrému vojákovi událost po kliknutí.',
+            'Po kliknutí ulož aktivního vojáka do společné proměnné.',
+            'Viditelně změň vzhled aktivního vojáka.',
             'Kliknutím na nepřítele proveď útok v dosahu.',
             'Přidej životy, poškození a odstranění poraženého nepřítele.',
             'Přidej lukostřelce s delším dosahem.',

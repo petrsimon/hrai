@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'hrai.lesson-progress';
+const STORAGE_KEY = 'hrai.lesson-progress.v2';
 
 const readProgress = () => {
     if (typeof window === 'undefined') return {};

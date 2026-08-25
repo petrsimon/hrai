@@ -32,4 +32,5 @@ test('Soldier Battle starter prepares four named units without scripts', () => {
         'Cerveny luk'
     ]);
     expect(units.every(unit => Object.keys(unit.blocks).length === 0)).toBe(true);
+    expect(lessons.find(lesson => lesson.id === '11-soldier-battle').stages).toHaveLength(9);
 });

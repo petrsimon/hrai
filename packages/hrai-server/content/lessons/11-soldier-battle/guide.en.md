@@ -9,7 +9,7 @@ Scratch does not normally expose a right-mouse-button block. The game therefore 
 1. Click one of your soldiers.
 2. Click an enemy soldier.
 
-The selected soldier gets a yellow highlight. If the enemy is in range, it takes damage.
+The selected soldier visibly changes appearance. If the enemy is in range, it takes damage.
 
 ## Soldiers
 
@@ -26,27 +26,35 @@ Do not add obstacles or complicated visibility in the first version. First make 
 
 Create a battlefield with friendly soldiers and enemies. Add a sword soldier and a bow soldier. Each soldier needs team, type, health, row, and column information.
 
-### 2. Selection
+### 2. Detect the click
 
-Use `when this sprite clicked`. When a friendly soldier is clicked, store its ID in `selected soldier` and show a yellow highlight. When an enemy is clicked, store its ID in `target soldier`.
+Select `Modry mec` in the sprite list. Add `when this sprite clicked` from Events. Clicking in the sprite list only opens a sprite for editing; this event detects the player's click during the running game.
 
-### 3. Sword attack
+### 3. Remember the active soldier
 
-Calculate the distance between the selected soldier and the target. A sword may attack only at a distance of one square or less. A valid attack removes two health points.
+Create a `selected soldier` variable for all sprites. Under the click event, set it to the blue soldier's ID. The game can now remember which soldier should perform the next attack.
 
-### 4. Health and death
+### 4. Mark the active soldier
+
+Add a visible appearance change below the variable assignment, such as setting the color effect to 25. The player must be able to recognize the active soldier without reading the variable.
+
+### 5. Sword attack
+
+When an enemy is clicked, store its ID in `target soldier`. Calculate the distance between the selected soldier and the target. A sword may attack only at a distance of one square or less. A valid attack removes two health points.
+
+### 6. Health and death
 
 Every soldier starts with three health points. When health reaches zero or below, hide the soldier. For an enemy, increase `dead enemies` and decrease `living enemies`.
 
-### 5. Bow attack
+### 7. Bow attack
 
 A bow has range four and deals one damage. Reuse the same selection system, but use the selected soldier’s type to choose range and damage.
 
-### 6. Timer and reinforcements
+### 8. Timer and reinforcements
 
 The game lasts exactly sixty seconds. Every five seconds a new enemy appears. Choose its type randomly between sword and bow. Add at most five reinforcements. After the timer ends, stop attacks and reinforcement creation.
 
-### 7. Result
+### 9. Result
 
 Broadcast `game over` and show the result:
 

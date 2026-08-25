@@ -60,6 +60,7 @@ export class Session {
         this.activeLessonId = lessonId;
         this.activeStageIndex = stageIndex;
         this.stageComplete = false;
+        this.resetRung();
         return stage;
     }
 
@@ -70,6 +71,7 @@ export class Session {
         if (!stage) return null;
         this.activeStageIndex = nextIndex;
         this.stageComplete = false;
+        this.resetRung();
         return stage;
     }
 

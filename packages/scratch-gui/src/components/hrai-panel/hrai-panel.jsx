@@ -92,6 +92,16 @@ const messages = defineMessages({
         id: 'gui.hrai.lessonComplete',
         defaultMessage: 'Výborně! Tento krok je hotový.',
         description: 'completion message for an hrai lesson stage'
+    },
+    stageAction: {
+        id: 'gui.hrai.stageAction',
+        defaultMessage: 'Teď udělej',
+        description: 'heading for the current concrete lesson action'
+    },
+    stageSuccess: {
+        id: 'gui.hrai.stageSuccess',
+        defaultMessage: 'Hotovo, když',
+        description: 'heading for the deterministic lesson completion condition'
     }
 });
 
@@ -400,6 +410,7 @@ const HraiPanel = ({
     const hintMaxReached = rung >= MAX_HINT_RUNG;
     const lessonStageIndex = lessonProgress?.stageIndex ?? 0;
     const lessonStage = lesson?.stages[lessonStageIndex];
+    const lessonStageDetails = lessonProgress?.stage;
     const lessonStageComplete = Boolean(lessonProgress?.complete);
     const hasNextStage = Boolean(lesson && lessonStageIndex < lesson.stages.length - 1);
     const hintDisabled = isThinking || hintMaxReached;
@@ -453,7 +464,22 @@ const HraiPanel = ({
                             }}
                         />
                     </span>
-                    <p>{lessonStage}</p>
+                    {lessonStageDetails?.title ? (
+                        <h3 className={styles.lessonStageTitle}>{lessonStageDetails.title}</h3>
+                    ) : null}
+                    <p>{lessonStageDetails?.goal || lessonStage}</p>
+                    {lessonStageDetails?.instruction ? (
+                        <div className={styles.lessonInstruction}>
+                            <strong><FormattedMessage {...messages.stageAction} /></strong>
+                            <p>{lessonStageDetails.instruction}</p>
+                        </div>
+                    ) : null}
+                    {lessonStageDetails?.success ? (
+                        <div className={styles.lessonSuccess}>
+                            <strong><FormattedMessage {...messages.stageSuccess} /></strong>
+                            <p>{lessonStageDetails.success}</p>
+                        </div>
+                    ) : null}
                     {lessonStageComplete ? (
                         <>
                             <strong><FormattedMessage {...messages.lessonComplete} /></strong>
@@ -546,6 +572,12 @@ HraiPanel.propTypes = {
     }),
     lessonProgress: PropTypes.shape({
         complete: PropTypes.bool.isRequired,
+        stage: PropTypes.shape({
+            goal: PropTypes.string.isRequired,
+            instruction: PropTypes.string.isRequired,
+            success: PropTypes.string.isRequired,
+            title: PropTypes.string.isRequired
+        }),
         stageIndex: PropTypes.number.isRequired
     }),
     messages: PropTypes.arrayOf(PropTypes.shape({

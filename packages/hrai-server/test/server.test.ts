@@ -110,4 +110,36 @@ describe("hrai server", () => {
         client().emit("workspace", null);
         expect(client().connected).toBe(true);
     });
+
+    it("answers deterministically when the active lesson stage is already complete", async () => {
+        const board = {
+            focusedTargetId: "blue-1",
+            targets: [
+                { id: "stage", name: "Stage", isStage: true, blocks: {} },
+                { id: "blue-1", name: "Blue 1", isStage: false, blocks: {} },
+                { id: "blue-2", name: "Blue 2", isStage: false, blocks: {} },
+                { id: "red-1", name: "Red 1", isStage: false, blocks: {} },
+                { id: "red-2", name: "Red 2", isStage: false, blocks: {} },
+            ],
+        };
+
+        client().emit("lessonStart", { lessonId: "11-soldier-battle", stageIndex: 0 });
+        const completed = new Promise<void>((resolve) => client().once("stageComplete", () => resolve()));
+        client().emit("workspace", board);
+        await completed;
+
+        const deltas: string[] = [];
+        const answer = await new Promise<string>((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error("no deterministic reply within 2s")), 2_000);
+            client().on("token", (payload: { delta: string }) => deltas.push(payload.delta));
+            client().once("done", () => {
+                clearTimeout(timer);
+                resolve(deltas.join(""));
+            });
+            client().emit("ask", { text: "hotovo, co teď?" });
+        });
+
+        expect(answer).toContain("Tento krok je hotový");
+        expect(answer).toContain("Další krok");
+    });
 });

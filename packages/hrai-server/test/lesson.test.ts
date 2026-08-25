@@ -20,14 +20,16 @@ const selectedBlock = (id: string, opcode: string): Block => ({
     topLevel: true,
 });
 
-const selectedTargets: RenderTarget[] = targets.map((target, index) => index === 1 ? ({
+const selectionTargets = (opcodes: string[], withVariable = false): RenderTarget[] => targets.map(
+    (target, index) => index === 1 ? ({
     ...target,
-    variables: {selected: {name: 'selected soldier', value: 1}},
-    blocks: {
-        clicked: selectedBlock('clicked', 'event_whenthisspriteclicked'),
-        setSelected: selectedBlock('setSelected', 'data_setvariableto'),
-    },
-}) : target);
+    variables: withVariable ? {selected: {name: 'vybraný voják', value: 1}} : {},
+    blocks: Object.fromEntries(opcodes.map((opcode, blockIndex) => [
+        `block-${blockIndex}`,
+        selectedBlock(`block-${blockIndex}`, opcode),
+    ])),
+}) : target,
+);
 
 describe('hrai lesson progression', () => {
     it('evaluates and advances the soldier battle stages', () => {
@@ -37,10 +39,25 @@ describe('hrai lesson progression', () => {
         session.setWorkspace(targets, 'blue-1');
         expect(session.evaluateLessonStage()).toBe(true);
         expect(session.lessonProgress?.complete).toBe(true);
-        expect(session.nextLessonStage()?.id).toBe('01-select');
+        expect(session.nextLessonStage()?.id).toBe('01-selection-click');
         expect(session.lessonProgress?.complete).toBe(false);
 
-        session.setWorkspace(selectedTargets, 'blue-1');
+        session.setWorkspace(selectionTargets(['event_whenthisspriteclicked']), 'blue-1');
+        expect(session.evaluateLessonStage()).toBe(true);
+
+        expect(session.nextLessonStage()?.id).toBe('02-selection-memory');
+        session.setWorkspace(selectionTargets([
+            'event_whenthisspriteclicked',
+            'data_setvariableto',
+        ], true), 'blue-1');
+        expect(session.evaluateLessonStage()).toBe(true);
+
+        expect(session.nextLessonStage()?.id).toBe('03-selection-mark');
+        session.setWorkspace(selectionTargets([
+            'event_whenthisspriteclicked',
+            'data_setvariableto',
+            'looks_seteffectto',
+        ], true), 'blue-1');
         expect(session.evaluateLessonStage()).toBe(true);
     });
 

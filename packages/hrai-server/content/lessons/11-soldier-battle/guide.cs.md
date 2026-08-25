@@ -9,7 +9,7 @@ Scratch běžně nerozlišuje pravé tlačítko myši v blocích. Proto hra pou�
 1. Klikni na svého vojáka.
 2. Klikni na nepřátelského vojáka.
 
-Vybraný voják se zvýrazní žlutým rámečkem. Když je nepřítel v dosahu, dostane poškození.
+Vybraný voják viditelně změní vzhled. Když je nepřítel v dosahu, dostane poškození.
 
 ## Vojáci
 
@@ -26,27 +26,35 @@ Pro první verzi nepřidávej překážky ani složitou viditelnost. Nejdřív o
 
 Přidej bojiště, několik vlastních vojáků a několik nepřátel. Vytvoř vojáka s mečem a vojáka s lukem. Každý voják potřebuje informace o týmu, typu, životě, řádku a sloupci.
 
-### 2. Výběr
+### 2. Rozpoznání kliknutí
 
-Použij `po kliknutí na tuto postavu`. Po kliknutí na vlastního vojáka ulož jeho ID do proměnné `vybraný voják` a ukaž žluté zvýraznění. Po kliknutí na nepřítele ulož jeho ID do `cílový voják`.
+Vyber postavu `Modry mec` v seznamu postav. Z kategorie Události přidej `po kliknutí na tuto postavu`. Kliknutí v seznamu pouze otevře postavu pro úpravy; tento blok naopak rozpozná kliknutí hráče na vojáka během hry.
 
-### 3. Útok mečem
+### 3. Zapamatování aktivního vojáka
 
-Vypočítej vzdálenost mezi řádkem a sloupcem vybraného vojáka a cíle. Meč smí zaútočit jen na vzdálenost nejvýše jedno políčko. Při platném útoku odečti nepříteli dva životy.
+Vytvoř pro všechny postavy proměnnou `vybraný voják`. Pod událost kliknutí nastav její hodnotu na ID modrého vojáka. Hra tak bude vědět, který voják má provést příští útok.
 
-### 4. Životy a smrt
+### 4. Viditelné označení
+
+Pod nastavení proměnné přidej viditelnou změnu vzhledu, například nastav efekt barvy na 25. Hráč musí bez pohledu na proměnnou poznat, který voják je aktivní.
+
+### 5. Útok mečem
+
+Po kliknutí na nepřítele ulož jeho ID do `cílový voják`. Vypočítej vzdálenost mezi řádkem a sloupcem vybraného vojáka a cíle. Meč smí zaútočit jen na vzdálenost nejvýše jedno políčko. Při platném útoku odečti nepříteli dva životy.
+
+### 6. Životy a smrt
 
 Každý voják začíná se třemi životy. Pokud životy klesnou na nulu nebo níže, voják se skryje. U nepřítele zvyš `mrtví nepřátelé` a sniž `živí nepřátelé`.
 
-### 5. Útok lukem
+### 7. Útok lukem
 
 Luk má dosah čtyři políčka a způsobí jedno poškození. Použij stejný výběr jako u meče, ale jiný dosah a poškození podle typu vojáka.
 
-### 6. Čas a posily
+### 8. Čas a posily
 
 Hra trvá přesně šedesát sekund. Každých pět sekund se objeví nový nepřítel. Jeho typ vyber náhodně mezi mečem a lukem. Posil může být nejvýše pět. Po uplynutí času zastav útoky i vytváření posil.
 
-### 7. Výsledek
+### 9. Výsledek
 
 Po konci hry vyšleš zprávu `konec hry` a oznámíš výsledek:
 

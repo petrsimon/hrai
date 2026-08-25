@@ -32,36 +32,46 @@
   "stages": [
     {
       "id": "00-board",
-      "goal": "Create a board with sword and bow soldiers on two teams.",
+      "goal": "Explore the battlefield and identify both teams.",
       "predicate": "board"
     },
     {
-      "id": "01-select",
-      "goal": "Click a friendly soldier and show which soldier is selected.",
-      "predicate": "selection"
+      "id": "01-selection-click",
+      "goal": "Detect a click on a friendly soldier.",
+      "predicate": "selectionClick"
     },
     {
-      "id": "02-sword",
+      "id": "02-selection-memory",
+      "goal": "Remember which friendly soldier is active.",
+      "predicate": "selectionMemory"
+    },
+    {
+      "id": "03-selection-mark",
+      "goal": "Visibly mark the active friendly soldier.",
+      "predicate": "selectionMark"
+    },
+    {
+      "id": "04-sword",
       "goal": "Let a selected sword soldier attack a nearby enemy.",
       "predicate": "swordAttack"
     },
     {
-      "id": "03-health",
+      "id": "05-health",
       "goal": "Give every soldier three health points and remove defeated enemies.",
       "predicate": "healthAndDeath"
     },
     {
-      "id": "04-bow",
+      "id": "06-bow",
       "goal": "Add a bow soldier with range four and damage one.",
       "predicate": "bowAttack"
     },
     {
-      "id": "05-reinforcements",
+      "id": "07-reinforcements",
       "goal": "Run a sixty-second battle and add at most five enemies every five seconds.",
       "predicate": "reinforcements"
     },
     {
-      "id": "06-result",
+      "id": "08-result",
       "goal": "Stop the battle and announce the result using deadEnemies > livingEnemies.",
       "predicate": "result"
     }

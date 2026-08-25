@@ -24,7 +24,7 @@ describe('HraiLessonsLibrary', () => {
 
         fireEvent.click(screen.getByRole('button', {name: /Bitva vojáků/}));
 
-        expect(screen.getByText('Připrav vojáky s mečem a lukem na bojišti.')).toBeTruthy();
+        expect(screen.getByText('Přidej modrému vojákovi událost po kliknutí.')).toBeTruthy();
         expect(screen.getByText(/hrai objeví v panelu/)).toBeTruthy();
         fireEvent.click(screen.getByRole('button', {name: 'Začít s průvodcem'}));
         expect(onStartLesson).toHaveBeenCalledWith('11-soldier-battle');

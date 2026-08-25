@@ -1,5 +1,7 @@
 const blocksIn = project => (project.targets || []).flatMap(target => Object.values(target.blocks || {}));
 
+const blocksInTarget = target => Object.values(target.blocks || {});
+
 const targetsIn = project => project.targets || [];
 
 const hasOpcode = (project, opcode) => blocksIn(project).some(block => block.opcode === opcode);
@@ -14,14 +16,33 @@ const hasVariable = (project, name) => targetsIn(project).some(target => (
 
 const hasAllVariables = (project, names) => names.every(name => hasVariable(project, name));
 
+const hasSelectionVariable = project => ['vybraný voják', 'selected soldier'].some(name => hasVariable(project, name));
+
+const targetHasAllOpcodes = (target, opcodes) => opcodes.every(opcode => (
+    blocksInTarget(target).some(block => block.opcode === opcode)
+));
+
+const selectionVisualOpcodes = ['looks_seteffectto', 'looks_changeeffectby', 'looks_switchcostumeto'];
+
 export const predicates = {
     board: project => targetsIn(project).filter(target => !target.isStage).length >= 4,
 
-    selection: project => (
-        hasOpcode(project, 'event_whenthisspriteclicked') &&
-        hasOpcode(project, 'data_setvariableto') &&
-        hasVariable(project, 'selected soldier')
-    ),
+    selectionClick: project => targetsIn(project).some(target => (
+        !target.isStage && targetHasAllOpcodes(target, ['event_whenthisspriteclicked'])
+    )),
+
+    selectionMemory: project => hasSelectionVariable(project) && targetsIn(project).some(target => (
+        !target.isStage && targetHasAllOpcodes(target, [
+            'event_whenthisspriteclicked',
+            'data_setvariableto'
+        ])
+    )),
+
+    selectionMark: project => hasSelectionVariable(project) && targetsIn(project).some(target => (
+        !target.isStage &&
+        targetHasAllOpcodes(target, ['event_whenthisspriteclicked', 'data_setvariableto']) &&
+        selectionVisualOpcodes.some(opcode => blocksInTarget(target).some(block => block.opcode === opcode))
+    )),
 
     swordAttack: project => (
         hasOpcode(project, 'event_whenthisspriteclicked') &&

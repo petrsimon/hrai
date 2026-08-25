@@ -147,6 +147,17 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         socket.on('lessonProgress', progress => {
             saveLessonProgress(projectId, progress.lessonId, progress.stageIndex, projectTitle);
             setLessonProgress(progress);
+            if (progress.stage?.instruction) {
+                const guideId = `lesson-guide-${progress.lessonId}-${progress.stageIndex}`;
+                setChatMessages(previous => {
+                    if (previous.some(message => message.id === guideId)) return previous;
+                    return [...previous, {
+                        id: guideId,
+                        role: 'tutor',
+                        text: `Teď udělej: ${progress.stage.instruction}`
+                    }];
+                });
+            }
         });
 
         socket.on('stageComplete', progress => {
@@ -158,7 +169,9 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             setChatMessages(previous => [...previous, {
                 id: `lesson-complete-${progress.stageIndex}`,
                 role: 'tutor',
-                text: stageCompleteText
+                text: progress.stage?.success ?
+                    `${stageCompleteText} ${progress.stage.success}` :
+                    stageCompleteText
             }]);
         });
 

@@ -120,10 +120,7 @@ export function startServer(port = PORT) {
             session.setWorkspace(workspace.targets, workspace.focusedTargetId);
             const progress = session.lessonProgress;
             if (progress && !progress.complete && session.evaluateLessonStage()) {
-                socket.emit("stageComplete", {
-                    lessonId: progress.lessonId,
-                    stageIndex: progress.stageIndex,
-                });
+                socket.emit("stageComplete", session.lessonProgress);
             }
         });
 
@@ -134,10 +131,21 @@ export function startServer(port = PORT) {
         const answer = (question: string): void => {
             const id = `m${Date.now()}`;
             session.remember("learner", question);
+            const progress = session.lessonProgress;
+
+            if (progress?.complete) {
+                const text = `Tento krok je hotový: ${progress.stage.success} Klikni na Další krok a budeme pokračovat.`;
+                session.remember("tutor", text);
+                socket.emit("token", { id, delta: text });
+                socket.emit("blocks", { id, blocks: {} });
+                socket.emit("done", { id, rung: session.rung });
+                return;
+            }
+
             socket.emit("thinking", { thinking: true });
 
             void chatStream(
-                systemPrompt(session.rung, session.lessonProgress?.stage.goal),
+                systemPrompt(session.rung, progress?.stage),
                 userPrompt(session.render(), question, session.history.slice(0, -1)),
                 (delta) => socket.emit("token", { id, delta }),
             )
@@ -159,8 +167,9 @@ export function startServer(port = PORT) {
         socket.on("ask", (payload: unknown) => {
             const question = parseQuestion(payload);
             if (!question) return;
-            // A new question is a new problem, so the ladder starts again at the bottom.
-            session.resetRung();
+            // During a guided stage, follow-up messages concern the same task. Preserve
+            // the learner's requested hint depth until the stage changes.
+            if (!session.lessonProgress) session.resetRung();
             answer(question);
         });
 
