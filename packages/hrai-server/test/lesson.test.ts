@@ -4,7 +4,7 @@ import {Session} from '../src/session.ts';
 
 const targets: RenderTarget[] = [
     {id: 'stage', name: 'Stage', isStage: true, blocks: {}},
-    {id: 'blue-1', name: 'Blue 1', isStage: false, blocks: {}},
+    {id: 'blue-1', name: 'Modry mec', isStage: false, blocks: {}},
     {id: 'blue-2', name: 'Blue 2', isStage: false, blocks: {}},
     {id: 'red-1', name: 'Red 1', isStage: false, blocks: {}},
     {id: 'red-2', name: 'Red 2', isStage: false, blocks: {}}
@@ -20,8 +20,12 @@ const selectedBlock = (id: string, opcode: string): Block => ({
     topLevel: true,
 });
 
-const selectionTargets = (opcodes: string[], withVariable = false): RenderTarget[] => targets.map(
-    (target, index) => index === 1 ? ({
+const selectionTargets = (
+    opcodes: string[],
+    withVariable = false,
+    targetIndex = 1,
+): RenderTarget[] => targets.map(
+    (target, index) => index === targetIndex ? ({
     ...target,
     variables: withVariable ? {selected: {name: 'vybraný voják', value: 1}} : {},
     blocks: Object.fromEntries(opcodes.map((opcode, blockIndex) => [
@@ -41,6 +45,9 @@ describe('hrai lesson progression', () => {
         expect(session.lessonProgress?.complete).toBe(true);
         expect(session.nextLessonStage()?.id).toBe('01-selection-click');
         expect(session.lessonProgress?.complete).toBe(false);
+
+        session.setWorkspace(selectionTargets(['event_whenthisspriteclicked'], false, 2), 'blue-2');
+        expect(session.evaluateLessonStage()).toBe(false);
 
         session.setWorkspace(selectionTargets(['event_whenthisspriteclicked']), 'blue-1');
         expect(session.evaluateLessonStage()).toBe(true);

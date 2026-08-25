@@ -24,22 +24,24 @@ const targetHasAllOpcodes = (target, opcodes) => opcodes.every(opcode => (
 
 const selectionVisualOpcodes = ['looks_seteffectto', 'looks_changeeffectby', 'looks_switchcostumeto'];
 
+const isBlueSword = target => target.name === 'Modry mec';
+
 export const predicates = {
     board: project => targetsIn(project).filter(target => !target.isStage).length >= 4,
 
     selectionClick: project => targetsIn(project).some(target => (
-        !target.isStage && targetHasAllOpcodes(target, ['event_whenthisspriteclicked'])
+        isBlueSword(target) && targetHasAllOpcodes(target, ['event_whenthisspriteclicked'])
     )),
 
     selectionMemory: project => hasSelectionVariable(project) && targetsIn(project).some(target => (
-        !target.isStage && targetHasAllOpcodes(target, [
+        isBlueSword(target) && targetHasAllOpcodes(target, [
             'event_whenthisspriteclicked',
             'data_setvariableto'
         ])
     )),
 
     selectionMark: project => hasSelectionVariable(project) && targetsIn(project).some(target => (
-        !target.isStage &&
+        isBlueSword(target) &&
         targetHasAllOpcodes(target, ['event_whenthisspriteclicked', 'data_setvariableto']) &&
         selectionVisualOpcodes.some(opcode => blocksInTarget(target).some(block => block.opcode === opcode))
     )),
