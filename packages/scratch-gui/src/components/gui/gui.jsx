@@ -228,6 +228,10 @@ const GUIComponent = props => {
     }, [props.platform]);
 
     useEffect(() => {
+        window.dispatchEvent(new Event('resize'));
+    }, [hraiAssistantVisible]);
+
+    useEffect(() => {
         if (
             !isFetchingUserData &&
             !themeMap[theme]?.isAvailable?.({hasActiveMembership})

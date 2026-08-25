@@ -366,6 +366,10 @@ const HraiPanel = ({
     }, [handleResizeEnd, handleResizeMove]);
 
     useEffect(() => {
+        window.dispatchEvent(new Event('resize'));
+    }, [panelWidth]);
+
+    useEffect(() => {
         messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
     }, [chatMessages, isThinking]);
 
