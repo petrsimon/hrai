@@ -48,6 +48,7 @@ import {setTheme} from '../../reducers/settings.js';
 import {PLATFORM} from '../../lib/platform.js';
 import {MenuRefProvider} from '../../contexts/menu-ref-context.jsx';
 import {ModalFocusProvider} from '../../contexts/modal-focus-context.jsx';
+import HraiPanel from '../hrai-panel/hrai-panel.jsx';
 
 const ariaMessages = defineMessages({
     menuBar: {
@@ -191,6 +192,7 @@ const GUIComponent = props => {
         onTelemetryModalOptOut,
         onUpdateProjectThumbnail,
         showComingSoon,
+        showHraiPanel,
         showNewFeatureCallouts,
         soundsTabVisible,
         stageSizeMode,
@@ -570,6 +572,11 @@ const GUIComponent = props => {
                                 />
                             </Box>
                         </Box>
+                        {/* Hidden in fullscreen: .stage-wrapper.full-screen is position:fixed
+                            over the viewport, so the panel would render underneath it. */}
+                        {showHraiPanel && !isFullScreen ? (
+                            <HraiPanel vm={vm} />
+                        ) : null}
                     </Box>
                     <DragLayer />
                 </Box>
@@ -653,6 +660,7 @@ GUIComponent.propTypes = {
     renderLogin: PropTypes.func,
     setTheme: PropTypes.func.isRequired,
     showComingSoon: PropTypes.bool,
+    showHraiPanel: PropTypes.bool,
     showNewFeatureCallouts: PropTypes.bool,
     soundsTabVisible: PropTypes.bool,
     stageSizeMode: PropTypes.oneOf(Object.keys(STAGE_SIZE_MODES)),
@@ -694,6 +702,7 @@ GUIComponent.defaultProps = {
     loading: false,
     menuBarHidden: false,
     showComingSoon: false,
+    showHraiPanel: false,
     showNewFeatureCallouts: false,
     stageSizeMode: STAGE_SIZE_MODES.large,
     useExternalPeripheralList: false

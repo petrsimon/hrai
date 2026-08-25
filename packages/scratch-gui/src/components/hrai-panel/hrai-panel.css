@@ -1,0 +1,32 @@
+@import "../../css/colors.css";
+@import "../../css/units.css";
+
+.hrai-panel {
+    flex: 0 0 16rem;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    padding: $space;
+    border-left: 1px solid $ui-black-transparent;
+    background-color: $ui-white;
+}
+
+.opcode-list {
+    margin: 0;
+    padding-left: 1.25rem;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.75rem;
+}
+
+.opcode-list li {
+    margin-bottom: 0.25rem;
+    word-break: break-word;
+}
+
+.empty-state {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.75rem;
+    color: $text-primary-transparent;
+}
