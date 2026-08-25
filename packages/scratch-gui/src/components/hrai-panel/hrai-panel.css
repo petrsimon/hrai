@@ -7,26 +7,123 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
     padding: $space;
     border-left: 1px solid $ui-black-transparent;
     background-color: $ui-white;
 }
 
-.opcode-list {
-    margin: 0;
-    padding-left: 1.25rem;
+.title {
+    margin: 0 0 $space;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: bold;
+    color: $text-primary;
 }
 
-.opcode-list li {
-    margin-bottom: 0.25rem;
+.message-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: $space;
+    margin-bottom: $space;
+}
+
+.message-tutor,
+.message-learner {
+    display: flex;
+}
+
+.message-tutor {
+    justify-content: flex-start;
+}
+
+.message-learner {
+    justify-content: flex-end;
+}
+
+.message-bubble {
+    max-width: 100%;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.75rem;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.75rem;
+    line-height: 1.4;
     word-break: break-word;
+    white-space: pre-wrap;
 }
 
-.empty-state {
+.message-tutor .message-bubble {
+    background-color: $ui-secondary;
+    color: $text-primary;
+}
+
+.message-learner .message-bubble {
+    background-color: $motion-primary;
+    color: $ui-white;
+}
+
+.block-ref {
+    display: inline;
+    margin: 0 0.125rem;
+    padding: 0.0625rem 0.375rem;
+    border: 1px solid $looks-secondary-dark;
+    border-radius: 0.5rem;
+    background-color: $ui-white;
+    color: $looks-secondary-dark;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 0.75rem;
+    font-size: inherit;
+    font-weight: bold;
+    line-height: 1.2;
+    cursor: pointer;
+    vertical-align: baseline;
+}
+
+.block-ref:hover,
+.block-ref:focus {
+    background-color: $looks-light-transparent;
+    outline: none;
+    box-shadow: 0 0 0 0.125rem $looks-transparent;
+}
+
+.thinking {
+    margin: 0;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.6875rem;
+    font-style: italic;
     color: $text-primary-transparent;
+}
+
+.input-area {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: $space;
+}
+
+.message-input {
+    width: 100%;
+    border-radius: $form-radius;
+}
+
+.send-button {
+    align-self: flex-end;
+    min-height: 2rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: $form-radius;
+    background-color: $ui-white;
+    color: $text-primary;
+}
+
+.send-button:hover:not(:disabled),
+.send-button:focus:not(:disabled) {
+    border-color: $motion-primary;
+    box-shadow: 0 0 0 0.125rem $looks-transparent;
+}
+
+.send-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }

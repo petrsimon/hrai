@@ -50,6 +50,8 @@ import {MenuRefProvider} from '../../contexts/menu-ref-context.jsx';
 import {ModalFocusProvider} from '../../contexts/modal-focus-context.jsx';
 import HraiPanel from '../hrai-panel/hrai-panel.jsx';
 
+const hraiPanelPlaceholderSend = () => {};
+
 const ariaMessages = defineMessages({
     menuBar: {
         id: 'gui.aria.menuBar',
@@ -575,7 +577,10 @@ const GUIComponent = props => {
                         {/* Hidden in fullscreen: .stage-wrapper.full-screen is position:fixed
                             over the viewport, so the panel would render underneath it. */}
                         {showHraiPanel && !isFullScreen ? (
-                            <HraiPanel vm={vm} />
+                            <HraiPanel
+                                messages={[]}
+                                onSend={hraiPanelPlaceholderSend}
+                            />
                         ) : null}
                     </Box>
                     <DragLayer />
