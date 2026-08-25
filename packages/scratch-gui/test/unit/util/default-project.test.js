@@ -18,4 +18,17 @@ describe('defaultProject', () => {
             });
         });
     });
+
+    test('uses the HRAI dragon and its animation frame for the default sprite', () => {
+        const defaultProject = defaultProjectGenerator(() => '');
+        const projectData = JSON.parse(defaultProject[0].data);
+        const sprite = projectData.targets.find(target => !target.isStage);
+
+        expect(sprite.costumes).toHaveLength(2);
+        expect(sprite.costumes.map(costume => costume.assetId)).toEqual([
+            '4588e7e83273b7f3831be57b7cdcb7c3',
+            '920e898fb4ff2716f9eb8a71d77f5346'
+        ]);
+        expect(sprite.costumes.every(costume => costume.dataFormat === 'png')).toBe(true);
+    });
 });
