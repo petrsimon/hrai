@@ -7,6 +7,7 @@ import Button from '../button/button.jsx';
 import Input from '../forms/input.jsx';
 import Label from '../forms/label.jsx';
 
+import hraiLogo from './hrai-logo.svg';
 import styles from './hrai-panel.css';
 
 const MAX_HINT_RUNG = 5;
@@ -107,6 +108,7 @@ BlockRef.defaultProps = {
 const BlockOpcodeChip = ({block, formatBlockOpcode}) => (
     <span
         className={styles.blockChip}
+        data-category={block.categoryKey}
         aria-label={formatBlockOpcode(formatBlockLabel(block.label), block.category)}
     >
         <span className={styles.blockChipLabel}>
@@ -121,6 +123,7 @@ const BlockOpcodeChip = ({block, formatBlockOpcode}) => (
 BlockOpcodeChip.propTypes = {
     block: PropTypes.shape({
         category: PropTypes.string.isRequired,
+        categoryKey: PropTypes.string,
         label: PropTypes.string.isRequired
     }).isRequired,
     formatBlockOpcode: PropTypes.func.isRequired
@@ -192,6 +195,7 @@ HraiMessage.propTypes = {
     message: PropTypes.shape({
         blocks: PropTypes.objectOf(PropTypes.shape({
             category: PropTypes.string.isRequired,
+            categoryKey: PropTypes.string,
             label: PropTypes.string.isRequired
         })),
         id: PropTypes.string.isRequired,
@@ -282,6 +286,12 @@ const HraiPanel = ({
             aria-label={intl.formatMessage(messages.panelLabel)}
         >
             <h2 className={styles.title}>
+                <img
+                    className={styles.logo}
+                    src={hraiLogo}
+                    alt=""
+                    draggable={false}
+                />
                 <FormattedMessage {...messages.title} />
             </h2>
             <div

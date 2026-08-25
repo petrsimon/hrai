@@ -3,594 +3,693 @@
     "opcode": "control_create_clone_of",
     "category": "Ovládání",
     "cs": "klonuj %1",
-    "en": "create clone of %1"
+    "en": "create clone of %1",
+    "categoryKey": "control"
   },
   {
     "opcode": "control_delete_this_clone",
     "category": "Ovládání",
     "cs": "zruš tento klon",
-    "en": "delete this clone"
+    "en": "delete this clone",
+    "categoryKey": "control"
   },
   {
     "opcode": "control_if",
     "category": "Ovládání",
     "cs": "když %1 tak",
-    "en": "if %1 then"
+    "en": "if %1 then",
+    "categoryKey": "control"
   },
   {
     "opcode": "control_if_else",
     "category": "Ovládání",
     "cs": "když %1 tak",
-    "en": "if %1 then"
+    "en": "if %1 then",
+    "categoryKey": "control"
   },
   {
     "opcode": "control_repeat",
     "category": "Ovládání",
     "cs": "opakuj %1 krát",
-    "en": "repeat %1"
+    "en": "repeat %1",
+    "categoryKey": "control"
   },
   {
     "opcode": "control_start_as_clone",
     "category": "Ovládání",
     "cs": "když startuje můj klon",
-    "en": "when I start as a clone"
+    "en": "when I start as a clone",
+    "categoryKey": "control"
   },
   {
     "opcode": "control_stop",
     "category": "Ovládání",
     "cs": "zastav",
-    "en": "stop"
+    "en": "stop",
+    "categoryKey": "control"
   },
   {
     "opcode": "control_wait",
     "category": "Ovládání",
     "cs": "čekej %1 sekund",
-    "en": "wait %1 seconds"
+    "en": "wait %1 seconds",
+    "categoryKey": "control"
   },
   {
     "opcode": "data_addtolist",
     "category": "Proměnné",
     "cs": "přidej %1 k %2",
-    "en": "add %1 to %2"
+    "en": "add %1 to %2",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_changevariableby",
     "category": "Proměnné",
     "cs": "změň %1 o %2",
-    "en": "change %1 by %2"
+    "en": "change %1 by %2",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_deletealloflist",
     "category": "Proměnné",
     "cs": "smaž všechno z %1",
-    "en": "delete all of %1"
+    "en": "delete all of %1",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_deleteoflist",
     "category": "Proměnné",
     "cs": "smaž %1 z %2",
-    "en": "delete %1 of %2"
+    "en": "delete %1 of %2",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_hidelist",
     "category": "Proměnné",
     "cs": "skryj seznam %1",
-    "en": "hide list %1"
+    "en": "hide list %1",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_hidevariable",
     "category": "Proměnné",
     "cs": "skryj proměnnou %1",
-    "en": "hide variable %1"
+    "en": "hide variable %1",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_insertatlist",
     "category": "Proměnné",
     "cs": "vlož %1 na %2 v %3",
-    "en": "insert %1 at %2 of %3"
+    "en": "insert %1 at %2 of %3",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_itemnumoflist",
     "category": "Proměnné",
     "cs": "pořadí %1 ve %2",
-    "en": "item # of %1 in %2"
+    "en": "item # of %1 in %2",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_itemoflist",
     "category": "Proměnné",
     "cs": "prvek %1 z %2",
-    "en": "item %1 of %2"
+    "en": "item %1 of %2",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_lengthoflist",
     "category": "Proměnné",
     "cs": "délka %1",
-    "en": "length of %1"
+    "en": "length of %1",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_listcontainsitem",
     "category": "Proměnné",
     "cs": "%1 obsahuje %2",
-    "en": "%1 contains %2?"
+    "en": "%1 contains %2?",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_replaceitemoflist",
     "category": "Proměnné",
     "cs": "nahraď %1 v %2 hodnotou %3",
-    "en": "replace item %1 of %2 with %3"
+    "en": "replace item %1 of %2 with %3",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_setvariableto",
     "category": "Proměnné",
     "cs": "nastav %1 na %2",
-    "en": "set %1 to %2"
+    "en": "set %1 to %2",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_showlist",
     "category": "Proměnné",
     "cs": "ukaž seznam %1",
-    "en": "show list %1"
+    "en": "show list %1",
+    "categoryKey": "variables"
   },
   {
     "opcode": "data_showvariable",
     "category": "Proměnné",
     "cs": "ukaž proměnnou %1",
-    "en": "show variable %1"
+    "en": "show variable %1",
+    "categoryKey": "variables"
   },
   {
     "opcode": "event_broadcast",
     "category": "Události",
     "cs": "vyšli zprávu %1",
-    "en": "broadcast %1"
+    "en": "broadcast %1",
+    "categoryKey": "events"
   },
   {
     "opcode": "event_broadcastandwait",
     "category": "Události",
     "cs": "vyšli zprávu %1 a čekej",
-    "en": "broadcast %1 and wait"
+    "en": "broadcast %1 and wait",
+    "categoryKey": "events"
   },
   {
     "opcode": "event_whenbackdropswitchesto",
     "category": "Události",
     "cs": "po změně pozadí na %1",
-    "en": "when backdrop switches to %1"
+    "en": "when backdrop switches to %1",
+    "categoryKey": "events"
   },
   {
     "opcode": "event_whenbroadcastreceived",
     "category": "Události",
     "cs": "po obdržení zprávy %1",
-    "en": "when I receive %1"
+    "en": "when I receive %1",
+    "categoryKey": "events"
   },
   {
     "opcode": "event_whenflagclicked",
     "category": "Události",
     "cs": "po kliknutí na %1",
-    "en": "when %1 clicked"
+    "en": "when %1 clicked",
+    "categoryKey": "events"
   },
   {
     "opcode": "event_whengreaterthan",
     "category": "Události",
     "cs": "když %1 > %2",
-    "en": "when %1 > %2"
+    "en": "when %1 > %2",
+    "categoryKey": "events"
   },
   {
     "opcode": "event_whenkeypressed",
     "category": "Události",
     "cs": "po stisku klávesy %1",
-    "en": "when %1 key pressed"
+    "en": "when %1 key pressed",
+    "categoryKey": "events"
   },
   {
     "opcode": "event_whenstageclicked",
     "category": "Události",
     "cs": "po kliknutí na scénu",
-    "en": "when stage clicked"
+    "en": "when stage clicked",
+    "categoryKey": "events"
   },
   {
     "opcode": "event_whenthisspriteclicked",
     "category": "Události",
     "cs": "po kliknutí na mě",
-    "en": "when this sprite clicked"
+    "en": "when this sprite clicked",
+    "categoryKey": "events"
   },
   {
     "opcode": "looks_changeeffectby",
     "category": "Vzhled",
     "cs": "změň efekt %1 o %2",
-    "en": "change %1 effect by %2"
+    "en": "change %1 effect by %2",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_changesizeby",
     "category": "Vzhled",
     "cs": "změň velikost o %1",
-    "en": "change size by %1"
+    "en": "change size by %1",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_cleargraphiceffects",
     "category": "Vzhled",
     "cs": "zruš grafické efekty",
-    "en": "clear graphic effects"
+    "en": "clear graphic effects",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_goforwardbackwardlayers",
     "category": "Vzhled",
     "cs": "jdi %1 o %2",
-    "en": "go %1 %2 layers"
+    "en": "go %1 %2 layers",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_gotofrontback",
     "category": "Vzhled",
     "cs": "přejdi na vrstvu %1",
-    "en": "go to %1 layer"
+    "en": "go to %1 layer",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_hide",
     "category": "Vzhled",
     "cs": "skryj se",
-    "en": "hide"
+    "en": "hide",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_nextbackdrop",
     "category": "Vzhled",
     "cs": "další pozadí",
-    "en": "next backdrop"
+    "en": "next backdrop",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_nextcostume",
     "category": "Vzhled",
     "cs": "další kostým",
-    "en": "next costume"
+    "en": "next costume",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_say",
     "category": "Vzhled",
     "cs": "bublina %1",
-    "en": "say %1"
+    "en": "say %1",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_sayforsecs",
     "category": "Vzhled",
     "cs": "bublina %1 %2 sekund",
-    "en": "say %1 for %2 seconds"
+    "en": "say %1 for %2 seconds",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_seteffectto",
     "category": "Vzhled",
     "cs": "nastav efekt %1 na %2",
-    "en": "set %1 effect to %2"
+    "en": "set %1 effect to %2",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_setsizeto",
     "category": "Vzhled",
     "cs": "nastav velikost na %1 %",
-    "en": "set size to %1 %"
+    "en": "set size to %1 %",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_show",
     "category": "Vzhled",
     "cs": "ukaž se",
-    "en": "show"
+    "en": "show",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_switchbackdropto",
     "category": "Vzhled",
     "cs": "přepni pozadí na %1",
-    "en": "switch backdrop to %1"
+    "en": "switch backdrop to %1",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_switchbackdroptoandwait",
     "category": "Vzhled",
     "cs": "změň pozadí na %1",
-    "en": "switch backdrop to %1 and wait"
+    "en": "switch backdrop to %1 and wait",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_think",
     "category": "Vzhled",
     "cs": "myšlenka %1",
-    "en": "think %1"
+    "en": "think %1",
+    "categoryKey": "looks"
   },
   {
     "opcode": "looks_thinkforsecs",
     "category": "Vzhled",
     "cs": "myšlenka %1 %2 sekund",
-    "en": "think %1 for %2 seconds"
+    "en": "think %1 for %2 seconds",
+    "categoryKey": "looks"
   },
   {
     "opcode": "motion_changexby",
     "category": "Pohyb",
     "cs": "změň x o %1",
-    "en": "change x by %1"
+    "en": "change x by %1",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_changeyby",
     "category": "Pohyb",
     "cs": "změň y o %1",
-    "en": "change y by %1"
+    "en": "change y by %1",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_glidesecstoxy",
     "category": "Pohyb",
     "cs": "klouzej %1 sekund na x: %2 y: %3",
-    "en": "glide %1 secs to x: %2 y: %3"
+    "en": "glide %1 secs to x: %2 y: %3",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_glideto",
     "category": "Pohyb",
     "cs": "klouzej %1 sekund na %2",
-    "en": "glide %1 secs to %2"
+    "en": "glide %1 secs to %2",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_goto",
     "category": "Pohyb",
     "cs": "skoč na %1",
-    "en": "go to %1"
+    "en": "go to %1",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_gotoxy",
     "category": "Pohyb",
     "cs": "skoč na x: %1 y: %2",
-    "en": "go to x: %1 y: %2"
+    "en": "go to x: %1 y: %2",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_ifonedgebounce",
     "category": "Pohyb",
     "cs": "když narazíš na okraj, odraz se",
-    "en": "if on edge, bounce"
+    "en": "if on edge, bounce",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_movesteps",
     "category": "Pohyb",
     "cs": "dopředu o %1 kroků",
-    "en": "move %1 steps"
+    "en": "move %1 steps",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_pointindirection",
     "category": "Pohyb",
     "cs": "nastav směr %1",
-    "en": "point in direction %1"
+    "en": "point in direction %1",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_pointtowards",
     "category": "Pohyb",
     "cs": "nastav směr k %1",
-    "en": "point towards %1"
+    "en": "point towards %1",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_setrotationstyle",
     "category": "Pohyb",
     "cs": "nastav otáčení %1",
-    "en": "set rotation style %1"
+    "en": "set rotation style %1",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_setx",
     "category": "Pohyb",
     "cs": "nastav x na %1",
-    "en": "set x to %1"
+    "en": "set x to %1",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_sety",
     "category": "Pohyb",
     "cs": "nastav y na %1",
-    "en": "set y to %1"
+    "en": "set y to %1",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_turnleft",
     "category": "Pohyb",
     "cs": "otoč se %1 o %2 stupňů",
-    "en": "turn %1 %2 degrees"
+    "en": "turn %1 %2 degrees",
+    "categoryKey": "motion"
   },
   {
     "opcode": "motion_turnright",
     "category": "Pohyb",
     "cs": "otoč se %1 o %2 stupňů",
-    "en": "turn %1 %2 degrees"
+    "en": "turn %1 %2 degrees",
+    "categoryKey": "motion"
   },
   {
     "opcode": "operator_add",
     "category": "Operátory",
     "cs": "%1 + %2",
-    "en": "%1 + %2"
+    "en": "%1 + %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_and",
     "category": "Operátory",
     "cs": "%1 a %2",
-    "en": "%1 and %2"
+    "en": "%1 and %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_contains",
     "category": "Operátory",
     "cs": "%1 obsahuje %2?",
-    "en": "%1 contains %2?"
+    "en": "%1 contains %2?",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_divide",
     "category": "Operátory",
     "cs": "%1 / %2",
-    "en": "%1 / %2"
+    "en": "%1 / %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_equals",
     "category": "Operátory",
     "cs": "%1 = %2",
-    "en": "%1 = %2"
+    "en": "%1 = %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_gt",
     "category": "Operátory",
     "cs": "%1 > %2",
-    "en": "%1 > %2"
+    "en": "%1 > %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_join",
     "category": "Operátory",
     "cs": "spoj %1 %2",
-    "en": "join %1 %2"
+    "en": "join %1 %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_length",
     "category": "Operátory",
     "cs": "délka %1",
-    "en": "length of %1"
+    "en": "length of %1",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_letter_of",
     "category": "Operátory",
     "cs": "písmeno %1 z %2",
-    "en": "letter %1 of %2"
+    "en": "letter %1 of %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_lt",
     "category": "Operátory",
     "cs": "%1 < %2",
-    "en": "%1 < %2"
+    "en": "%1 < %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_mathop",
     "category": "Operátory",
     "cs": "%1 %2",
-    "en": "%1 of %2"
+    "en": "%1 of %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_mod",
     "category": "Operátory",
     "cs": "zbytek %1 děleno %2",
-    "en": "%1 mod %2"
+    "en": "%1 mod %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_multiply",
     "category": "Operátory",
     "cs": "%1 * %2",
-    "en": "%1 * %2"
+    "en": "%1 * %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_not",
     "category": "Operátory",
     "cs": "ne %1",
-    "en": "not %1"
+    "en": "not %1",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_or",
     "category": "Operátory",
     "cs": "%1 nebo %2",
-    "en": "%1 or %2"
+    "en": "%1 or %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_random",
     "category": "Operátory",
     "cs": "náhodné číslo od %1 do %2",
-    "en": "pick random %1 to %2"
+    "en": "pick random %1 to %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_round",
     "category": "Operátory",
     "cs": "zaokrouhli %1",
-    "en": "round %1"
+    "en": "round %1",
+    "categoryKey": "operators"
   },
   {
     "opcode": "operator_subtract",
     "category": "Operátory",
     "cs": "%1 - %2",
-    "en": "%1 - %2"
+    "en": "%1 - %2",
+    "categoryKey": "operators"
   },
   {
     "opcode": "sensing_coloristouchingcolor",
     "category": "Vnímání",
     "cs": "barvou %1 se dotýkáš %2?",
-    "en": "color %1 is touching %2?"
+    "en": "color %1 is touching %2?",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_dayssince2000",
     "category": "Vnímání",
     "cs": "dnů od r. 2000",
-    "en": "days since 2000"
+    "en": "days since 2000",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_distanceto",
     "category": "Vnímání",
     "cs": "vzdálenost k %1",
-    "en": "distance to %1"
+    "en": "distance to %1",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_keypressed",
     "category": "Vnímání",
     "cs": "klávesa %1 stisknuta?",
-    "en": "key %1 pressed?"
+    "en": "key %1 pressed?",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_mousedown",
     "category": "Vnímání",
     "cs": "myš stisknuta?",
-    "en": "mouse down?"
+    "en": "mouse down?",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_mousex",
     "category": "Vnímání",
     "cs": "x myši",
-    "en": "mouse x"
+    "en": "mouse x",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_mousey",
     "category": "Vnímání",
     "cs": "y myši",
-    "en": "mouse y"
+    "en": "mouse y",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_resettimer",
     "category": "Vnímání",
     "cs": "vynuluj stopky",
-    "en": "reset timer"
+    "en": "reset timer",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_setdragmode",
     "category": "Vnímání",
     "cs": "povoleno přesouvat %1",
-    "en": "set drag mode %1"
+    "en": "set drag mode %1",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_touchingcolor",
     "category": "Vnímání",
     "cs": "dotýkáš se barvy %1?",
-    "en": "touching color %1?"
+    "en": "touching color %1?",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_touchingobject",
     "category": "Vnímání",
     "cs": "dotýkáš se %1?",
-    "en": "touching %1?"
+    "en": "touching %1?",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sensing_username",
     "category": "Vnímání",
     "cs": "jméno uživatele",
-    "en": "username"
+    "en": "username",
+    "categoryKey": "sensing"
   },
   {
     "opcode": "sound_changeeffectby",
     "category": "Zvuk",
     "cs": "změň efekt %1 o %2",
-    "en": "change %1 effect by %2"
+    "en": "change %1 effect by %2",
+    "categoryKey": "sound"
   },
   {
     "opcode": "sound_changevolumeby",
     "category": "Zvuk",
     "cs": "změň hlasitost o %1",
-    "en": "change volume by %1"
+    "en": "change volume by %1",
+    "categoryKey": "sound"
   },
   {
     "opcode": "sound_cleareffects",
     "category": "Zvuk",
     "cs": "zruš zvukové efekty",
-    "en": "clear sound effects"
+    "en": "clear sound effects",
+    "categoryKey": "sound"
   },
   {
     "opcode": "sound_setvolumeto",
     "category": "Zvuk",
     "cs": "nastav hlasitost na %1%",
-    "en": "set volume to %1%"
+    "en": "set volume to %1%",
+    "categoryKey": "sound"
   },
   {
     "opcode": "sound_stopallsounds",
     "category": "Zvuk",
     "cs": "zastav všechny zvuky",
-    "en": "stop all sounds"
+    "en": "stop all sounds",
+    "categoryKey": "sound"
   }
 ]

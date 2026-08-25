@@ -13,6 +13,8 @@ export interface PaletteEntry {
     opcode: string;
     /** Czech category name as it appears in the editor. */
     category: string;
+    /** Stable category identifier, for styling that must not depend on translated text. */
+    categoryKey: string;
     /** Czech label template, `%1` marking an input slot. */
     cs: string;
     en: string;

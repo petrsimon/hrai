@@ -20,7 +20,10 @@ export class Session {
     private currentRung: number = FIRST_RUNG;
     readonly history: Turn[] = [];
 
-    /** How specific the next answer may be. */
+    /**
+     * How specific the next answer may be.
+     * @returns The current hint-ladder rung.
+     */
     get rung(): number {
         return this.currentRung;
     }

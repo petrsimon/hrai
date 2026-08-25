@@ -55,12 +55,16 @@ const BY_OPCODE = new Map(PALETTE.map((entry) => [entry.opcode, entry]));
  * @param text The tutor's reply.
  * @returns Opcode to display label and category, for opcodes that exist.
  */
-function blocksNamedIn(text: string): Record<string, { label: string; category: string }> {
-    const named: Record<string, { label: string; category: string }> = {};
+function blocksNamedIn(
+    text: string,
+): Record<string, { label: string; category: string; categoryKey: string }> {
+    const named: Record<string, { label: string; category: string; categoryKey: string }> = {};
     for (const token of new Set(text.match(/\b[a-z]+_[a-z0-9_]+\b/g) ?? [])) {
         const entry = BY_OPCODE.get(token);
         // Structural guarantee: a chip renders only for a block that actually exists.
-        if (entry) named[token] = { label: entry.cs, category: entry.category };
+        if (entry) {
+            named[token] = { label: entry.cs, category: entry.category, categoryKey: entry.categoryKey };
+        }
     }
     return named;
 }
