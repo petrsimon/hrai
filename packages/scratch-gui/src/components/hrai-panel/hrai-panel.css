@@ -265,7 +265,10 @@
 
 .message-input {
     width: 100%;
+    min-height: 2.5rem;
     border-radius: $form-radius;
+    font-size: 1rem;
+    font-weight: normal;
 }
 
 .send-button {
