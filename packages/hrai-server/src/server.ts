@@ -44,6 +44,8 @@ function parseQuestion(payload: unknown): string | null {
     return trimmed.length > 0 ? trimmed : null;
 }
 
+const COMPLETION_CLAIM = /(?:^|\s)(?:ano|hotovo|m[aá]m|ud[eě]lal(?:a)?)(?:\s|[,.!?]|$)/iu;
+
 const BY_OPCODE = new Map(PALETTE.map((entry) => [entry.opcode, entry]));
 
 /**
@@ -135,6 +137,16 @@ export function startServer(port = PORT) {
 
             if (progress?.complete) {
                 const text = `Tento krok je hotový: ${progress.stage.success} Klikni na Další krok a budeme pokračovat.`;
+                session.remember("tutor", text);
+                socket.emit("token", { id, delta: text });
+                socket.emit("blocks", { id, blocks: {} });
+                socket.emit("done", { id, rung: session.rung });
+                return;
+            }
+
+            if (progress && COMPLETION_CLAIM.test(question)) {
+                const text = `Editor zatím nevidí splněnou podmínku: ${progress.stage.success} ` +
+                    "Nemusíš mi psát „hotovo“ — Další krok se objeví automaticky, jakmile ji projekt splní.";
                 session.remember("tutor", text);
                 socket.emit("token", { id, delta: text });
                 socket.emit("blocks", { id, blocks: {} });

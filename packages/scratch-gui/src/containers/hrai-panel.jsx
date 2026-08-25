@@ -19,12 +19,6 @@ const messages = defineMessages({
         id: 'gui.hrai.helperUnavailable',
         defaultMessage: 'Pomocník teď není k dispozici.',
         description: 'calm message shown when the hrai tutor server cannot be reached'
-    },
-    stageComplete: {
-        id: 'gui.hrai.stageComplete',
-        defaultMessage: 'Skvělá práce! Tento krok je hotový. ' +
-            'Až budeš připravený, pokračuj dalším krokem.',
-        description: 'message shown when an hrai lesson stage is complete'
     }
 });
 
@@ -72,7 +66,6 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
     );
 
     const helperUnavailableText = intl.formatMessage(messages.helperUnavailable);
-    const stageCompleteText = intl.formatMessage(messages.stageComplete);
 
     useEffect(() => {
         const socket = io(`${HRAI_SERVER_URL}/hrai`, {
@@ -155,13 +148,6 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
                 if (!previous) return previous;
                 return {...previous, ...progress, complete: true};
             });
-            setChatMessages(previous => [...previous, {
-                id: `lesson-complete-${progress.stageIndex}`,
-                role: 'tutor',
-                text: progress.stage?.success ?
-                    `${stageCompleteText} ${progress.stage.success}` :
-                    stageCompleteText
-            }]);
         });
 
         socket.on('error', ({message}) => {
@@ -195,8 +181,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         helperUnavailableText,
         projectId,
         projectTitle,
-        pushWorkspace,
-        stageCompleteText
+        pushWorkspace
     ]);
 
     useEffect(() => {
@@ -239,15 +224,17 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             text
         }]);
         if (socketRef.current?.connected) {
+            pushWorkspace();
             socketRef.current.emit('ask', {text});
         }
-    }, []);
+    }, [pushWorkspace]);
 
     const handleHint = useCallback(() => {
         if (socketRef.current?.connected) {
+            pushWorkspace();
             socketRef.current.emit('hint');
         }
-    }, []);
+    }, [pushWorkspace]);
 
     const handleNextStage = useCallback(() => {
         if (socketRef.current?.connected) {

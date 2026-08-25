@@ -142,4 +142,22 @@ describe("hrai server", () => {
         expect(answer).toContain("Tento krok je hotový");
         expect(answer).toContain("Další krok");
     });
+
+    it("does not let the model acknowledge an incomplete guided stage", async () => {
+        client().emit("lessonStart", { lessonId: "11-soldier-battle", stageIndex: 2 });
+
+        const deltas: string[] = [];
+        const answer = await new Promise<string>((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error("no grounded reply within 2s")), 2_000);
+            client().on("token", (payload: { delta: string }) => deltas.push(payload.delta));
+            client().once("done", () => {
+                clearTimeout(timer);
+                resolve(deltas.join(""));
+            });
+            client().emit("ask", { text: "ano, hotovo" });
+        });
+
+        expect(answer).toContain("Editor zatím nevidí splněnou podmínku");
+        expect(answer).toContain("Další krok se objeví automaticky");
+    });
 });

@@ -16,7 +16,9 @@ const hasVariable = (project, name) => targetsIn(project).some(target => (
 
 const hasAllVariables = (project, names) => names.every(name => hasVariable(project, name));
 
-const hasSelectionVariable = project => ['vybraný voják', 'selected soldier'].some(name => hasVariable(project, name));
+const hasSharedVariable = project => targetsIn(project).some(target => (
+    target.isStage && Object.keys(target.variables || {}).length > 0
+));
 
 const targetHasAllOpcodes = (target, opcodes) => opcodes.every(opcode => (
     blocksInTarget(target).some(block => block.opcode === opcode)
@@ -33,14 +35,14 @@ export const predicates = {
         isBlueSword(target) && targetHasAllOpcodes(target, ['event_whenthisspriteclicked'])
     )),
 
-    selectionMemory: project => hasSelectionVariable(project) && targetsIn(project).some(target => (
+    selectionMemory: project => hasSharedVariable(project) && targetsIn(project).some(target => (
         isBlueSword(target) && targetHasAllOpcodes(target, [
             'event_whenthisspriteclicked',
             'data_setvariableto'
         ])
     )),
 
-    selectionMark: project => hasSelectionVariable(project) && targetsIn(project).some(target => (
+    selectionMark: project => hasSharedVariable(project) && targetsIn(project).some(target => (
         isBlueSword(target) &&
         targetHasAllOpcodes(target, ['event_whenthisspriteclicked', 'data_setvariableto']) &&
         selectionVisualOpcodes.some(opcode => blocksInTarget(target).some(block => block.opcode === opcode))

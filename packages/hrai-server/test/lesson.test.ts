@@ -24,16 +24,14 @@ const selectionTargets = (
     opcodes: string[],
     withVariable = false,
     targetIndex = 1,
-): RenderTarget[] => targets.map(
-    (target, index) => index === targetIndex ? ({
+): RenderTarget[] => targets.map((target, index) => ({
     ...target,
-    variables: withVariable ? {selected: {name: 'vybraný voják', value: 1}} : {},
-    blocks: Object.fromEntries(opcodes.map((opcode, blockIndex) => [
+    variables: withVariable && target.isStage ? {selected: {name: 'libovolný název', value: 1}} : {},
+    blocks: index === targetIndex ? Object.fromEntries(opcodes.map((opcode, blockIndex) => [
         `block-${blockIndex}`,
         selectedBlock(`block-${blockIndex}`, opcode),
-    ])),
-}) : target,
-);
+    ])) : target.blocks,
+}));
 
 describe('hrai lesson progression', () => {
     it('evaluates and advances the soldier battle stages', () => {
@@ -53,6 +51,12 @@ describe('hrai lesson progression', () => {
         expect(session.evaluateLessonStage()).toBe(true);
 
         expect(session.nextLessonStage()?.id).toBe('02-selection-memory');
+        session.setWorkspace(selectionTargets([
+            'event_whenthisspriteclicked',
+            'data_setvariableto',
+        ]), 'blue-1');
+        expect(session.evaluateLessonStage()).toBe(false);
+
         session.setWorkspace(selectionTargets([
             'event_whenthisspriteclicked',
             'data_setvariableto',
