@@ -44,6 +44,10 @@ export default appTarget => {
     const backpackHostMatches = window.location.href.match(/[?&]backpack_host=([^&]*)&?/);
     const backpackHost = backpackHostMatches ? backpackHostMatches[1] : null;
 
+    // Opt in to the hrai tutor panel with ?hrai=true. Off by default: it needs a local
+    // model server running, and an editor that silently fails to reach one is confusing.
+    const showHraiPanel = /[?&]hrai=true/.test(window.location.href);
+
     const scratchDesktopMatches = window.location.href.match(/[?&]isScratchDesktop=([^&]+)/);
     let simulateScratchDesktop;
     if (scratchDesktopMatches) {
@@ -75,6 +79,7 @@ export default appTarget => {
                 onTelemetryModalCancel={handleTelemetryModalCancel}
                 onTelemetryModalOptIn={handleTelemetryModalOptIn}
                 onTelemetryModalOptOut={handleTelemetryModalOptOut}
+                showHraiPanel={showHraiPanel}
             /> :
             <WrappedGui
                 canEditTitle
@@ -83,6 +88,7 @@ export default appTarget => {
                 backpackHost={backpackHost}
                 canSave={false}
                 onClickLogo={onClickLogo}
+                showHraiPanel={showHraiPanel}
             />
     );
 };

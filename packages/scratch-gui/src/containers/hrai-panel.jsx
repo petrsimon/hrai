@@ -8,7 +8,7 @@ import VM from '@scratch/scratch-vm';
 
 import HraiPanelComponent from '../components/hrai-panel/hrai-panel.jsx';
 
-const HRAI_SERVER_URL = process.env.HRAI_SERVER_URL || 'http://localhost:8601';
+const HRAI_SERVER_URL = process.env.HRAI_SERVER_URL || 'http://localhost:8791';
 const HELPER_UNAVAILABLE_ID = 'helper-unavailable';
 
 const messages = defineMessages({

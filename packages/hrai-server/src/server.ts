@@ -11,7 +11,7 @@ import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
 import type { RenderTarget } from "./render.ts";
 
-const PORT = Number(process.env.HRAI_PORT ?? 8601);
+const PORT = Number(process.env.HRAI_PORT ?? 8791);
 
 /**
  * Narrows an incoming workspace push.

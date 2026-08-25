@@ -21,6 +21,29 @@ Point elsewhere with `HRAI_EVAL_MODEL` and `HRAI_EVAL_HOST`. If the model is una
 suite **skips loudly** with the reason printed — it never passes silently, because a green
 run that tested nothing is worse than a red one.
 
+## Running it against the editor
+
+Three terminals:
+
+```sh
+ollama serve                                    # 1. the model
+npm start --workspace=packages/hrai-server      # 2. the tutor server on :8791
+npm start --workspace=packages/scratch-gui      # 3. the editor on :8601
+```
+
+Then open the editor with the panel switched on:
+
+```
+http://localhost:8601/?hrai=true
+```
+
+The panel is off without `?hrai=true`, because it needs a local model server and an
+editor that silently fails to reach one is confusing. If the server is down the panel
+still opens and says so calmly — a child should never meet a stack trace.
+
+Override the server location with `HRAI_SERVER_URL` at build time, and the port it
+listens on with `HRAI_PORT`.
+
 ## What the two suites do, and why both are needed
 
 | Suite | Asserts |
