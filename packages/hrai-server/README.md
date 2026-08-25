@@ -48,8 +48,8 @@ listens on with `HRAI_PORT`.
 
 The first game-specific bundle lives at `content/lessons/11-soldier-battle/`. It contains
 Czech and English guides, staged goals, the battle rules, and structural predicates for the
-future lesson runner. The editor lesson library currently exposes the staged guide; loading
-starter `.sb3` files and executing predicates in a lesson session are the next runtime slice.
+future lesson runner. The editor lesson library starts the staged guide and the server evaluates
+its predicates against pushed workspace state; loading starter `.sb3` files remains the next content slice.
 
 ## What the two suites do, and why both are needed
 

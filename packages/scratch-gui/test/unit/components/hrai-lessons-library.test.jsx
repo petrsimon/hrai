@@ -10,11 +10,13 @@ import {renderWithIntl} from '../../helpers/intl-helpers.jsx';
 describe('HraiLessonsLibrary', () => {
     test('opens a lesson detail from the lesson list', () => {
         const store = configureStore()({locales: {isRtl: false}});
+        const onStartLesson = jest.fn();
         renderWithIntl(
             <Provider store={store}>
                 <HraiLessonsLibrary
                     lessons={lessons}
                     onRequestClose={jest.fn()}
+                    onStartLesson={onStartLesson}
                 />
             </Provider>
         );
@@ -22,6 +24,8 @@ describe('HraiLessonsLibrary', () => {
         fireEvent.click(screen.getByRole('button', {name: /Bitva vojáků/}));
 
         expect(screen.getByText('Připrav vojáky s mečem a lukem na bojišti.')).toBeTruthy();
-        expect(screen.getByText(/Startovní projekty a kontrola splnění přibudou/)).toBeTruthy();
+        expect(screen.getByText(/hrai objeví v panelu/)).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', {name: 'Začít s průvodcem'}));
+        expect(onStartLesson).toHaveBeenCalledWith('11-soldier-battle');
     });
 });

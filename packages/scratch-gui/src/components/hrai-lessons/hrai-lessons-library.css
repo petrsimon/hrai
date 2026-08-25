@@ -134,6 +134,13 @@
     color: var(--hrai-text-muted);
 }
 
+.start-button {
+    margin-top: 1rem;
+    background: var(--hrai-brand);
+    color: var(--hrai-brand-contrast);
+    font-weight: bold;
+}
+
 .close-button {
     position: fixed;
     right: 2rem;

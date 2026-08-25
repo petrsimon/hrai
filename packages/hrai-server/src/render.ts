@@ -45,6 +45,7 @@ export interface RenderTarget {
     name: string;
     isStage: boolean;
     blocks: Record<string, Block>;
+    variables?: Record<string, [string, unknown]>;
 }
 
 export interface Render {

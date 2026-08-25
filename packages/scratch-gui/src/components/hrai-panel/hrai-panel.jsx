@@ -72,6 +72,26 @@ const messages = defineMessages({
         id: 'gui.aria.resizeHraiPanel',
         defaultMessage: 'Změnit velikost panelu hrai',
         description: 'accessibility label for the hrai panel resize handle'
+    },
+    currentLesson: {
+        id: 'gui.hrai.currentLesson',
+        defaultMessage: 'Lekce: {title}',
+        description: 'active lesson title in the hrai panel'
+    },
+    currentStage: {
+        id: 'gui.hrai.currentStage',
+        defaultMessage: 'Krok {current} z {total}',
+        description: 'active lesson stage count in the hrai panel'
+    },
+    nextStage: {
+        id: 'gui.hrai.nextStage',
+        defaultMessage: 'Další krok',
+        description: 'button to advance to the next hrai lesson stage'
+    },
+    lessonComplete: {
+        id: 'gui.hrai.lessonComplete',
+        defaultMessage: 'Výborně! Tento krok je hotový.',
+        description: 'completion message for an hrai lesson stage'
     }
 });
 
@@ -256,6 +276,9 @@ const HraiPanel = ({
     onSend,
     onHint,
     isThinking,
+    lesson,
+    lessonProgress,
+    onNextStage,
     rung,
     onAliasClick
 }) => {
@@ -375,6 +398,10 @@ const HraiPanel = ({
 
     const canSend = draft.trim().length > 0;
     const hintMaxReached = rung >= MAX_HINT_RUNG;
+    const lessonStageIndex = lessonProgress?.stageIndex ?? 0;
+    const lessonStage = lesson?.stages[lessonStageIndex];
+    const lessonStageComplete = Boolean(lessonProgress?.complete);
+    const hasNextStage = Boolean(lesson && lessonStageIndex < lesson.stages.length - 1);
     const hintDisabled = isThinking || hintMaxReached;
     const hintExplanation = hintMaxReached ?
         intl.formatMessage(messages.hintMaxReached) :
@@ -409,6 +436,40 @@ const HraiPanel = ({
                 />
                 <FormattedMessage {...messages.title} />
             </h2>
+            {lesson && lessonStage ? (
+                <section className={styles.lessonCard}>
+                    <strong>
+                        <FormattedMessage
+                            {...messages.currentLesson}
+                            values={{title: lesson.title}}
+                        />
+                    </strong>
+                    <span>
+                        <FormattedMessage
+                            {...messages.currentStage}
+                            values={{
+                                current: lessonStageIndex + 1,
+                                total: lesson.stages.length
+                            }}
+                        />
+                    </span>
+                    <p>{lessonStage}</p>
+                    {lessonStageComplete ? (
+                        <>
+                            <strong><FormattedMessage {...messages.lessonComplete} /></strong>
+                            {hasNextStage ? (
+                                <Button
+                                    type="button"
+                                    className={styles.nextStageButton}
+                                    onClick={onNextStage}
+                                >
+                                    <FormattedMessage {...messages.nextStage} />
+                                </Button>
+                            ) : null}
+                        </>
+                    ) : null}
+                </section>
+            ) : null}
             <div
                 className={styles.messageList}
                 aria-label={intl.formatMessage(messages.messageListLabel)}
@@ -479,6 +540,14 @@ const HraiPanel = ({
 
 HraiPanel.propTypes = {
     isThinking: PropTypes.bool,
+    lesson: PropTypes.shape({
+        stages: PropTypes.arrayOf(PropTypes.string).isRequired,
+        title: PropTypes.string.isRequired
+    }),
+    lessonProgress: PropTypes.shape({
+        complete: PropTypes.bool.isRequired,
+        stageIndex: PropTypes.number.isRequired
+    }),
     messages: PropTypes.arrayOf(PropTypes.shape({
         blocks: PropTypes.objectOf(PropTypes.shape({
             category: PropTypes.string.isRequired,
@@ -490,6 +559,7 @@ HraiPanel.propTypes = {
     })).isRequired,
     onAliasClick: PropTypes.func,
     onHint: PropTypes.func.isRequired,
+    onNextStage: PropTypes.func.isRequired,
     onSend: PropTypes.func.isRequired,
     rung: PropTypes.number
 };
@@ -497,6 +567,8 @@ HraiPanel.propTypes = {
 HraiPanel.defaultProps = {
     isThinking: false,
     onAliasClick: null,
+    lesson: null,
+    lessonProgress: null,
     rung: 0
 };
 

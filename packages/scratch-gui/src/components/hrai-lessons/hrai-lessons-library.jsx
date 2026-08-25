@@ -43,15 +43,19 @@ const messages = defineMessages({
         defaultMessage: 'Zavřít',
         description: 'button to close the hrai lesson library'
     },
+    start: {
+        id: 'gui.hraiLessons.start',
+        defaultMessage: 'Začít s průvodcem',
+        description: 'button to start an hrai lesson with the tutor'
+    },
     bundleNote: {
         id: 'gui.hraiLessons.bundleNote',
-        defaultMessage: 'Tato lekce je připravená jako průvodce. ' +
-            'Startovní projekty a kontrola splnění přibudou ve stejné lekci.',
+        defaultMessage: 'Po spuštění se ti hrai objeví v panelu a bude sledovat kroky, které právě tvoříš.',
         description: 'note about the current hrai lesson bundle stage'
     }
 });
 
-const HraiLessonsLibrary = ({lessons, onRequestClose}) => {
+const HraiLessonsLibrary = ({lessons, onRequestClose, onStartLesson}) => {
     const intl = useIntl();
     const [selectedLessonId, setSelectedLessonId] = useState(null);
     const selectedLesson = lessons.find(lesson => lesson.id === selectedLessonId);
@@ -59,6 +63,11 @@ const HraiLessonsLibrary = ({lessons, onRequestClose}) => {
     const handleLessonSelect = useCallback(event => {
         setSelectedLessonId(event.currentTarget.dataset.lessonId);
     }, []);
+    const handleStartLesson = useCallback(() => {
+        if (selectedLesson) {
+            onStartLesson(selectedLesson.id);
+        }
+    }, [onStartLesson, selectedLesson]);
 
     return (
         <Modal
@@ -104,6 +113,12 @@ const HraiLessonsLibrary = ({lessons, onRequestClose}) => {
                         <ol className={styles.stageList}>
                             {selectedLesson.stages.map(stage => <li key={stage}>{stage}</li>)}
                         </ol>
+                        <Button
+                            className={styles.startButton}
+                            onClick={handleStartLesson}
+                        >
+                            <FormattedMessage {...messages.start} />
+                        </Button>
                         <p className={styles.note}>
                             <FormattedMessage {...messages.bundleNote} />
                         </p>
@@ -162,7 +177,8 @@ HraiLessonsLibrary.propTypes = {
         stages: PropTypes.arrayOf(PropTypes.string).isRequired,
         title: PropTypes.string.isRequired
     })).isRequired,
-    onRequestClose: PropTypes.func.isRequired
+    onRequestClose: PropTypes.func.isRequired,
+    onStartLesson: PropTypes.func.isRequired
 };
 
 export default HraiLessonsLibrary;

@@ -7,6 +7,7 @@
  * later.
  */
 import { renderProject, type RenderTarget } from "./render.ts";
+import { evaluateLessonStage, lessonStage, type LessonStage } from "./lesson.ts";
 import type { Turn } from "./prompt.ts";
 
 /** The gentlest rung, and the most specific one the tutor will ever go to. */
@@ -18,6 +19,9 @@ export class Session {
     private focusedTargetId = "";
     private aliases = new Map<string, string>();
     private currentRung: number = FIRST_RUNG;
+    private activeLessonId: string | null = null;
+    private activeStageIndex = 0;
+    private stageComplete = false;
     readonly history: Turn[] = [];
 
     /**
@@ -48,6 +52,45 @@ export class Session {
      */
     resetRung(): void {
         this.currentRung = FIRST_RUNG;
+    }
+
+    startLesson(lessonId: string): LessonStage | null {
+        const stage = lessonStage(lessonId, 0);
+        if (!stage) return null;
+        this.activeLessonId = lessonId;
+        this.activeStageIndex = 0;
+        this.stageComplete = false;
+        return stage;
+    }
+
+    nextLessonStage(): LessonStage | null {
+        if (!this.activeLessonId || !this.stageComplete) return null;
+        const nextIndex = this.activeStageIndex + 1;
+        const stage = lessonStage(this.activeLessonId, nextIndex);
+        if (!stage) return null;
+        this.activeStageIndex = nextIndex;
+        this.stageComplete = false;
+        return stage;
+    }
+
+    get lessonProgress(): { lessonId: string; stageIndex: number; stage: LessonStage; complete: boolean } | null {
+        if (!this.activeLessonId) return null;
+        const stage = lessonStage(this.activeLessonId, this.activeStageIndex);
+        if (!stage) return null;
+        return {
+            lessonId: this.activeLessonId,
+            stageIndex: this.activeStageIndex,
+            stage,
+            complete: this.stageComplete,
+        };
+    }
+
+    evaluateLessonStage(): boolean {
+        if (!this.activeLessonId || this.stageComplete) return this.stageComplete;
+        this.stageComplete = evaluateLessonStage(this.activeLessonId, this.activeStageIndex, {
+            targets: this.targets,
+        });
+        return this.stageComplete;
     }
 
     /**

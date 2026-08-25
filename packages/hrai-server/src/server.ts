@@ -97,10 +97,33 @@ export function startServer(port = PORT) {
     io.of("/hrai").on("connection", (socket) => {
         const session = new Session();
 
+        const emitLessonProgress = (): void => {
+            const progress = session.lessonProgress;
+            if (progress) socket.emit("lessonProgress", progress);
+        };
+
+        socket.on("lessonStart", (payload: unknown) => {
+            if (typeof payload !== "object" || payload === null) return;
+            const lessonId = (payload as Record<string, unknown>).lessonId;
+            if (typeof lessonId !== "string") return;
+            if (session.startLesson(lessonId)) emitLessonProgress();
+        });
+
+        socket.on("lessonNext", () => {
+            if (session.nextLessonStage()) emitLessonProgress();
+        });
+
         socket.on("workspace", (payload: unknown) => {
             const workspace = parseWorkspace(payload);
             if (!workspace) return;
             session.setWorkspace(workspace.targets, workspace.focusedTargetId);
+            const progress = session.lessonProgress;
+            if (progress && !progress.complete && session.evaluateLessonStage()) {
+                socket.emit("stageComplete", {
+                    lessonId: progress.lessonId,
+                    stageIndex: progress.stageIndex,
+                });
+            }
         });
 
         /**
@@ -113,7 +136,7 @@ export function startServer(port = PORT) {
             socket.emit("thinking", { thinking: true });
 
             void chatStream(
-                systemPrompt(session.rung),
+                systemPrompt(session.rung, session.lessonProgress?.stage.goal),
                 userPrompt(session.render(), question, session.history.slice(0, -1)),
                 (delta) => socket.emit("token", { id, delta }),
             )

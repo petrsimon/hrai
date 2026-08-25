@@ -71,6 +71,36 @@
     object-fit: contain;
 }
 
+.lesson-card {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: $space;
+    padding: 0.625rem;
+    border: 1px solid var(--hrai-border);
+    border-radius: 0.5rem;
+    background-color: var(--hrai-bubble-tutor);
+    color: var(--hrai-text);
+    font-size: 0.6875rem;
+}
+
+.lesson-card p {
+    margin: 0.25rem 0;
+    line-height: 1.4;
+}
+
+.next-stage-button {
+    align-self: flex-start;
+    min-height: 1.75rem;
+    border: 0;
+    border-radius: $form-radius;
+    background-color: var(--hrai-brand);
+    color: var(--hrai-brand-contrast);
+    font-size: 0.6875rem;
+    font-weight: bold;
+}
+
 .message-list {
     flex: 1 1 auto;
     min-height: 0;
