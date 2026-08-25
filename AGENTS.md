@@ -73,6 +73,7 @@ packages/
 ├── scratch-render/         WebGL renderer for the stage
 ├── scratch-svg-renderer/   SVG asset processor
 ├── task-herder/            Async task scheduler with rate limiting
+├── hrai-server/            hrai tutor server; currently only the model evaluation harness
 └── scratch-media-lib-scripts/  Build scripts for media library assets
 scripts/                    Monorepo-level utility scripts
 ```
@@ -86,6 +87,7 @@ scripts/                    Monorepo-level utility scripts
 | `scratch-render` | JavaScript | webpack | Tap |
 | `scratch-svg-renderer` | JavaScript | webpack | Tap |
 | `task-herder` | TypeScript | Vite | Vitest |
+| `hrai-server` | TypeScript | — | Vitest |
 | `scratch-media-lib-scripts` | JavaScript | — | Jest |
 
 `task-herder` represents the target stack for new packages (TypeScript + Vite + Vitest). The other packages
@@ -110,6 +112,15 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 - After adding or changing messages, run `npm run i18n:src` to update the translation source file.
 - Integration tests (`test/integration/`) require a browser environment via Jest + jsdom; they are slow and
   should not be run unnecessarily. Smoke tests (`test/smoke/`) require a live server.
+
+### hrai-server specifics
+
+- Not published; `private: true`. It is the only package outside the `@scratch/` scope, because hrai
+  is a distinct product name and the `TRADEMARK` file reserves the Scratch marks.
+- Its tests call a **local model server** (ollama) and are therefore slow and environment-dependent.
+  They skip loudly, printing the reason, when the model is unavailable — never silently green.
+- `npm test --workspace=packages/hrai-server` needs `ollama serve` and `ollama pull qwen3:14b`.
+  Override with `HRAI_EVAL_MODEL` / `HRAI_EVAL_HOST`.
 
 ### scratch-vm specifics
 
