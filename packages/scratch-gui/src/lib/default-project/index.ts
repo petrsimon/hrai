@@ -5,8 +5,10 @@ import {TranslatorFunction} from '../../gui-config';
 import popWav from '!arraybuffer-loader!./83a9787d4cb6f3b7632b4ddfebf74367.wav?';
 import meowWav from '!arraybuffer-loader!./83c36d806dc92327b9e7049a565c6bff.wav?';
 import backdrop from '!raw-loader!./cd21514d0531fdffb22204e0ec5ed84a.svg?';
-import costume1 from '!arraybuffer-loader!../../../static/hrai/hrai-dragon-mark-256.png?';
-import costume2 from '!arraybuffer-loader!../../../static/hrai/hrai-dragon-mark-256-animation.png?';
+import costumeIdle from '!arraybuffer-loader!../../../static/hrai/sprites/dragon-idle.png?';
+import costumeFlyUp from '!arraybuffer-loader!../../../static/hrai/sprites/dragon-fly-up.png?';
+import costumeFire from '!arraybuffer-loader!../../../static/hrai/sprites/dragon-fire.png?';
+import costumeFlyDown from '!arraybuffer-loader!../../../static/hrai/sprites/dragon-fly-down.png?';
 
 
 declare function require (path: 'fastestsmallesttextencoderdecoder'): {TextEncoder: typeof TextEncoder};
@@ -45,15 +47,25 @@ const defaultProject = (translator?: TranslatorFunction) => {
         dataFormat: 'SVG',
         data: encoder.encode(backdrop)
     }, {
-        id: '4588e7e83273b7f3831be57b7cdcb7c3',
+        id: '7f91a8cc4db049d193145cda079a510f',
         assetType: 'ImageBitmap',
         dataFormat: 'PNG',
-        data: new Uint8Array(costume1)
+        data: new Uint8Array(costumeIdle)
     }, {
-        id: '222e093b5bfdfc634108d28d5c55f9fa',
+        id: '42217ca144971f0aa71196ebedec7b80',
         assetType: 'ImageBitmap',
         dataFormat: 'PNG',
-        data: new Uint8Array(costume2)
+        data: new Uint8Array(costumeFlyUp)
+    }, {
+        id: '855d408d8dc17bad4865480447674fc9',
+        assetType: 'ImageBitmap',
+        dataFormat: 'PNG',
+        data: new Uint8Array(costumeFire)
+    }, {
+        id: '4375d2db113110fd1b242e50da526496',
+        assetType: 'ImageBitmap',
+        dataFormat: 'PNG',
+        data: new Uint8Array(costumeFlyDown)
     }];
 };
 

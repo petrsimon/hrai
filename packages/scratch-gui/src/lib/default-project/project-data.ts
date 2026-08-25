@@ -62,22 +62,40 @@ const projectData = (translateFunction?: TranslatorFunction): object => {
                 currentCostume: 0,
                 costumes: [
                     {
-                        assetId: '4588e7e83273b7f3831be57b7cdcb7c3',
+                        assetId: '7f91a8cc4db049d193145cda079a510f',
                         name: translator(messages.costume, {index: 1}),
-                        bitmapResolution: 1,
-                        md5ext: '4588e7e83273b7f3831be57b7cdcb7c3.png',
+                        bitmapResolution: 2,
+                        md5ext: '7f91a8cc4db049d193145cda079a510f.png',
                         dataFormat: 'png',
-                        rotationCenterX: 128,
-                        rotationCenterY: 126
+                        rotationCenterX: 627,
+                        rotationCenterY: 627
                     },
                     {
-                        assetId: '222e093b5bfdfc634108d28d5c55f9fa',
+                        assetId: '42217ca144971f0aa71196ebedec7b80',
                         name: translator(messages.costume, {index: 2}),
-                        bitmapResolution: 1,
-                        md5ext: '222e093b5bfdfc634108d28d5c55f9fa.png',
+                        bitmapResolution: 2,
+                        md5ext: '42217ca144971f0aa71196ebedec7b80.png',
                         dataFormat: 'png',
-                        rotationCenterX: 128,
-                        rotationCenterY: 126
+                        rotationCenterX: 627,
+                        rotationCenterY: 627
+                    },
+                    {
+                        assetId: '855d408d8dc17bad4865480447674fc9',
+                        name: translator(messages.costume, {index: 3}),
+                        bitmapResolution: 2,
+                        md5ext: '855d408d8dc17bad4865480447674fc9.png',
+                        dataFormat: 'png',
+                        rotationCenterX: 627,
+                        rotationCenterY: 627
+                    },
+                    {
+                        assetId: '4375d2db113110fd1b242e50da526496',
+                        name: translator(messages.costume, {index: 4}),
+                        bitmapResolution: 2,
+                        md5ext: '4375d2db113110fd1b242e50da526496.png',
+                        dataFormat: 'png',
+                        rotationCenterX: 627,
+                        rotationCenterY: 627
                     }
                 ],
                 sounds: [
@@ -95,7 +113,7 @@ const projectData = (translateFunction?: TranslatorFunction): object => {
                 visible: true,
                 x: 0,
                 y: 0,
-                size: 100,
+                size: 35,
                 direction: 90,
                 draggable: false,
                 rotationStyle: 'all around'
