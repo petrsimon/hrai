@@ -7,7 +7,7 @@
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { EVAL_MODEL, chatStream } from "./model-client.ts";
-import { PALETTE } from "./palette.ts";
+import { PALETTE, labelText, opcodesNamedByLabel } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
 import type { RenderTarget } from "./render.ts";
@@ -55,15 +55,28 @@ const BY_OPCODE = new Map(PALETTE.map((entry) => [entry.opcode, entry]));
  * @param text The tutor's reply.
  * @returns Opcode to display label and category, for opcodes that exist.
  */
-function blocksNamedIn(
-    text: string,
-): Record<string, { label: string; category: string; categoryKey: string }> {
-    const named: Record<string, { label: string; category: string; categoryKey: string }> = {};
-    for (const token of new Set(text.match(/\b[a-z]+_[a-z0-9_]+\b/g) ?? [])) {
+interface NamedBlock {
+    /** Label template, `%1` still marking input slots, for display. */
+    label: string;
+    /** Label as prose, used by the panel to find the label in the reply text. */
+    plainLabel: string;
+    category: string;
+    categoryKey: string;
+}
+
+function blocksNamedIn(text: string): Record<string, NamedBlock> {
+    const named: Record<string, NamedBlock> = {};
+    const cited = new Set([...(text.match(/\b[a-z]+_[a-z0-9_]+\b/g) ?? []), ...opcodesNamedByLabel(text)]);
+    for (const token of cited) {
         const entry = BY_OPCODE.get(token);
         // Structural guarantee: a chip renders only for a block that actually exists.
         if (entry) {
-            named[token] = { label: entry.cs, category: entry.category, categoryKey: entry.categoryKey };
+            named[token] = {
+                label: entry.cs,
+                plainLabel: labelText(entry.cs),
+                category: entry.category,
+                categoryKey: entry.categoryKey,
+            };
         }
     }
     return named;

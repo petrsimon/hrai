@@ -129,8 +129,30 @@ BlockOpcodeChip.propTypes = {
     formatBlockOpcode: PropTypes.func.isRequired
 };
 
+/*
+ * The tutor is asked to name blocks by opcode, and mostly does, but not reliably at
+ * every hint level. When it writes the Czech label instead, the server still recognises
+ * the block and sends it, so the label is split out here and shown as the same chip. A
+ * child should see the coloured block either way.
+ */
+const splitPattern = blocks => {
+    const labels = Object.values(blocks ?? {})
+        .map(block => block.plainLabel)
+        .filter(Boolean)
+        // Longest first, so a label containing a shorter one still matches whole.
+        .sort((a, b) => b.length - a.length)
+        .map(label => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (labels.length === 0) {
+        return TUTOR_TOKEN_PATTERN;
+    }
+    return new RegExp(`(\\bb\\d+\\b|\\b[a-z]+_[a-z0-9_]+\\b|${labels.join('|')})`, 'i');
+};
+
 const renderTutorText = (text, blocks, onAliasClick, formatBlockReference, formatBlockOpcode) => {
-    const segments = text.split(TUTOR_TOKEN_PATTERN);
+    const segments = text.split(splitPattern(blocks));
+    const byLabel = new Map(Object.values(blocks ?? {})
+        .filter(block => block.plainLabel)
+        .map(block => [block.plainLabel.toLowerCase(), block]));
 
     return segments.map((segment, index) => {
         if (BLOCK_REF_PATTERN.test(segment)) {
@@ -149,6 +171,17 @@ const renderTutorText = (text, blocks, onAliasClick, formatBlockReference, forma
                 <BlockOpcodeChip
                     key={`${segment}-${index}`}
                     block={blocks[segment]}
+                    formatBlockOpcode={formatBlockOpcode}
+                />
+            );
+        }
+
+        const namedByLabel = segment && byLabel.get(segment.toLowerCase());
+        if (namedByLabel) {
+            return (
+                <BlockOpcodeChip
+                    key={`${segment}-${index}`}
+                    block={namedByLabel}
                     formatBlockOpcode={formatBlockOpcode}
                 />
             );

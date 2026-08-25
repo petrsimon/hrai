@@ -38,7 +38,10 @@ function categoriesFromToolbox(): Map<string, string> {
         const czech = CATEGORY_CS[section.name];
         if (!czech) return;
         const body = source.slice(section.at, starts[index + 1]?.at ?? source.length);
-        for (const match of body.matchAll(/<block type="([a-z_0-9]+)"/g)) {
+        // `type` is not always the first attribute: <block id="forever" type="control_forever"/>.
+        // An earlier version of this regex missed 20 blocks, forever among them, and this
+        // test did not catch it because it shared the same bug as the generator.
+        for (const match of body.matchAll(/<block\b[^>]*?\btype="([a-z_0-9]+)"/g)) {
             const opcode = match[1] ?? "";
             if (opcode.endsWith("_menu")) continue;
             if (!found.has(opcode)) found.set(opcode, czech);
@@ -59,6 +62,22 @@ describe("palette data", () => {
             }
             expect(entry.category, `${entry.opcode} moved category`).toBe(expected);
         }
+    });
+
+    it("contains every block the toolbox offers", () => {
+        const truth = categoriesFromToolbox();
+        const known = new Set(PALETTE.map((e) => e.opcode));
+        const missing = [...truth.keys()].filter((opcode) => !known.has(opcode));
+        // Some toolbox entries have no translated label and are not blocks a child picks.
+        expect(missing.filter((o) => o.startsWith("control_") || o.startsWith("event_"))).toEqual([]);
+    });
+
+    it("includes the most common block in Scratch", () => {
+        // Regression: forever was absent because the generator required `type` to be the
+        // first attribute on the tag. A tutor cannot mention a block it does not know.
+        const forever = PALETTE.find((e) => e.opcode === "control_forever");
+        expect(forever?.cs).toBe("opakuj stále");
+        expect(forever?.category).toBe("Ovládání");
     });
 
     it("places the block that caused the live failure in Události", () => {

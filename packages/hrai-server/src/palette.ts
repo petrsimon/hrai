@@ -23,6 +23,43 @@ export interface PaletteEntry {
 export const PALETTE = palette as PaletteEntry[];
 
 /**
+ * Strips input-slot markers from a label template: `po stisku klávesy %1` -> `po stisku klávesy`.
+ * @param template A label as stored in the catalogue, slots included.
+ * @returns The label as prose.
+ */
+export function labelText(template: string): string {
+    return template.replace(/%\d/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Finds palette blocks that a reply names by their Czech label rather than by opcode.
+ *
+ * The tutor is told to write opcodes, because the panel turns those into a real picture
+ * of the block. It mostly does, but not reliably at every rung, and a child then sees
+ * plain words where a coloured block should be. Recognising the label is a deterministic
+ * safety net: matching against the palette is exactly as safe as matching an opcode,
+ * since both only ever resolve to a block that exists.
+ *
+ * Only labels of two or more words are matched. Single words like `délka` are ordinary
+ * Czech and would turn innocent prose into block chips.
+ * @param text The tutor's reply.
+ * @returns Opcodes whose label appears in the text, longest label first.
+ */
+export function opcodesNamedByLabel(text: string): string[] {
+    const haystack = text.toLocaleLowerCase("cs");
+    const matches: { opcode: string; length: number }[] = [];
+    for (const entry of PALETTE) {
+        const label = labelText(entry.cs);
+        if (label.split(" ").length < 2 || label.length < 8) continue;
+        if (haystack.includes(label.toLocaleLowerCase("cs"))) {
+            matches.push({ opcode: entry.opcode, length: label.length });
+        }
+    }
+    // Longest first so `opakuj dokud nenastane` wins over any shorter label inside it.
+    return matches.sort((a, b) => b.length - a.length).map((m) => m.opcode);
+}
+
+/**
  * Renders the palette as prompt text, grouped by category.
  *
  * Grouping matters: the failure was a category claim, and a flat list makes the
