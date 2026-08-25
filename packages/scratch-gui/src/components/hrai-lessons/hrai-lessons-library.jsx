@@ -48,6 +48,11 @@ const messages = defineMessages({
         defaultMessage: 'Začít s průvodcem',
         description: 'button to start an hrai lesson with the tutor'
     },
+    startPrompt: {
+        id: 'gui.hraiLessons.startPrompt',
+        defaultMessage: 'Tímto nahradíš právě otevřený projekt připraveným začátkem lekce. Pokračovat?',
+        description: 'confirmation before loading an hrai lesson starter project'
+    },
     bundleNote: {
         id: 'gui.hraiLessons.bundleNote',
         defaultMessage: 'Po spuštění se ti hrai objeví v panelu a bude sledovat kroky, které právě tvoříš.',
@@ -63,11 +68,13 @@ const HraiLessonsLibrary = ({lessons, onRequestClose, onStartLesson}) => {
     const handleLessonSelect = useCallback(event => {
         setSelectedLessonId(event.currentTarget.dataset.lessonId);
     }, []);
+    const startPrompt = intl.formatMessage(messages.startPrompt);
     const handleStartLesson = useCallback(() => {
-        if (selectedLesson) {
+        // eslint-disable-next-line no-alert -- replacing the current project needs explicit confirmation
+        if (selectedLesson && window.confirm(startPrompt)) {
             onStartLesson(selectedLesson.id);
         }
-    }, [onStartLesson, selectedLesson]);
+    }, [onStartLesson, selectedLesson, startPrompt]);
 
     return (
         <Modal

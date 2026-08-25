@@ -1,4 +1,5 @@
 import lessons from '../../../src/lib/hrai-lessons';
+import {soldierBattleStarterProject} from '../../../src/lib/hrai-lessons/soldier-battle-starter';
 
 test('HRAI lesson library contains the course lessons', () => {
     expect(lessons).toHaveLength(11);
@@ -18,4 +19,17 @@ test('HRAI lesson library contains the course lessons', () => {
     lessons.forEach(lesson => {
         expect(lesson.stages.length).toBeGreaterThan(0);
     });
+});
+
+test('Soldier Battle starter prepares four named units without scripts', () => {
+    const [stage, ...units] = soldierBattleStarterProject.targets;
+
+    expect(stage.name).toBe('Stage');
+    expect(units.map(unit => unit.name)).toEqual([
+        'Modry mec',
+        'Modry luk',
+        'Cerveny mec',
+        'Cerveny luk'
+    ]);
+    expect(units.every(unit => Object.keys(unit.blocks).length === 0)).toBe(true);
 });

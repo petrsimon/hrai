@@ -11,6 +11,7 @@ describe('HraiLessonsLibrary', () => {
     test('opens a lesson detail from the lesson list', () => {
         const store = configureStore()({locales: {isRtl: false}});
         const onStartLesson = jest.fn();
+        jest.spyOn(window, 'confirm').mockReturnValue(true);
         renderWithIntl(
             <Provider store={store}>
                 <HraiLessonsLibrary
@@ -27,5 +28,6 @@ describe('HraiLessonsLibrary', () => {
         expect(screen.getByText(/hrai objeví v panelu/)).toBeTruthy();
         fireEvent.click(screen.getByRole('button', {name: 'Začít s průvodcem'}));
         expect(onStartLesson).toHaveBeenCalledWith('11-soldier-battle');
+        window.confirm.mockRestore();
     });
 });
