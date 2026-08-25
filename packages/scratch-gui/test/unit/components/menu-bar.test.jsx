@@ -60,12 +60,12 @@ describe('MenuBar Component', () => {
 
     test('menu bar can use a product logo', () => {
         const {container} = renderWithIntl(getComponent({
-            logo: 'static/hrai/hrai-wordmark-400.png',
+            logo: 'static/hrai/hrai-wordmark-800.png',
             logoAlt: 'hrai'
         }));
         const logo = container.querySelector('#logo_img');
 
-        expect(logo.getAttribute('src')).toBe('static/hrai/hrai-wordmark-400.png');
+        expect(logo.getAttribute('src')).toBe('static/hrai/hrai-wordmark-800.png');
         expect(logo.getAttribute('alt')).toBe('hrai');
     });
 

@@ -47,6 +47,12 @@
     vertical-align: middle;
 }
 
+.hrai-logo {
+    height: 2.6rem;
+    max-width: 12rem;
+    object-fit: contain;
+}
+
 .scratch-logo.clickable {
     cursor: pointer;
 }

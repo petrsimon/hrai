@@ -20,12 +20,6 @@
     color: var(--hrai-brand-contrast, #fff);
 }
 
-:global([data-hrai-editor="true"]) .scratch-logo {
-    height: 2.5rem;
-    max-width: 12rem;
-    object-fit: contain;
-}
-
 :global([data-hrai-editor="true"]) .menu-bar-item.active,
 :global([data-hrai-editor="true"]) .menu-bar-item.hoverable:hover {
     background-color: rgb(0 0 0 / 0.16);

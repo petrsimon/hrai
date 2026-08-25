@@ -340,7 +340,8 @@ class MenuBar extends React.Component {
                                 id="logo_img"
                                 alt={this.props.logoAlt}
                                 className={classNames(styles.scratchLogo, {
-                                    [styles.clickable]: typeof this.props.onClickLogo !== 'undefined'
+                                    [styles.clickable]: typeof this.props.onClickLogo !== 'undefined',
+                                    [styles.hraiLogo]: this.props.hraiLogo
                                 })}
                                 draggable={false}
                                 src={this.getLogo()}
@@ -666,6 +667,7 @@ MenuBar.propTypes = {
     currentLocale: PropTypes.string.isRequired,
     enableCommunity: PropTypes.bool,
     hasActiveMembership: PropTypes.bool,
+    hraiLogo: PropTypes.bool,
     intl: intlShape,
     isRtl: PropTypes.bool,
     isShared: PropTypes.bool,
@@ -723,6 +725,7 @@ MenuBar.propTypes = {
 };
 
 MenuBar.defaultProps = {
+    hraiLogo: false,
     logo: scratchLogo,
     logoAlt: 'Scratch',
     onShare: () => {}
