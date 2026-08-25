@@ -1,7 +1,14 @@
 :root {
   --hrai-blue: #086788;
+  --hrai-blue-hover: #064f68;
+  --hrai-brand-contrast: #ffffff;
   --hrai-sky: #3aa7e8;
   --hrai-yellow: #ffbf1f;
   --hrai-orange: #ff7a21;
   --hrai-coral: #f45b4f;
+  --hrai-surface: #ffffff;
+  --hrai-surface-sunken: #f1f6f8;
+  --hrai-text: #17313d;
+  --hrai-text-muted: #5f7680;
+  --hrai-border: #cbdde4;
 }

@@ -162,6 +162,7 @@ class MenuBar extends React.Component {
             'handleClickSeeCommunity',
             'handleClickShare',
             'handleSetMode',
+            'getLogo',
             'handleKeyPress',
             'handleRestoreOption',
             'getSaveToComputerHandler',
@@ -211,6 +212,9 @@ class MenuBar extends React.Component {
             }
         }
     }
+    getLogo () {
+        return this.props.logo || getScratchLogo(this.props.platform);
+    }
     handleSetMode (mode) {
         return () => {
             // Turn on/off filters for modes.
@@ -235,7 +239,7 @@ class MenuBar extends React.Component {
             } else if (mode === '220022BC') {
                 document.getElementById('logo_img').src = prehistoricLogo;
             } else {
-                document.getElementById('logo_img').src = getScratchLogo(this.props.platform);
+                document.getElementById('logo_img').src = this.getLogo();
             }
 
             this.props.onSetTimeTravelMode(mode);
@@ -334,12 +338,12 @@ class MenuBar extends React.Component {
                         >
                             <img
                                 id="logo_img"
-                                alt="Scratch"
+                                alt={this.props.logoAlt}
                                 className={classNames(styles.scratchLogo, {
                                     [styles.clickable]: typeof this.props.onClickLogo !== 'undefined'
                                 })}
                                 draggable={false}
-                                src={getScratchLogo(this.props.platform)}
+                                src={this.getLogo()}
                             />
                         </button>
                         {(this.props.canChangeColorMode || this.props.canChangeLanguage || this.props.canChangeTheme) &&
@@ -671,6 +675,7 @@ MenuBar.propTypes = {
     locale: PropTypes.string.isRequired,
     loginMenuOpen: PropTypes.bool,
     logo: PropTypes.string,
+    logoAlt: PropTypes.string,
     mode1920: PropTypes.bool,
     mode1990: PropTypes.bool,
     mode2020: PropTypes.bool,
@@ -719,6 +724,7 @@ MenuBar.propTypes = {
 
 MenuBar.defaultProps = {
     logo: scratchLogo,
+    logoAlt: 'Scratch',
     onShare: () => {}
 };
 

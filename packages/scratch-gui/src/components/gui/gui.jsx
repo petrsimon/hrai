@@ -50,6 +50,8 @@ import {MenuRefProvider} from '../../contexts/menu-ref-context.jsx';
 import {ModalFocusProvider} from '../../contexts/modal-focus-context.jsx';
 import HraiPanel from '../../containers/hrai-panel.jsx';
 
+const HRAI_LOGO = 'static/hrai/hrai-logo-horizontal-400.png';
+
 const ariaMessages = defineMessages({
     menuBar: {
         id: 'gui.aria.menuBar',
@@ -275,6 +277,7 @@ const GUIComponent = props => {
             <ModalFocusProvider>
                 <Box
                     className={styles.pageWrapper}
+                    data-hrai-editor={showHraiPanel ? 'true' : null}
                     dir={isRtl ? 'rtl' : 'ltr'}
                     {...componentProps}
                 >
@@ -357,7 +360,8 @@ const GUIComponent = props => {
                             hasActiveMembership={hasActiveMembership}
                             isShared={isShared}
                             isTotallyNormal={isTotallyNormal}
-                            logo={logo}
+                            logo={showHraiPanel ? HRAI_LOGO : logo}
+                            logoAlt={showHraiPanel ? 'hrai' : 'Scratch'}
                             renderLogin={renderLogin}
                             showComingSoon={showComingSoon}
                             onClickAbout={onClickAbout}

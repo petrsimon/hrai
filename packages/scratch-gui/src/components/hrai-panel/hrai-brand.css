@@ -4,28 +4,27 @@
  * One rule governs colour in this panel: **colour means "this is a block."** Block chips
  * carry Scratch's own category colours, because their whole job is helping a child find
  * that block in the palette by colour and shape rather than by reading. Everything else
- * — header, buttons, bubbles — stays in the brand teal and neutrals, so nothing competes
+ * — header, buttons, bubbles — stays in the brand blue and neutrals, so nothing competes
  * with the one signal that has to survive.
  *
- * The teal is chosen to sit outside every Scratch category hue (motion 215, looks 270,
- * sound 300, events 45, control 38, sensing 195, operators 100, variables 30, my blocks
- * 345) and to read as an identity rather than a category. TRADEMARK reserves the Scratch
- * name and marks, so hrai must look like itself.
+ * The editor shell uses HRAI's blue identity palette and the official dragon mark from
+ * static/hrai. Scratch category colours remain reserved for block references. Light and
+ * dark panel surfaces are both defined.
  */
 
 :root {
-  --hrai-brand: #0f6c80;
-  --hrai-brand-hover: #0b5464;
+  --hrai-brand: #086788;
+  --hrai-brand-hover: #064f68;
   --hrai-brand-contrast: #ffffff;
 
   --hrai-surface: #ffffff;
-  --hrai-surface-sunken: #f1f6f7;
-  --hrai-bubble-tutor: #f1f6f7;
-  --hrai-bubble-learner: #dceef2;
+  --hrai-surface-sunken: #f1f6f8;
+  --hrai-bubble-tutor: #f1f6f8;
+  --hrai-bubble-learner: #e0f1f8;
 
-  --hrai-text: #17282d;
-  --hrai-text-muted: #5b6f75;
-  --hrai-border: #d6e2e5;
+  --hrai-text: #17313d;
+  --hrai-text-muted: #5f7680;
+  --hrai-border: #cbdde4;
 
   /* Scratch category colours, used only by block chips. */
   --hrai-cat-motion: #4c97ff;
@@ -41,17 +40,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --hrai-brand: #2c9db5;
-    --hrai-brand-hover: #3fb4cd;
-    --hrai-brand-contrast: #08181c;
+    --hrai-brand: #3aa7e8;
+    --hrai-brand-hover: #70c2f0;
+    --hrai-brand-contrast: #082532;
 
-    --hrai-surface: #122024;
-    --hrai-surface-sunken: #0d181b;
-    --hrai-bubble-tutor: #1a2b30;
-    --hrai-bubble-learner: #17383f;
+    --hrai-surface: #122a35;
+    --hrai-surface-sunken: #0d2029;
+    --hrai-bubble-tutor: #1b3541;
+    --hrai-bubble-learner: #17485e;
 
-    --hrai-text: #e6f0f2;
-    --hrai-text-muted: #93a8ae;
-    --hrai-border: #23383e;
+    --hrai-text: #e9f5fa;
+    --hrai-text-muted: #a7c2ce;
+    --hrai-border: #315363;
   }
 }

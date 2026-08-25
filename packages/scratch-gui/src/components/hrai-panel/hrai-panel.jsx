@@ -7,7 +7,7 @@ import Button from '../button/button.jsx';
 import Input from '../forms/input.jsx';
 import Label from '../forms/label.jsx';
 
-import hraiLogo from './hrai-logo.svg';
+import hraiLogo from '../../../static/hrai/hrai-dragon-mark-256.png';
 import styles from './hrai-panel.css';
 
 const MAX_HINT_RUNG = 5;
