@@ -9,6 +9,9 @@ import Label from '../forms/label.jsx';
 
 import styles from './hrai-panel.css';
 
+const MAX_HINT_RUNG = 5;
+const BLOCK_SLOT_PLACEHOLDER = '\u25BE';
+
 const messages = defineMessages({
     panelLabel: {
         id: 'gui.aria.hraiPanel',
@@ -35,6 +38,16 @@ const messages = defineMessages({
         defaultMessage: 'Send',
         description: 'button to send a message to hrai'
     },
+    hintButton: {
+        id: 'gui.hrai.hintButton',
+        defaultMessage: 'Poradit',
+        description: 'button to ask hrai for a more direct hint'
+    },
+    hintMaxReached: {
+        id: 'gui.hrai.hintMaxReached',
+        defaultMessage: 'To je ta nejpřímější rada, jakou ti můžu dát.',
+        description: 'explanation shown when the hint button is disabled at the most direct hint level'
+    },
     thinking: {
         id: 'gui.hrai.thinking',
         defaultMessage: 'hrai is thinking…',
@@ -44,10 +57,19 @@ const messages = defineMessages({
         id: 'gui.hrai.blockReference',
         defaultMessage: 'Go to block {alias}',
         description: 'accessibility label for a clickable block reference in a tutor message'
+    },
+    blockOpcode: {
+        id: 'gui.hrai.blockOpcode',
+        defaultMessage: 'Block {label}, category {category}',
+        description: 'accessibility label for a block opcode chip in a tutor message'
     }
 });
 
 const BLOCK_REF_PATTERN = /\bb\d+\b/;
+const BLOCK_OPCODE_PATTERN = /\b[a-z]+_[a-z0-9_]+\b/;
+const TUTOR_TOKEN_PATTERN = /(\bb\d+\b|\b[a-z]+_[a-z0-9_]+\b)/;
+
+const formatBlockLabel = label => label.replace(/%\d+/g, BLOCK_SLOT_PLACEHOLDER);
 
 const BlockRef = ({alias, onAliasClick, formatBlockReference}) => {
     const handleClick = useCallback(() => {
@@ -82,8 +104,30 @@ BlockRef.defaultProps = {
     onAliasClick: null
 };
 
-const renderTutorText = (text, onAliasClick, formatBlockReference) => {
-    const segments = text.split(/(\bb\d+\b)/);
+const BlockOpcodeChip = ({block, formatBlockOpcode}) => (
+    <span
+        className={styles.blockChip}
+        aria-label={formatBlockOpcode(formatBlockLabel(block.label), block.category)}
+    >
+        <span className={styles.blockChipLabel}>
+            {formatBlockLabel(block.label)}
+        </span>
+        <span className={styles.blockChipCategory}>
+            {block.category}
+        </span>
+    </span>
+);
+
+BlockOpcodeChip.propTypes = {
+    block: PropTypes.shape({
+        category: PropTypes.string.isRequired,
+        label: PropTypes.string.isRequired
+    }).isRequired,
+    formatBlockOpcode: PropTypes.func.isRequired
+};
+
+const renderTutorText = (text, blocks, onAliasClick, formatBlockReference, formatBlockOpcode) => {
+    const segments = text.split(TUTOR_TOKEN_PATTERN);
 
     return segments.map((segment, index) => {
         if (BLOCK_REF_PATTERN.test(segment)) {
@@ -93,6 +137,16 @@ const renderTutorText = (text, onAliasClick, formatBlockReference) => {
                     alias={segment}
                     onAliasClick={onAliasClick}
                     formatBlockReference={formatBlockReference}
+                />
+            );
+        }
+
+        if (BLOCK_OPCODE_PATTERN.test(segment) && blocks?.[segment]) {
+            return (
+                <BlockOpcodeChip
+                    key={`${segment}-${index}`}
+                    block={blocks[segment]}
+                    formatBlockOpcode={formatBlockOpcode}
                 />
             );
         }
@@ -109,7 +163,7 @@ const renderTutorText = (text, onAliasClick, formatBlockReference) => {
     });
 };
 
-const HraiMessage = ({message, onAliasClick, formatBlockReference}) => {
+const HraiMessage = ({message, onAliasClick, formatBlockReference, formatBlockOpcode}) => {
     const isTutor = message.role === 'tutor';
 
     return (
@@ -119,7 +173,13 @@ const HraiMessage = ({message, onAliasClick, formatBlockReference}) => {
         >
             <div className={styles.messageBubble}>
                 {isTutor ?
-                    renderTutorText(message.text, onAliasClick, formatBlockReference) :
+                    renderTutorText(
+                        message.text,
+                        message.blocks,
+                        onAliasClick,
+                        formatBlockReference,
+                        formatBlockOpcode
+                    ) :
                     message.text}
             </div>
         </div>
@@ -127,8 +187,13 @@ const HraiMessage = ({message, onAliasClick, formatBlockReference}) => {
 };
 
 HraiMessage.propTypes = {
+    formatBlockOpcode: PropTypes.func.isRequired,
     formatBlockReference: PropTypes.func.isRequired,
     message: PropTypes.shape({
+        blocks: PropTypes.objectOf(PropTypes.shape({
+            category: PropTypes.string.isRequired,
+            label: PropTypes.string.isRequired
+        })),
         id: PropTypes.string.isRequired,
         role: PropTypes.oneOf(['tutor', 'learner']).isRequired,
         text: PropTypes.string.isRequired
@@ -143,7 +208,9 @@ HraiMessage.defaultProps = {
 const HraiPanel = ({
     messages: chatMessages,
     onSend,
+    onHint,
     isThinking,
+    rung,
     onAliasClick
 }) => {
     const intl = useIntl();
@@ -153,6 +220,11 @@ const HraiPanel = ({
     const formatBlockReference = useCallback(alias => intl.formatMessage(
         messages.blockReference,
         {alias}
+    ), [intl]);
+
+    const formatBlockOpcode = useCallback((label, category) => intl.formatMessage(
+        messages.blockOpcode,
+        {category, label}
     ), [intl]);
 
     const handleAliasClick = useCallback(alias => {
@@ -187,11 +259,20 @@ const HraiPanel = ({
         submitDraft();
     }, [submitDraft]);
 
+    const handleHintClick = useCallback(() => {
+        onHint();
+    }, [onHint]);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
     }, [chatMessages, isThinking]);
 
     const canSend = draft.trim().length > 0;
+    const hintMaxReached = rung >= MAX_HINT_RUNG;
+    const hintDisabled = isThinking || hintMaxReached;
+    const hintExplanation = hintMaxReached ?
+        intl.formatMessage(messages.hintMaxReached) :
+        null;
 
     return (
         <Box
@@ -215,6 +296,7 @@ const HraiPanel = ({
                         message={message}
                         onAliasClick={handleAliasClick}
                         formatBlockReference={formatBlockReference}
+                        formatBlockOpcode={formatBlockOpcode}
                     />
                 ))}
                 {isThinking ? (
@@ -226,6 +308,22 @@ const HraiPanel = ({
                     </p>
                 ) : null}
                 <div ref={messagesEndRef} />
+            </div>
+            <div className={styles.hintArea}>
+                <Button
+                    type="button"
+                    className={styles.hintButton}
+                    disabled={hintDisabled}
+                    title={hintExplanation}
+                    onClick={handleHintClick}
+                >
+                    <FormattedMessage {...messages.hintButton} />
+                </Button>
+                {hintMaxReached ? (
+                    <p className={styles.hintExplanation}>
+                        {hintExplanation}
+                    </p>
+                ) : null}
             </div>
             <form
                 className={styles.inputArea}
@@ -257,17 +355,24 @@ const HraiPanel = ({
 HraiPanel.propTypes = {
     isThinking: PropTypes.bool,
     messages: PropTypes.arrayOf(PropTypes.shape({
+        blocks: PropTypes.objectOf(PropTypes.shape({
+            category: PropTypes.string.isRequired,
+            label: PropTypes.string.isRequired
+        })),
         id: PropTypes.string.isRequired,
         role: PropTypes.oneOf(['tutor', 'learner']).isRequired,
         text: PropTypes.string.isRequired
     })).isRequired,
     onAliasClick: PropTypes.func,
-    onSend: PropTypes.func.isRequired
+    onHint: PropTypes.func.isRequired,
+    onSend: PropTypes.func.isRequired,
+    rung: PropTypes.number
 };
 
 HraiPanel.defaultProps = {
     isThinking: false,
-    onAliasClick: null
+    onAliasClick: null,
+    rung: 0
 };
 
 export default HraiPanel;

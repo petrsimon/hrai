@@ -9,11 +9,43 @@
 import { renderProject, type RenderTarget } from "./render.ts";
 import type { Turn } from "./prompt.ts";
 
+/** The gentlest rung, and the most specific one the tutor will ever go to. */
+export const FIRST_RUNG = 1;
+export const LAST_RUNG = 5;
+
 export class Session {
     private targets: RenderTarget[] = [];
     private focusedTargetId = "";
     private aliases = new Map<string, string>();
+    private currentRung: number = FIRST_RUNG;
     readonly history: Turn[] = [];
+
+    /** How specific the next answer may be. */
+    get rung(): number {
+        return this.currentRung;
+    }
+
+    /**
+     * Moves one rung up the hint ladder, stopping at the top.
+     *
+     * Escalation is learner-driven by design: the tutor never decides on its own that a
+     * child needs more help, because that is how a tutor turns into a copilot.
+     * @returns The new rung.
+     */
+    escalate(): number {
+        this.currentRung = Math.min(this.currentRung + 1, LAST_RUNG);
+        return this.currentRung;
+    }
+
+    /**
+     * Returns to the gentlest rung.
+     *
+     * A new question is a new problem: carrying a rung-5 mindset into it would hand over
+     * an answer the child never asked for.
+     */
+    resetRung(): void {
+        this.currentRung = FIRST_RUNG;
+    }
 
     /**
      * Replaces the known workspace.

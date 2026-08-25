@@ -7,6 +7,7 @@
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { EVAL_MODEL, chatStream } from "./model-client.ts";
+import { PALETTE } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
 import type { RenderTarget } from "./render.ts";
@@ -43,6 +44,27 @@ function parseQuestion(payload: unknown): string | null {
     return trimmed.length > 0 ? trimmed : null;
 }
 
+const BY_OPCODE = new Map(PALETTE.map((entry) => [entry.opcode, entry]));
+
+/**
+ * Every palette block named in a reply, with the label and category to display.
+ *
+ * The tutor writes opcodes so it cannot invent a name; the panel needs the real Czech
+ * label to show a child, and duplicating the opcode-to-label mapping in the browser
+ * would be a second source of truth that drifts.
+ * @param text The tutor's reply.
+ * @returns Opcode to display label and category, for opcodes that exist.
+ */
+function blocksNamedIn(text: string): Record<string, { label: string; category: string }> {
+    const named: Record<string, { label: string; category: string }> = {};
+    for (const token of new Set(text.match(/\b[a-z]+_[a-z0-9_]+\b/g) ?? [])) {
+        const entry = BY_OPCODE.get(token);
+        // Structural guarantee: a chip renders only for a block that actually exists.
+        if (entry) named[token] = { label: entry.cs, category: entry.category };
+    }
+    return named;
+}
+
 /**
  * Starts the socket server and begins accepting editor connections.
  * @param port TCP port to listen on.
@@ -64,22 +86,24 @@ export function startServer(port = PORT) {
             session.setWorkspace(workspace.targets, workspace.focusedTargetId);
         });
 
-        socket.on("ask", (payload: unknown) => {
-            const question = parseQuestion(payload);
-            if (!question) return;
-
+        /**
+         * Answers, at the session's current rung.
+         * @param question What to answer.
+         */
+        const answer = (question: string): void => {
             const id = `m${Date.now()}`;
             session.remember("learner", question);
             socket.emit("thinking", { thinking: true });
 
             void chatStream(
-                systemPrompt(),
+                systemPrompt(session.rung),
                 userPrompt(session.render(), question, session.history.slice(0, -1)),
                 (delta) => socket.emit("token", { id, delta }),
             )
                 .then((reply) => {
                     session.remember("tutor", reply.text);
-                    socket.emit("done", { id });
+                    socket.emit("blocks", { id, blocks: blocksNamedIn(reply.text) });
+                    socket.emit("done", { id, rung: session.rung });
                 })
                 .catch((error: unknown) => {
                     // The child sees a calm sentence; the operator sees the cause.
@@ -89,6 +113,19 @@ export function startServer(port = PORT) {
                     });
                 })
                 .finally(() => socket.emit("thinking", { thinking: false }));
+        };
+
+        socket.on("ask", (payload: unknown) => {
+            const question = parseQuestion(payload);
+            if (!question) return;
+            // A new question is a new problem, so the ladder starts again at the bottom.
+            session.resetRung();
+            answer(question);
+        });
+
+        socket.on("hint", () => {
+            session.escalate();
+            answer("Nerozumím tomu, poraď mi víc.");
         });
     });
 

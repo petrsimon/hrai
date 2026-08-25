@@ -40,6 +40,7 @@ const HraiPanel = ({vm}) => {
     const [chatMessages, setChatMessages] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
     const [isServerAvailable, setIsServerAvailable] = useState(false);
+    const [rung, setRung] = useState(0);
     const socketRef = useRef(null);
     const messageIdCounter = useRef(0);
     const vmRef = useRef(vm);
@@ -111,6 +112,18 @@ const HraiPanel = ({vm}) => {
             });
         });
 
+        socket.on('blocks', ({id, blocks}) => {
+            setChatMessages(prev => prev.map(message => (
+                message.id === id ?
+                    {...message, blocks} :
+                    message
+            )));
+        });
+
+        socket.on('done', ({rung: responseRung}) => {
+            setRung(responseRung);
+        });
+
         socket.on('error', ({message}) => {
             const errorId = `error-${messageIdCounter.current += 1}`;
             setChatMessages(prev => [...prev, {
@@ -128,6 +141,8 @@ const HraiPanel = ({vm}) => {
             socket.off('disconnect');
             socket.off('thinking');
             socket.off('token');
+            socket.off('blocks');
+            socket.off('done');
             socket.off('error');
             socket.disconnect();
             socketRef.current = null;
@@ -151,6 +166,7 @@ const HraiPanel = ({vm}) => {
 
     const handleSend = useCallback(text => {
         const learnerId = `learner-${messageIdCounter.current += 1}`;
+        setRung(0);
         setChatMessages(prev => [...prev, {
             id: learnerId,
             role: 'learner',
@@ -161,11 +177,19 @@ const HraiPanel = ({vm}) => {
         }
     }, []);
 
+    const handleHint = useCallback(() => {
+        if (socketRef.current?.connected) {
+            socketRef.current.emit('hint');
+        }
+    }, []);
+
     return (
         <HraiPanelComponent
             messages={chatMessages}
             onSend={handleSend}
+            onHint={handleHint}
             isThinking={isThinking && isServerAvailable}
+            rung={rung}
         />
     );
 };

@@ -16,6 +16,21 @@ export interface Turn {
 import { paletteForPrompt } from "./palette.ts";
 
 /**
+ * The hint ladder, one instruction per rung.
+ *
+ * The rungs must differ in kind, not just in tone. An earlier version said only "be more
+ * specific" above rung 1, and rungs 3, 4 and 5 produced identical answers — the ladder
+ * looked like it worked while offering the child nothing new for pressing the button.
+ */
+const RUNG_INSTRUCTIONS = [
+    "2. Toto je nápověda úrovně 1: polož otázku o tom, co má postava dělat. Nejmenuj žádný blok ani kategorii.",
+    "2. Toto je nápověda úrovně 2: polož konkrétnější otázku o tom, co se má stát dřív a co potom. Stále nejmenuj blok ani kategorii.",
+    "2. Toto je nápověda úrovně 3: řekni, ve které kategorii v editoru se má dítě dívat (například Události). Ještě neříkej, který blok to je.",
+    "2. Toto je nápověda úrovně 4: napiš kód konkrétního bloku ze seznamu níže (například event_whenkeypressed) a řekni, v jaké je kategorii. Kód bloku musíš napsat vždy, panel ho dítěti ukáže jako obrázek bloku. Neříkej, kam přesně ho má dítě připojit.",
+    "2. Toto je nápověda úrovně 5: napiš kód bloku ze seznamu níže (například motion_movesteps) a popiš slovy, kam ho dítě má připojit. Kód bloku musíš napsat vždy, panel ho dítěti ukáže jako obrázek bloku. Nikdy nevypisuj celý hotový scénář.",
+];
+
+/**
  * The tutor's standing instructions.
  *
  * Deliberately Czech: the first learner is Czech, and asking a 14B to hold register
@@ -29,11 +44,7 @@ export function systemPrompt(rung = 1): string {
         "",
         "PRAVIDLA:",
         "1. Nikdy nenapíšeš hotové řešení ani celý scénář. Vedeš dítě otázkou nebo malou nápovědou.",
-        rung <= 1
-            ? "2. Toto je první nápověda (úroveň 1): polož otázku, která dítě navede k zamyšlení. Neříkej, který blok chybí."
-            : `2. Toto je nápověda úrovně ${rung}: můžeš být konkrétnější, ale stále neukazuj celé řešení.`,
-        "3. O blocích, které dítě už má v projektu, mluv jejich značkou (b1, b2, ...).",
-        "4. Když chceš zmínit blok, který dítě zatím nemá, napiš jeho kód ze seznamu níže (například event_whenkeypressed). Nikdy nepiš český název bloku sám od sebe a nikdy neuváděj kategorii, kterou v seznamu nevidíš. Když si nejsi jistý, zeptej se místo toho.",
+        RUNG_INSTRUCTIONS[Math.min(Math.max(rung, 1), 5) - 1],
         "5. Piš česky, krátkými větami, slovy, kterým rozumí osmileté dítě. Nejvýše 3 věty.",
         "6. Buď povzbudivý, nikdy nevytýkej chybu.",
         "",
