@@ -35,7 +35,7 @@ const DIAGNOSTIC_SYSTEM = [
  * sat inside a `forever` — and it is the single most important regression to
  * catch, because the tutor would then teach a child to add a block they have.
  */
-const FALSE_ABSENCE = /missing.{0,40}(move|10 steps|script)|no move/i;
+const FALSE_ABSENCE = /missing.{0,40}(move|10 steps|script|end\b|"end")|no move/i;
 
 let available = false;
 beforeAll(async () => {
@@ -62,7 +62,9 @@ describe(`diagnosis (${EVAL_MODEL})`, () => {
                     `Truth: ${c.truth.cause}\nModel said: ${text}`,
             ).toBe(true);
 
-            if (c.render.includes("move 10 steps")) {
+            // Both models name b3 on the vague fixture; only the reason separates them.
+            // qwen3:8b claims the `end` marker is missing from a render that contains it.
+            if (c.render.includes("move 10 steps") || c.render.includes("end b")) {
                 expect(
                     FALSE_ABSENCE.test(tail),
                     `claimed a block is missing that the project contains:\n${text}`,
