@@ -13,7 +13,7 @@
 }
 
 :global([data-hrai-editor="true"]) .menu-bar {
-    background-color: var(--hrai-blue);
+    background-color: var(--hrai-sky);
 }
 
 :global([data-hrai-editor="true"]) .menu-bar-item {
@@ -166,7 +166,7 @@
 }
 
 :global([data-hrai-editor="true"]) .tab.is-selected {
-    color: var(--hrai-blue);
+    color: var(--hrai-sky);
     border-color: var(--hrai-border);
 }
 

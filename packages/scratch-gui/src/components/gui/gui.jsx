@@ -50,7 +50,7 @@ import {MenuRefProvider} from '../../contexts/menu-ref-context.jsx';
 import {ModalFocusProvider} from '../../contexts/modal-focus-context.jsx';
 import HraiPanel from '../../containers/hrai-panel.jsx';
 
-const HRAI_LOGO = 'static/hrai/hrai-logo-horizontal-400.png';
+const HRAI_LOGO = 'static/hrai/hrai-wordmark-400.png';
 
 const ariaMessages = defineMessages({
     menuBar: {

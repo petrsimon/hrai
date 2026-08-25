@@ -6,7 +6,7 @@ import popWav from '!arraybuffer-loader!./83a9787d4cb6f3b7632b4ddfebf74367.wav?'
 import meowWav from '!arraybuffer-loader!./83c36d806dc92327b9e7049a565c6bff.wav?';
 import backdrop from '!raw-loader!./cd21514d0531fdffb22204e0ec5ed84a.svg?';
 import costume1 from '!arraybuffer-loader!../../../static/hrai/hrai-dragon-mark-256.png?';
-import costume2 from '!arraybuffer-loader!../../../static/hrai/hrai-dragon-mark-256-flipped.png?';
+import costume2 from '!arraybuffer-loader!../../../static/hrai/hrai-dragon-mark-256-animation.png?';
 
 
 declare function require (path: 'fastestsmallesttextencoderdecoder'): {TextEncoder: typeof TextEncoder};
@@ -50,7 +50,7 @@ const defaultProject = (translator?: TranslatorFunction) => {
         dataFormat: 'PNG',
         data: new Uint8Array(costume1)
     }, {
-        id: '920e898fb4ff2716f9eb8a71d77f5346',
+        id: '222e093b5bfdfc634108d28d5c55f9fa',
         assetType: 'ImageBitmap',
         dataFormat: 'PNG',
         data: new Uint8Array(costume2)

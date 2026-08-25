@@ -13,9 +13,9 @@
  */
 
 :root {
-  --hrai-brand: #086788;
-  --hrai-brand-hover: #064f68;
-  --hrai-brand-contrast: #ffffff;
+  --hrai-brand: #3aa7e8;
+  --hrai-brand-hover: #228bc9;
+  --hrai-brand-contrast: #082532;
 
   --hrai-surface: #ffffff;
   --hrai-surface-sunken: #f1f6f8;
@@ -40,8 +40,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --hrai-brand: #3aa7e8;
-    --hrai-brand-hover: #70c2f0;
+    --hrai-brand: #70c2f0;
+    --hrai-brand-hover: #9bd8f5;
     --hrai-brand-contrast: #082532;
 
     --hrai-surface: #122a35;

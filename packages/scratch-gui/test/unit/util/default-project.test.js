@@ -27,7 +27,7 @@ describe('defaultProject', () => {
         expect(sprite.costumes).toHaveLength(2);
         expect(sprite.costumes.map(costume => costume.assetId)).toEqual([
             '4588e7e83273b7f3831be57b7cdcb7c3',
-            '920e898fb4ff2716f9eb8a71d77f5346'
+            '222e093b5bfdfc634108d28d5c55f9fa'
         ]);
         expect(sprite.costumes.every(costume => costume.dataFormat === 'png')).toBe(true);
     });

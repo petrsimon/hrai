@@ -71,10 +71,10 @@ const projectData = (translateFunction?: TranslatorFunction): object => {
                         rotationCenterY: 126
                     },
                     {
-                        assetId: '920e898fb4ff2716f9eb8a71d77f5346',
+                        assetId: '222e093b5bfdfc634108d28d5c55f9fa',
                         name: translator(messages.costume, {index: 2}),
                         bitmapResolution: 1,
-                        md5ext: '920e898fb4ff2716f9eb8a71d77f5346.png',
+                        md5ext: '222e093b5bfdfc634108d28d5c55f9fa.png',
                         dataFormat: 'png',
                         rotationCenterX: 128,
                         rotationCenterY: 126
