@@ -21,8 +21,8 @@
 }
 
 :global([data-hrai-editor="true"]) .scratch-logo {
-    height: 2.25rem;
-    max-width: 10rem;
+    height: 2.5rem;
+    max-width: 12rem;
     object-fit: contain;
 }
 

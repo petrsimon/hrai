@@ -47,6 +47,11 @@ export default appTarget => {
     // Opt in to the hrai tutor panel with ?hrai=true. Off by default: it needs a local
     // model server running, and an editor that silently fails to reach one is confusing.
     const showHraiPanel = /[?&]hrai=true/.test(window.location.href);
+    if (showHraiPanel) {
+        document.documentElement.dataset.hraiEditor = 'true';
+    } else {
+        delete document.documentElement.dataset.hraiEditor;
+    }
 
     const scratchDesktopMatches = window.location.href.match(/[?&]isScratchDesktop=([^&]+)/);
     let simulateScratchDesktop;

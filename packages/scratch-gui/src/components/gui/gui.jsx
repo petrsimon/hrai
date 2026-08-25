@@ -365,7 +365,7 @@ const GUIComponent = props => {
                             renderLogin={renderLogin}
                             showComingSoon={showComingSoon}
                             onClickAbout={onClickAbout}
-                            onClickLogo={onClickLogo}
+                            onClickLogo={showHraiPanel ? null : onClickLogo}
                             onLogOut={onLogOut}
                             onClickLogin={onClickLogin}
                             onOpenRegistration={onOpenRegistration}

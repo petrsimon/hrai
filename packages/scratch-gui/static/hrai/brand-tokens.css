@@ -12,3 +12,76 @@
   --hrai-text-muted: #5f7680;
   --hrai-border: #cbdde4;
 }
+
+/*
+ * HRAI editor palette. Scratch block category colours stay unchanged; these tokens
+ * recolour the surrounding editor chrome, controls, dialogs, and feedback states.
+ */
+[data-hrai-editor="true"] {
+  --hrai-ui-primary: #eaf7fb;
+  --hrai-ui-secondary: #d9f0f7;
+  --hrai-ui-tertiary: #bfe3ee;
+  --hrai-ui-modal-overlay: rgb(58 167 232 / 0.9);
+  --hrai-ui-alert-overlay: rgb(58 167 232 / 0.4);
+  --hrai-ui-white: #ffffff;
+  --hrai-ui-white-dim: rgb(255 255 255 / 0.75);
+  --hrai-ui-white-transparent: rgb(255 255 255 / 0.25);
+  --hrai-ui-transparent: rgb(255 255 255 / 0);
+  --hrai-ui-black: #082532;
+  --hrai-ui-black-transparent: rgb(8 37 50 / 0.18);
+  --hrai-ui-black-transparent-10: rgb(8 37 50 / 0.1);
+  --hrai-ui-green: #2eae8f;
+  --hrai-ui-green-2: #239476;
+  --hrai-ui-orange: var(--hrai-yellow);
+  --hrai-ui-alert-orange: #fff3d6;
+
+  --hrai-text-primary: #17313d;
+  --hrai-text-primary-transparent: rgb(23 49 61 / 0.75);
+
+  --hrai-motion-primary: var(--hrai-sky);
+  --hrai-motion-tertiary: var(--hrai-blue);
+  --hrai-looks-secondary: var(--hrai-sky);
+  --hrai-looks-transparent: rgb(58 167 232 / 0.35);
+  --hrai-looks-light-transparent: rgb(58 167 232 / 0.15);
+  --hrai-looks-secondary-dark: #228bc9;
+  --hrai-red-primary: var(--hrai-coral);
+  --hrai-red-tertiary: #c9433d;
+  --hrai-sound-primary: var(--hrai-coral);
+  --hrai-sound-tertiary: #c9433d;
+  --hrai-sound-surface: rgb(244 91 79 / 0.15);
+  --hrai-control-primary: var(--hrai-yellow);
+  --hrai-data-primary: var(--hrai-orange);
+  --hrai-pen-primary: var(--hrai-ui-green);
+  --hrai-pen-transparent: rgb(46 174 143 / 0.25);
+  --hrai-pen-tertiary: #1d755f;
+  --hrai-error-primary: var(--hrai-orange);
+  --hrai-error-light: #ffad67;
+  --hrai-error-transparent: rgb(255 122 33 / 0.25);
+  --hrai-extensions-primary: var(--hrai-ui-green);
+  --hrai-extensions-tertiary: #1d755f;
+  --hrai-extensions-transparent: rgb(46 174 143 / 0.35);
+  --hrai-extensions-light: #d7f1e9;
+  --hrai-membership-blue: var(--hrai-blue);
+  --hrai-drop-highlight: #70c2f0;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-hrai-editor="true"] {
+    --hrai-ui-primary: #102d39;
+    --hrai-ui-secondary: #163d4c;
+    --hrai-ui-tertiary: #20586a;
+    --hrai-ui-white: #17313d;
+    --hrai-ui-white-dim: rgb(233 245 250 / 0.75);
+    --hrai-ui-white-transparent: rgb(233 245 250 / 0.25);
+    --hrai-ui-transparent: rgb(233 245 250 / 0);
+    --hrai-ui-black: #e9f5fa;
+    --hrai-ui-black-transparent: rgb(8 37 50 / 0.5);
+    --hrai-ui-black-transparent-10: rgb(8 37 50 / 0.3);
+    --hrai-ui-alert-orange: #513b1e;
+    --hrai-text-primary: #e9f5fa;
+    --hrai-text-primary-transparent: rgb(233 245 250 / 0.75);
+    --hrai-looks-secondary-dark: #70c2f0;
+    --hrai-sound-surface: rgb(244 91 79 / 0.25);
+    --hrai-extensions-light: #1d4d45;
+  }
+}
