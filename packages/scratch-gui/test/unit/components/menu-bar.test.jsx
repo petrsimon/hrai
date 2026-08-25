@@ -69,6 +69,19 @@ describe('MenuBar Component', () => {
         expect(logo.getAttribute('alt')).toBe('hrai');
     });
 
+    test('menu bar shows hrai lessons in hrai mode', () => {
+        store.clearActions();
+        const {container} = renderWithIntl(getComponent({hraiLogo: true}));
+        const button = container.querySelector('button[aria-label="lekce hrai"]');
+
+        expect(button).toBeTruthy();
+        fireEvent.click(button);
+        expect(store.getActions()).toContainEqual({
+            type: 'scratch-gui/modals/OPEN_MODAL',
+            modal: 'hraiLessons'
+        });
+    });
+
     describe('triggering About button handler', () => {
         test('clicking on About button calls the handler', () => {
             const onClickAbout = jest.fn();

@@ -28,7 +28,7 @@ import EditMenu from './edit-menu.jsx';
 import ModeMenu from './mode-menu.jsx';
 import AboutMenu from './about-menu.jsx';
 
-import {openTipsLibrary, openDebugModal} from '../../reducers/modals';
+import {openTipsLibrary, openHraiLessons, openDebugModal} from '../../reducers/modals';
 import {setPlayer} from '../../reducers/mode';
 import {
     isTimeTravel220022BC,
@@ -70,6 +70,7 @@ import ninetiesLogo from './nineties_logo.svg';
 import catLogo from './cat_logo.svg';
 import prehistoricLogo from './prehistoric-logo.svg';
 import oldtimeyLogo from './oldtimey-logo.svg';
+import hraiMark from '../../../static/hrai/hrai-dragon-mark-256.png';
 
 import sharedMessages from '../../lib/shared-messages';
 
@@ -81,6 +82,11 @@ const ariaMessages = defineMessages({
         id: 'gui.menuBar.tutorialsLibrary',
         defaultMessage: 'Tutorials',
         description: 'accessibility text for the tutorials button'
+    },
+    hraiLessons: {
+        id: 'gui.menuBar.hraiLessonsLibrary',
+        defaultMessage: 'lekce hrai',
+        description: 'accessibility text for the hrai lessons button'
     },
     debug: {
         id: 'gui.menuBar.debug',
@@ -477,6 +483,22 @@ class MenuBar extends React.Component {
                                 <FormattedMessage {...ariaMessages.tutorials} />
                             </span>
                         </button>
+                        {this.props.hraiLogo ? (
+                            <button
+                                aria-label={this.props.intl.formatMessage(ariaMessages.hraiLessons)}
+                                className={classNames(styles.menuBarItem, styles.noOffset, styles.hoverable)}
+                                onClick={this.props.onOpenHraiLessons}
+                            >
+                                <img
+                                    className={styles.helpIcon}
+                                    src={hraiMark}
+                                    alt=""
+                                />
+                                <span className={styles.tutorialsLabel}>
+                                    <FormattedMessage {...ariaMessages.hraiLessons} />
+                                </span>
+                            </button>
+                        ) : null}
                         <button
                             aria-label={this.props.intl.formatMessage(ariaMessages.debug)}
                             className={classNames(styles.menuBarItem, styles.noOffset, styles.hoverable)}
@@ -702,6 +724,7 @@ MenuBar.propTypes = {
     onLogOut: PropTypes.func,
     onOpenRegistration: PropTypes.func,
     onOpenTipLibrary: PropTypes.func,
+    onOpenHraiLessons: PropTypes.func,
     onOpenDebugModal: PropTypes.func,
     onProjectTelemetryEvent: PropTypes.func,
     onRequestCloseLogin: PropTypes.func,
@@ -781,6 +804,7 @@ const mapStateToProps = (state, ownProps) => {
 const mapDispatchToProps = (dispatch, ownProps) => ({
     autoUpdateProject: () => dispatch(autoUpdateProject()),
     onOpenTipLibrary: () => dispatch(openTipsLibrary()),
+    onOpenHraiLessons: () => dispatch(openHraiLessons()),
     onOpenDebugModal: () => dispatch(openDebugModal()),
     onClickNew: needSave => dispatch(requestNewProject(needSave)),
     onClickLogin: ownProps.onClickLogin ?? (() => dispatch(openLoginMenu())),

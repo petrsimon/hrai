@@ -12,6 +12,7 @@ const MODAL_SPRITE_LIBRARY = 'spriteLibrary';
 const MODAL_SOUND_RECORDER = 'soundRecorder';
 const MODAL_CONNECTION = 'connectionModal';
 const MODAL_TIPS_LIBRARY = 'tipsLibrary';
+const MODAL_HRAI_LESSONS = 'hraiLessons';
 
 const initialState = {
     [MODAL_BACKDROP_LIBRARY]: false,
@@ -24,7 +25,8 @@ const initialState = {
     [MODAL_SPRITE_LIBRARY]: false,
     [MODAL_SOUND_RECORDER]: false,
     [MODAL_CONNECTION]: false,
-    [MODAL_TIPS_LIBRARY]: false
+    [MODAL_TIPS_LIBRARY]: false,
+    [MODAL_HRAI_LESSONS]: false
 };
 
 const reducer = function (state, action) {
@@ -87,6 +89,9 @@ const openConnectionModal = function () {
 const openTipsLibrary = function () {
     return openModal(MODAL_TIPS_LIBRARY);
 };
+const openHraiLessons = function () {
+    return openModal(MODAL_HRAI_LESSONS);
+};
 const closeBackdropLibrary = function () {
     return closeModal(MODAL_BACKDROP_LIBRARY);
 };
@@ -117,6 +122,9 @@ const closeSoundRecorder = function () {
 const closeTipsLibrary = function () {
     return closeModal(MODAL_TIPS_LIBRARY);
 };
+const closeHraiLessons = function () {
+    return closeModal(MODAL_HRAI_LESSONS);
+};
 const closeConnectionModal = function () {
     return closeModal(MODAL_CONNECTION);
 };
@@ -133,6 +141,7 @@ export {
     openSoundRecorder,
     openTelemetryModal,
     openTipsLibrary,
+    openHraiLessons,
     openConnectionModal,
     closeBackdropLibrary,
     closeCostumeLibrary,
@@ -144,5 +153,6 @@ export {
     closeSoundRecorder,
     closeTelemetryModal,
     closeTipsLibrary,
+    closeHraiLessons,
     closeConnectionModal
 };

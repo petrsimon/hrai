@@ -49,6 +49,7 @@ import {PLATFORM} from '../../lib/platform.js';
 import {MenuRefProvider} from '../../contexts/menu-ref-context.jsx';
 import {ModalFocusProvider} from '../../contexts/modal-focus-context.jsx';
 import HraiPanel from '../../containers/hrai-panel.jsx';
+import HraiLessonsLibrary from '../../containers/hrai-lessons-library.jsx';
 
 const HRAI_LOGO = 'static/hrai/hrai-logo-horizontal-800.png';
 
@@ -315,6 +316,7 @@ const GUIComponent = props => {
                             onTutorialSelect={onTutorialSelect}
                         />
                     ) : null}
+                    <HraiLessonsLibrary />
                     {cardsVisible ? (
                         <Cards />
                     ) : null}
