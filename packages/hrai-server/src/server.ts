@@ -104,9 +104,10 @@ export function startServer(port = PORT) {
 
         socket.on("lessonStart", (payload: unknown) => {
             if (typeof payload !== "object" || payload === null) return;
-            const lessonId = (payload as Record<string, unknown>).lessonId;
+            const { lessonId, stageIndex } = payload as Record<string, unknown>;
             if (typeof lessonId !== "string") return;
-            if (session.startLesson(lessonId)) emitLessonProgress();
+            const requestedStage = typeof stageIndex === "number" && Number.isInteger(stageIndex) ? stageIndex : 0;
+            if (session.startLesson(lessonId, requestedStage)) emitLessonProgress();
         });
 
         socket.on("lessonNext", () => {

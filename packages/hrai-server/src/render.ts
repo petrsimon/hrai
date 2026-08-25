@@ -45,7 +45,7 @@ export interface RenderTarget {
     name: string;
     isStage: boolean;
     blocks: Record<string, Block>;
-    variables?: Record<string, [string, unknown]>;
+    variables?: Record<string, unknown>;
 }
 
 export interface Render {
@@ -212,6 +212,21 @@ export function renderProject(targets: RenderTarget[], focusedTargetId: string, 
     for (const target of targets) {
         if (target.id !== focusedTargetId) continue;
         state.lines.push(`postava: ${target.name}`);
+        const variables = Object.values(target.variables ?? {})
+            .map((variable) => {
+                if (Array.isArray(variable)) {
+                    return `${String(variable[0])}=${fieldText(variable[1])}`;
+                }
+                if (typeof variable === "object" && variable !== null && "name" in variable) {
+                    const namedVariable = variable as { name: unknown; value?: unknown };
+                    return `${String(namedVariable.name)}=${fieldText(namedVariable.value)}`;
+                }
+                return null;
+            })
+            .filter((variable): variable is string => variable !== null);
+        if (variables.length > 0) {
+            state.lines.push(`proměnné: ${variables.join(", ")}`);
+        }
         const roots = Object.values(target.blocks).filter(isScriptRoot);
         if (roots.length === 0) {
             state.lines.push("(zatim zadne bloky)");

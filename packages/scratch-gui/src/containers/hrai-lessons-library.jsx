@@ -7,7 +7,7 @@ import HraiLessonsLibraryComponent from '../components/hrai-lessons/hrai-lessons
 import lessons from '../lib/hrai-lessons';
 import log from '../lib/log.js';
 import {closeHraiLessons} from '../reducers/modals';
-import {startHraiLesson} from '../reducers/hrai-lesson';
+import {clearHraiLesson, startHraiLesson} from '../reducers/hrai-lesson';
 import {loadSoldierBattleStarter} from '../lib/hrai-lessons/soldier-battle-starter';
 
 const mapStateToProps = state => ({
@@ -17,12 +17,14 @@ const mapStateToProps = state => ({
 
 const mapDispatchToProps = dispatch => ({
     onRequestClose: () => dispatch(closeHraiLessons()),
+    onResetLesson: () => dispatch(clearHraiLesson()),
     onActivateLesson: lessonId => dispatch(startHraiLesson(lessonId))
 });
 
 const HraiLessonsLibrary = ({visible, vm, ...props}) => {
-    const {onActivateLesson, onRequestClose, ...componentProps} = props;
+    const {onActivateLesson, onRequestClose, onResetLesson, ...componentProps} = props;
     const handleStartLesson = useCallback(async lessonId => {
+        onResetLesson();
         try {
             if (lessonId === '11-soldier-battle') {
                 await loadSoldierBattleStarter(vm);
@@ -32,7 +34,7 @@ const HraiLessonsLibrary = ({visible, vm, ...props}) => {
         } catch (error) {
             log.error('hrai: failed to load lesson starter', {lessonId, error});
         }
-    }, [onActivateLesson, onRequestClose, vm]);
+    }, [onActivateLesson, onRequestClose, onResetLesson, vm]);
 
     if (!visible) return null;
     return (
@@ -48,6 +50,7 @@ const HraiLessonsLibrary = ({visible, vm, ...props}) => {
 HraiLessonsLibrary.propTypes = {
     onActivateLesson: PropTypes.func.isRequired,
     onRequestClose: PropTypes.func.isRequired,
+    onResetLesson: PropTypes.func.isRequired,
     visible: PropTypes.bool.isRequired,
     vm: PropTypes.instanceOf(VM).isRequired
 };

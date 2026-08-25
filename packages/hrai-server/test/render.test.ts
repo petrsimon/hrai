@@ -120,6 +120,18 @@ describe("renderProject", () => {
         expect(text).not.toContain("move");
     });
 
+    it("renders focused sprite variables from VM and SB3 shapes", () => {
+        const t = {
+            ...target("Rover", []),
+            variables: {
+                vmVariable: { name: "selected soldier", value: 1 },
+                sb3Variable: ["health", 3],
+            },
+        };
+        const { text } = renderProject([t], "Rover");
+        expect(text).toContain("proměnné: selected soldier=1, health=3");
+    });
+
     it("says so explicitly when the focused sprite has no blocks", () => {
         // An empty project is a real state a child reaches, and an empty render
         // would leave the model guessing whether it was given anything at all.

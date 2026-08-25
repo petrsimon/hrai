@@ -70,10 +70,10 @@ const HraiLessonsLibrary = ({lessons, onRequestClose, onStartLesson}) => {
     }, []);
     const startPrompt = intl.formatMessage(messages.startPrompt);
     const handleStartLesson = useCallback(() => {
+        if (!selectedLesson) return;
         // eslint-disable-next-line no-alert -- replacing the current project needs explicit confirmation
-        if (selectedLesson && window.confirm(startPrompt)) {
-            onStartLesson(selectedLesson.id);
-        }
+        if (selectedLesson.replacesProject && !window.confirm(startPrompt)) return;
+        onStartLesson(selectedLesson.id);
     }, [onStartLesson, selectedLesson, startPrompt]);
 
     return (
@@ -181,6 +181,7 @@ HraiLessonsLibrary.propTypes = {
         englishTitle: PropTypes.string.isRequired,
         goal: PropTypes.string.isRequired,
         id: PropTypes.string.isRequired,
+        replacesProject: PropTypes.bool,
         stages: PropTypes.arrayOf(PropTypes.string).isRequired,
         title: PropTypes.string.isRequired
     })).isRequired,

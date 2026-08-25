@@ -97,6 +97,7 @@ const lessons = [
     },
     {
         id: '11-soldier-battle',
+        replacesProject: true,
         title: 'Bitva vojáků',
         englishTitle: 'Soldier Battle',
         duration: '90–120 minut',

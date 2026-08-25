@@ -54,11 +54,11 @@ export class Session {
         this.currentRung = FIRST_RUNG;
     }
 
-    startLesson(lessonId: string): LessonStage | null {
-        const stage = lessonStage(lessonId, 0);
+    startLesson(lessonId: string, stageIndex = 0): LessonStage | null {
+        const stage = lessonStage(lessonId, stageIndex);
         if (!stage) return null;
         this.activeLessonId = lessonId;
-        this.activeStageIndex = 0;
+        this.activeStageIndex = stageIndex;
         this.stageComplete = false;
         return stage;
     }

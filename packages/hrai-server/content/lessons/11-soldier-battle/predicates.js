@@ -6,8 +6,10 @@ const hasOpcode = (project, opcode) => blocksIn(project).some(block => block.opc
 
 const hasAnyOpcode = (project, opcodes) => opcodes.some(opcode => hasOpcode(project, opcode));
 
+const variableName = variable => Array.isArray(variable) ? variable[0] : variable?.name;
+
 const hasVariable = (project, name) => targetsIn(project).some(target => (
-    Object.values(target.variables || {}).some(variable => variable[0] === name)
+    Object.values(target.variables || {}).some(variable => variableName(variable) === name)
 ));
 
 const hasAllVariables = (project, names) => names.every(name => hasVariable(project, name));
@@ -17,6 +19,7 @@ export const predicates = {
 
     selection: project => (
         hasOpcode(project, 'event_whenthisspriteclicked') &&
+        hasOpcode(project, 'data_setvariableto') &&
         hasVariable(project, 'selected soldier')
     ),
 

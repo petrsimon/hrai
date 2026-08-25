@@ -8,6 +8,7 @@ import VM from '@scratch/scratch-vm';
 
 import HraiPanelComponent from '../components/hrai-panel/hrai-panel.jsx';
 import lessons from '../lib/hrai-lessons';
+import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
 
 const HRAI_SERVER_URL = process.env.HRAI_SERVER_URL || 'http://localhost:8791';
@@ -44,7 +45,7 @@ const buildWorkspacePayload = vm => {
     };
 };
 
-const HraiPanel = ({activeLessonId, onNextStage, vm}) => {
+const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) => {
     const intl = useIntl();
     const [chatMessages, setChatMessages] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
@@ -100,7 +101,11 @@ const HraiPanel = ({activeLessonId, onNextStage, vm}) => {
             setChatMessages(prev => prev.filter(message => message.id !== HELPER_UNAVAILABLE_ID));
             pushWorkspace();
             if (activeLessonId) {
-                socket.emit('lessonStart', {lessonId: activeLessonId});
+                const saved = loadLessonProgress(projectId, activeLessonId, projectTitle);
+                socket.emit('lessonStart', {
+                    lessonId: activeLessonId,
+                    stageIndex: saved?.stageIndex || 0
+                });
             }
         });
 
@@ -140,10 +145,12 @@ const HraiPanel = ({activeLessonId, onNextStage, vm}) => {
         });
 
         socket.on('lessonProgress', progress => {
+            saveLessonProgress(projectId, progress.lessonId, progress.stageIndex, projectTitle);
             setLessonProgress(progress);
         });
 
         socket.on('stageComplete', progress => {
+            saveLessonProgress(projectId, progress.lessonId, progress.stageIndex, projectTitle);
             setLessonProgress(previous => {
                 if (!previous) return previous;
                 return {...previous, ...progress, complete: true};
@@ -180,14 +187,29 @@ const HraiPanel = ({activeLessonId, onNextStage, vm}) => {
             socket.disconnect();
             socketRef.current = null;
         };
-    }, [activeLessonId, debouncedPushWorkspace, helperUnavailableText, pushWorkspace, stageCompleteText]);
+    }, [
+        activeLessonId,
+        debouncedPushWorkspace,
+        helperUnavailableText,
+        projectId,
+        projectTitle,
+        pushWorkspace,
+        stageCompleteText
+    ]);
 
     useEffect(() => {
-        setLessonProgress(null);
+        setChatMessages([]);
+        setRung(0);
+        setIsThinking(false);
+        const saved = activeLessonId ? loadLessonProgress(projectId, activeLessonId, projectTitle) : null;
+        setLessonProgress(saved ? {stageIndex: saved.stageIndex, complete: false} : null);
         if (activeLessonId && socketRef.current?.connected) {
-            socketRef.current.emit('lessonStart', {lessonId: activeLessonId});
+            socketRef.current.emit('lessonStart', {
+                lessonId: activeLessonId,
+                stageIndex: saved?.stageIndex || 0
+            });
         }
-    }, [activeLessonId]);
+    }, [activeLessonId, projectId, projectTitle]);
 
     useEffect(() => {
         const onWorkspaceChange = () => {
@@ -247,6 +269,8 @@ const HraiPanel = ({activeLessonId, onNextStage, vm}) => {
 HraiPanel.propTypes = {
     activeLessonId: PropTypes.string,
     onNextStage: PropTypes.func.isRequired,
+    projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    projectTitle: PropTypes.string,
     vm: PropTypes.instanceOf(VM).isRequired
 };
 
@@ -256,6 +280,8 @@ HraiPanel.defaultProps = {
 
 const mapStateToProps = state => ({
     activeLessonId: state.scratchGui.hraiLesson.lessonId,
+    projectId: state.scratchGui.projectState.projectId,
+    projectTitle: state.scratchGui.projectTitle,
     vm: state.scratchGui.vm
 });
 
