@@ -1,0 +1,74 @@
+{
+  "id": "11-soldier-battle",
+  "title": {
+    "cs": "Bitva vojáků",
+    "en": "Soldier Battle"
+  },
+  "age": "8-10",
+  "durationMinutes": 120,
+  "goal": {
+    "cs": "Vyber své vojáky a poraz více nepřátel, než jich na konci zůstane.",
+    "en": "Select your soldiers and defeat more enemies than remain at the end."
+  },
+  "rules": {
+    "swordRange": 1,
+    "swordDamage": 2,
+    "bowRange": 4,
+    "bowDamage": 1,
+    "unitHealth": 3,
+    "durationSeconds": 60,
+    "reinforcementIntervalSeconds": 5,
+    "maxReinforcements": 5,
+    "winCondition": "deadEnemies > livingEnemies"
+  },
+  "concepts": [
+    "click selection",
+    "variables",
+    "conditionals",
+    "clones",
+    "broadcasts",
+    "timer"
+  ],
+  "stages": [
+    {
+      "id": "00-board",
+      "goal": "Create a board with sword and bow soldiers on two teams.",
+      "predicate": "board"
+    },
+    {
+      "id": "01-select",
+      "goal": "Click a friendly soldier and show which soldier is selected.",
+      "predicate": "selection"
+    },
+    {
+      "id": "02-sword",
+      "goal": "Let a selected sword soldier attack a nearby enemy.",
+      "predicate": "swordAttack"
+    },
+    {
+      "id": "03-health",
+      "goal": "Give every soldier three health points and remove defeated enemies.",
+      "predicate": "healthAndDeath"
+    },
+    {
+      "id": "04-bow",
+      "goal": "Add a bow soldier with range four and damage one.",
+      "predicate": "bowAttack"
+    },
+    {
+      "id": "05-reinforcements",
+      "goal": "Run a sixty-second battle and add at most five enemies every five seconds.",
+      "predicate": "reinforcements"
+    },
+    {
+      "id": "06-result",
+      "goal": "Stop the battle and announce the result using deadEnemies > livingEnemies.",
+      "predicate": "result"
+    }
+  ],
+  "guides": {
+    "cs": "guide.cs.md",
+    "en": "guide.en.md"
+  },
+  "predicates": "predicates.js"
+}

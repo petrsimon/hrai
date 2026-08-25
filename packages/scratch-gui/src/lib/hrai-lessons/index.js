@@ -94,6 +94,23 @@ const lessons = [
         goal: 'Obsluž zákazníky a spravuj seznam nákupu.',
         concepts: 'seznamy · kliknutí na postavu · opakování',
         stages: ['Přidej zboží.', 'Přijmi objednávku.', 'Veď seznam.', 'Dokonči nákup.']
+    },
+    {
+        id: '11-soldier-battle',
+        title: 'Bitva vojáků',
+        englishTitle: 'Soldier Battle',
+        duration: '90–120 minut',
+        goal: 'Vyber své vojáky a poraz více nepřátel, než jich na konci zůstane.',
+        concepts: 'kliknutí · proměnné · dosah · poškození · klony · čas',
+        stages: [
+            'Připrav vojáky s mečem a lukem na bojišti.',
+            'Vyber vlastního vojáka a označ ho.',
+            'Kliknutím na nepřítele proveď útok v dosahu.',
+            'Přidej životy, poškození a odstranění poraženého nepřítele.',
+            'Přidej lukostřelce s delším dosahem.',
+            'Přidej šedesátisekundový časovač a nejvýše pět posil.',
+            'Spočítej výsledek a ukaž výhru nebo prohru.'
+        ]
     }
 ];
 

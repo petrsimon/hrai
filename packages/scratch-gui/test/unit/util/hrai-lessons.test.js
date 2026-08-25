@@ -1,7 +1,7 @@
 import lessons from '../../../src/lib/hrai-lessons';
 
-test('HRAI lesson library contains the ten course lessons', () => {
-    expect(lessons).toHaveLength(10);
+test('HRAI lesson library contains the course lessons', () => {
+    expect(lessons).toHaveLength(11);
     expect(lessons.map(lesson => lesson.id)).toEqual([
         '01-space-rover',
         '02-pearl-diver',
@@ -12,7 +12,8 @@ test('HRAI lesson library contains the ten course lessons', () => {
         '07-cave-glider',
         '08-crosswalk-crew',
         '09-meteor-guard',
-        '10-farm-stand'
+        '10-farm-stand',
+        '11-soldier-battle'
     ]);
     lessons.forEach(lesson => {
         expect(lesson.stages.length).toBeGreaterThan(0);

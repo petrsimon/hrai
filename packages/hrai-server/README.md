@@ -44,6 +44,13 @@ still opens and says so calmly — a child should never meet a stack trace.
 Override the server location with `HRAI_SERVER_URL` at build time, and the port it
 listens on with `HRAI_PORT`.
 
+## Lesson bundle prototype
+
+The first game-specific bundle lives at `content/lessons/11-soldier-battle/`. It contains
+Czech and English guides, staged goals, the battle rules, and structural predicates for the
+future lesson runner. The editor lesson library currently exposes the staged guide; loading
+starter `.sb3` files and executing predicates in a lesson session are the next runtime slice.
+
 ## What the two suites do, and why both are needed
 
 | Suite | Asserts |
