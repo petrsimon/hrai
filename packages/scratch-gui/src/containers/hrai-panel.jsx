@@ -14,7 +14,7 @@ const HELPER_UNAVAILABLE_ID = 'helper-unavailable';
 const messages = defineMessages({
     helperUnavailable: {
         id: 'gui.hrai.helperUnavailable',
-        defaultMessage: 'The helper is not available right now.',
+        defaultMessage: 'Pomocník teď není k dispozici.',
         description: 'calm message shown when the hrai tutor server cannot be reached'
     }
 });
