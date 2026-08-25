@@ -18,7 +18,7 @@
  */
 import { describe, expect, it, beforeAll } from "vitest";
 import fixtures from "./fixtures/tutor-fixtures.json" with { type: "json" };
-import { EVAL_MODEL, chat, warnSkipped, isModelAvailable } from "./ollama.ts";
+import { EVAL_MODEL, chat, warnSkipped, isModelAvailable } from "../src/model-client.ts";
 
 const DIAGNOSTIC_SYSTEM = [
     "You are the diagnostic component of a Scratch tutor. You are NOT talking to a child.",

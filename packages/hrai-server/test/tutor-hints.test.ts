@@ -9,7 +9,7 @@
  */
 import { describe, expect, it, beforeAll } from "vitest";
 import fixtures from "./fixtures/tutor-fixtures.json" with { type: "json" };
-import { EVAL_MODEL, chat, warnSkipped, isModelAvailable } from "./ollama.ts";
+import { EVAL_MODEL, chat, warnSkipped, isModelAvailable } from "../src/model-client.ts";
 
 let available = false;
 beforeAll(async () => {
