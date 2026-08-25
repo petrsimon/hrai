@@ -48,9 +48,7 @@ import {setTheme} from '../../reducers/settings.js';
 import {PLATFORM} from '../../lib/platform.js';
 import {MenuRefProvider} from '../../contexts/menu-ref-context.jsx';
 import {ModalFocusProvider} from '../../contexts/modal-focus-context.jsx';
-import HraiPanel from '../hrai-panel/hrai-panel.jsx';
-
-const hraiPanelPlaceholderSend = () => {};
+import HraiPanel from '../../containers/hrai-panel.jsx';
 
 const ariaMessages = defineMessages({
     menuBar: {
@@ -577,10 +575,7 @@ const GUIComponent = props => {
                         {/* Hidden in fullscreen: .stage-wrapper.full-screen is position:fixed
                             over the viewport, so the panel would render underneath it. */}
                         {showHraiPanel && !isFullScreen ? (
-                            <HraiPanel
-                                messages={[]}
-                                onSend={hraiPanelPlaceholderSend}
-                            />
+                            <HraiPanel />
                         ) : null}
                     </Box>
                     <DragLayer />
