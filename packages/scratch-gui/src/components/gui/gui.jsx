@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import omit from 'lodash.omit';
 import PropTypes from 'prop-types';
-import React, {useEffect, useCallback} from 'react';
+import React, {useEffect, useCallback, useState} from 'react';
 import {defineMessages, FormattedMessage, useIntl} from 'react-intl';
 import {connect} from 'react-redux';
 import MediaQuery from 'react-responsive';
@@ -211,6 +211,10 @@ const GUIComponent = props => {
         vm,
         ...componentProps
     } = omit(props, 'dispatch', 'setPlatform');
+    const [hraiAssistantVisible, setHraiAssistantVisible] = useState(showHraiPanel);
+    const toggleHraiAssistant = useCallback(() => {
+        setHraiAssistantVisible(visible => !visible);
+    }, []);
     if (children) {
         return <Box {...componentProps}>{children}</Box>;
     }
@@ -559,6 +563,9 @@ const GUIComponent = props => {
                                 onSetManualThumbnailButtonClick={onSetManualThumbnailButtonClick}
                                 loading={loading}
                                 showNewFeatureCallouts={showNewFeatureCallouts}
+                                showHraiAssistant={showHraiPanel}
+                                hraiAssistantVisible={hraiAssistantVisible}
+                                onToggleHraiAssistant={toggleHraiAssistant}
                                 userOwnsProject={userOwnsProject}
                                 username={username}
                                 onUpdateProjectThumbnail={onUpdateProjectThumbnail}
@@ -579,7 +586,7 @@ const GUIComponent = props => {
                         </Box>
                         {/* Hidden in fullscreen: .stage-wrapper.full-screen is position:fixed
                             over the viewport, so the panel would render underneath it. */}
-                        {showHraiPanel && !isFullScreen ? (
+                        {hraiAssistantVisible && !isFullScreen ? (
                             <HraiPanel />
                         ) : null}
                     </Box>

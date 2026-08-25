@@ -28,6 +28,9 @@ const StageWrapperComponent = function (props) {
         userOwnsProject,
         stageSize,
         showNewFeatureCallouts,
+        showHraiAssistant,
+        hraiAssistantVisible,
+        onToggleHraiAssistant,
         vm
     } = props;
     return (
@@ -51,6 +54,9 @@ const StageWrapperComponent = function (props) {
                     loadingOrCreating={loading || isCreating}
                     onUpdateProjectThumbnail={onUpdateProjectThumbnail}
                     showNewFeatureCallouts={showNewFeatureCallouts}
+                    showHraiAssistant={showHraiAssistant}
+                    hraiAssistantVisible={hraiAssistantVisible}
+                    onToggleHraiAssistant={onToggleHraiAssistant}
                     stageSize={stageSize}
                     vm={vm}
                 />
@@ -84,6 +90,9 @@ StageWrapperComponent.propTypes = {
     onSetManualThumbnail: PropTypes.func,
     onSetManualThumbnailButtonClick: PropTypes.func,
     showNewFeatureCallouts: PropTypes.bool,
+    showHraiAssistant: PropTypes.bool,
+    hraiAssistantVisible: PropTypes.bool,
+    onToggleHraiAssistant: PropTypes.func,
     username: PropTypes.string,
     userOwnsProject: PropTypes.bool,
     onUpdateProjectThumbnail: PropTypes.func,
