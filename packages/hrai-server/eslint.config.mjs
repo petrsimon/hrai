@@ -5,7 +5,7 @@ import globals from 'globals'
 export default eslintConfigScratch.defineConfig(
   eslintConfigScratch.recommended,
   {
-    files: ['test/**'],
+    files: ['src/**', 'test/**'],
     languageOptions: {
       globals: globals.node,
       parserOptions: {

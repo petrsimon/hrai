@@ -4,16 +4,34 @@
 import { describe, expect, it } from "vitest";
 import { renderProject, type Block, type RenderTarget } from "../src/render.ts";
 
-/** Builds a block with the defaults the VM would supply. */
+/**
+ * Builds a block with the defaults the VM would supply.
+ * @param id Unique identifier the alias map will point back to.
+ * @param opcode Scratch opcode, e.g. `motion_movesteps`.
+ * @param extra Overrides such as `next`, `inputs` or `topLevel`.
+ * @returns A block ready to drop into a target's block map.
+ */
 function block(id: string, opcode: string, extra: Partial<Block> = {}): Block {
     return { id, opcode, next: null, parent: null, inputs: {}, fields: {}, ...extra };
 }
 
-/** A numeric shadow, as the VM stores a literal the child typed. */
+/**
+ * A numeric shadow, as the VM stores a literal the child typed.
+ * @param id Block ID.
+ * @param value The literal value.
+ * @returns The shadow block.
+ */
 function numberShadow(id: string, value: number): Block {
     return block(id, "math_number", { shadow: true, fields: { NUM: { name: "NUM", value } } });
 }
 
+/**
+ * Builds a render target from a list of blocks.
+ * @param name Sprite name.
+ * @param blocks Blocks belonging to the sprite.
+ * @param id Target ID, defaulting to the name.
+ * @returns The render target.
+ */
 function target(name: string, blocks: Block[], id = name): RenderTarget {
     return { id, name, isStage: false, blocks: Object.fromEntries(blocks.map((b) => [b.id, b])) };
 }
@@ -60,7 +78,9 @@ describe("renderProject", () => {
         expect(forever).toBeLessThan(move);
         expect(move).toBeLessThan(end);
         // The nested block is indented past its container.
-        expect(lines[move].indexOf("move")).toBeGreaterThan(lines[forever].indexOf("forever"));
+        const moveLine = lines[move] ?? "";
+        const foreverLine = lines[forever] ?? "";
+        expect(moveLine.indexOf("move")).toBeGreaterThan(foreverLine.indexOf("forever"));
     });
 
     it("renders a boolean input inside angle brackets", () => {

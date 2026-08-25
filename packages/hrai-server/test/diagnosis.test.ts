@@ -53,7 +53,7 @@ describe(`diagnosis (${EVAL_MODEL})`, () => {
                 `<project>\n${c.render}\n</project>\n\nSymptom the child reports: ${c.question}`,
             );
 
-            const [head, tail = ""] = text.split(/CAUSE/i);
+            const [head = "", tail = ""] = text.split(/CAUSE/i);
             const named = head.toLowerCase().match(/\bb\d+\b|none/g) ?? [];
 
             expect(

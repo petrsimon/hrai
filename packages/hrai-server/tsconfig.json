@@ -15,7 +15,8 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
     "allowImportingTsExtensions": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": [
     "src",

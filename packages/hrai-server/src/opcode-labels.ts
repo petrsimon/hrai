@@ -58,9 +58,7 @@ export function iconSlots(opcode: string): string[] {
     return ICON_SLOTS[opcode] ?? [];
 }
 
-type Catalogue = Record<string, Record<string, string>>;
-
-const catalogue = blocksMessages as unknown as Catalogue;
+const catalogue = blocksMessages;
 
 /**
  * The label template for an opcode, with `%1`/`%2` marking input slots.

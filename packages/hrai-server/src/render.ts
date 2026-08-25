@@ -55,6 +55,21 @@ export interface Render {
 }
 
 const BRANCH_PREFIX = "SUBSTACK";
+
+/**
+ * Stringifies a block field value for display.
+ *
+ * Field values are `unknown`: the VM stores whatever the field holds, and a plain
+ * `String()` would render an object as `[object Object]` in front of the model.
+ * @param value The raw field value.
+ * @returns A display string, empty for null or undefined.
+ */
+function fieldText(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "object") return JSON.stringify(value);
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- primitives only past this point
+    return String(value);
+}
 const INDENT = "  ";
 
 class RenderState {
@@ -62,6 +77,11 @@ class RenderState {
     readonly aliases = new Map<string, string>();
     private nextAlias = 1;
 
+    /**
+     * Assigns the next alias to a block.
+     * @param blockId The real block ID.
+     * @returns The alias, valid only for this render.
+     */
     aliasFor(blockId: string): string {
         const alias = `b${this.nextAlias++}`;
         this.aliases.set(alias, blockId);
@@ -73,6 +93,10 @@ class RenderState {
  * Renders one block's inline value: a nested reporter, a shadow's literal, or a field.
  * Inline values deliberately get no alias — the model refers to the statement that
  * contains them, and aliasing every literal would triple the alias count for no gain.
+ * @param blocks All blocks in the target, for resolving the referenced block.
+ * @param input The input slot being rendered.
+ * @param locale Catalogue locale to draw the template from.
+ * @returns Inline text, wrapped in `<>` for booleans and `()` otherwise.
  */
 function renderInputValue(blocks: Record<string, Block>, input: BlockInput, locale: string): string {
     const id = input.block ?? input.shadow;
@@ -83,7 +107,7 @@ function renderInputValue(blocks: Record<string, Block>, input: BlockInput, loca
     // A shadow with a single field is a literal the child typed or picked.
     const fieldValues = Object.values(block.fields);
     if (block.shadow && fieldValues.length === 1) {
-        return String(fieldValues[0].value ?? "");
+        return fieldText(fieldValues[0]?.value);
     }
 
     const inner = renderBlockLabel(blocks, block, locale);
@@ -97,13 +121,17 @@ function renderInputValue(blocks: Record<string, Block>, input: BlockInput, loca
  * Fills a block's label template with its inputs and fields.
  * Falls back to the humanized opcode when the catalogue has no template, so a block
  * is never rendered as an empty line.
+ * @param blocks All blocks in the target.
+ * @param block The block whose label is being built.
+ * @param locale Catalogue locale to draw the template from.
+ * @returns The filled label text.
  */
 function renderBlockLabel(blocks: Record<string, Block>, block: Block, locale: string): string {
     const template = labelTemplate(block.opcode, locale);
     if (!template) {
         // Variable and list reporters carry their name in a field rather than a label.
         const field = Object.values(block.fields)[0];
-        return field ? String(field.value ?? "") : humanizeOpcode(block.opcode);
+        return field ? fieldText(field.value) : humanizeOpcode(block.opcode);
     }
 
     // %1, %2... are filled by icon text first, then inputs, then fields, in order.
@@ -112,14 +140,21 @@ function renderBlockLabel(blocks: Record<string, Block>, block: Block, locale: s
         ...Object.values(block.inputs)
             .filter((i) => !i.name.startsWith(BRANCH_PREFIX))
             .map((i) => renderInputValue(blocks, i, locale)),
-        ...Object.values(block.fields).map((f) => `[${String(f.value ?? "")}]`),
+        ...Object.values(block.fields).map((f) => `[${fieldText(f.value)}]`),
     ];
 
     let slot = 0;
     return template.replace(/%\d/g, () => slots[slot++] ?? "()").trim();
 }
 
-/** Renders a stack of blocks starting at `startId`, following `next` to the end. */
+/**
+ * Renders a stack of blocks starting at `startId`, following `next` to the end.
+ * @param state Accumulating lines and alias map.
+ * @param blocks All blocks in the target.
+ * @param startId First block of the stack, or null to render nothing.
+ * @param depth Nesting depth; one indent level each.
+ * @param locale Catalogue locale to draw the template from.
+ */
 function renderStack(
     state: RenderState,
     blocks: Record<string, Block>,
@@ -150,7 +185,11 @@ function renderStack(
     }
 }
 
-/** True for a block that starts a script and is not itself an inline value. */
+/**
+ * True for a block that starts a script and is not itself an inline value.
+ * @param block The block to test.
+ * @returns Whether the block roots a script.
+ */
 function isScriptRoot(block: Block): boolean {
     return Boolean(block.topLevel) && !block.shadow;
 }
