@@ -29,12 +29,16 @@ If you want to work on fixing issues, you should be familiar with Git and Github
 
 **Important:** we follow the [Github Flow process](https://guides.github.com/introduction/flow/) as our development process.
 
+### HRAI fork branch workflow
+
+The HRAI fork uses `main` as its product and default branch. HRAI feature and fix branches are created from `main` and target `main` in pull requests. The `develop` branch is reserved for the clean upstream baseline and initially mirrors `upstream/develop`; do not add HRAI-only changes to it. See [the upstream synchronization guide](../docs/UPSTREAM_SYNC.md) for branch roles and synchronization instructions.
+
 ### How to Fix Bugs
 1. Identify which Github issue you are working on. Leave a comment on the issue to let us (and other contributors) know you're working on it.
 2. Make sure you have a fork of this repo (see [Github's forking a repo](https://help.github.com/en/github/getting-started-with-github/fork-a-repo) for details)
-3. Switch to the `develop` branch, and pull down the latest changes from upstream
+3. Switch to the `main` branch, and pull down the latest HRAI changes
 4. Run the code, and reproduce the problem
-5. Create your branch from the `develop` branch
+5. Create your branch from the `main` branch
 6. Make code changes to fix the problem
 7. Run `npm test` to make sure that your changes pass our tests
 8. Commit your changes
