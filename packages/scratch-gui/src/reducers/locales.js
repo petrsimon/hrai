@@ -1,14 +1,23 @@
 import {isRtl} from 'scratch-l10n';
 import editorMessages from 'scratch-l10n/locales/editor-msgs';
 
+import {forLocale as hraiMessagesForLocale} from '../lib/hrai-messages';
+
 const UPDATE_LOCALES = 'scratch-gui/locales/UPDATE_LOCALES';
 const SELECT_LOCALE = 'scratch-gui/locales/SELECT_LOCALE';
+
+const withHraiMessages = messagesByLocale => Object.keys(messagesByLocale).reduce((result, locale) => {
+    result[locale] = Object.assign({}, messagesByLocale[locale], hraiMessagesForLocale(locale));
+    return result;
+}, {});
+
+const messagesByLocale = withHraiMessages(editorMessages);
 
 const initialState = {
     isRtl: false,
     locale: 'en',
-    messagesByLocale: editorMessages,
-    messages: editorMessages.en
+    messagesByLocale,
+    messages: messagesByLocale.en
 };
 
 const reducer = function (state, action) {
@@ -21,13 +30,15 @@ const reducer = function (state, action) {
             messagesByLocale: state.messagesByLocale,
             messages: state.messagesByLocale[action.locale]
         });
-    case UPDATE_LOCALES:
+    case UPDATE_LOCALES: {
+        const updatedMessagesByLocale = withHraiMessages(action.messagesByLocale);
         return Object.assign({}, state, {
             isRtl: state.isRtl,
             locale: state.locale,
-            messagesByLocale: action.messagesByLocale,
-            messages: action.messagesByLocale[state.locale]
+            messagesByLocale: updatedMessagesByLocale,
+            messages: updatedMessagesByLocale[state.locale]
         });
+    }
     default:
         return state;
     }
