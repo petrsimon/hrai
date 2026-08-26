@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import PropTypes from 'prop-types';
 import React, {useMemo} from 'react';
-import {useIntl, FormattedMessage, defineMessage} from 'react-intl';
+import {useIntl, FormattedMessage, defineMessages} from 'react-intl';
 import {connect} from 'react-redux';
 import useMenuNavigation from '../../hooks/use-menu-navigation';
 
@@ -23,10 +23,22 @@ import dropdownCaret from './dropdown-caret.svg';
 import settingsIcon from './icon--settings.svg';
 import themeIcon from '../../lib/assets/icon--theme.svg';
 
-const settingsMenuAriaMessage = defineMessage({
-    id: 'gui.aria.settingsMenu',
-    defaultMessage: 'Settings menu',
-    description: 'accessibility label for settings menu'
+const {settingsMenuAriaMessage, themeMessage, colorModeMessage} = defineMessages({
+    settingsMenuAriaMessage: {
+        id: 'gui.aria.settingsMenu',
+        defaultMessage: 'Settings menu',
+        description: 'accessibility label for settings menu'
+    },
+    themeMessage: {
+        id: 'gui.menuBar.theme',
+        defaultMessage: 'Theme',
+        description: 'Theme sub-menu'
+    },
+    colorModeMessage: {
+        id: 'gui.menuBar.colorMode',
+        defaultMessage: 'Color Mode',
+        description: 'Color mode sub-menu'
+    }
 });
 
 const enabledColorModes = [DEFAULT_MODE, HIGH_CONTRAST_MODE];
@@ -105,11 +117,7 @@ const SettingsMenu = ({
                         itemsMap={availableThemesMap}
                         onChange={onChangeTheme}
                         defaultMenuIconSrc={themeIcon}
-                        submenuLabel={{
-                            defaultMessage: 'Theme',
-                            description: 'Theme sub-menu',
-                            id: 'gui.menuBar.theme'
-                        }}
+                        submenuLabel={themeMessage}
                         selectedItemKey={activeTheme}
                         isRtl={isRtl}
                         depth={depth + 1}
@@ -117,11 +125,7 @@ const SettingsMenu = ({
                 {canChangeColorMode && <PreferenceMenu
                     itemsMap={enabledColorModesMap}
                     onChange={onChangeColorMode}
-                    submenuLabel={{
-                        defaultMessage: 'Color Mode',
-                        description: 'Color mode sub-menu',
-                        id: 'gui.menuBar.colorMode'
-                    }}
+                    submenuLabel={colorModeMessage}
                     selectedItemKey={activeColorMode}
                     isRtl={isRtl}
                     depth={depth + 1}

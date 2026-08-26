@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import PropTypes from 'prop-types';
 import React, {useCallback, useRef} from 'react';
-import {useIntl, FormattedMessage, defineMessage} from 'react-intl';
+import {useIntl, FormattedMessage, defineMessages} from 'react-intl';
 import {connect} from 'react-redux';
 import locales from 'scratch-l10n';
 
@@ -16,10 +16,12 @@ import stylesLanguageMenu from './language-menu.css';
 
 import dropdownCaret from './dropdown-caret.svg';
 
-const languageMenu = defineMessage({
-    id: 'gui.aria.languageMenu',
-    defaultMessage: 'Language menu',
-    description: 'accessibility label for language menu'
+const {languageMenu} = defineMessages({
+    languageMenu: {
+        id: 'gui.aria.languageMenu',
+        defaultMessage: 'Language menu',
+        description: 'accessibility label for language menu'
+    }
 });
 
 const LanguageMenu = ({

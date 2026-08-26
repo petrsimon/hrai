@@ -1,7 +1,7 @@
 import React, {useCallback} from 'react';
 import PropTypes from 'prop-types';
 import classNames from 'classnames';
-import {useIntl, defineMessage} from 'react-intl';
+import {useIntl, defineMessages} from 'react-intl';
 import {connect} from 'react-redux';
 
 import MenuBarMenu from './menu-bar-menu.jsx';
@@ -13,10 +13,12 @@ import stylesMenuBar from './menu-bar.css';
 import stylesAboutMenu from './about-menu.css';
 import aboutIcon from './icon--about.svg';
 
-const aboutMenuMessage = defineMessage({
-    id: 'gui.aria.aboutMenu',
-    defaultMessage: 'About menu',
-    description: 'accessibility label for About menu'
+const {aboutMenuMessage} = defineMessages({
+    aboutMenuMessage: {
+        id: 'gui.aria.aboutMenu',
+        defaultMessage: 'About menu',
+        description: 'accessibility label for About menu'
+    }
 });
 
 const AboutButton = props => {
