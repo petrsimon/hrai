@@ -16,6 +16,8 @@ const PANEL_MIN_WIDTH = 224;
 const PANEL_MAX_WIDTH = 512;
 const PANEL_KEYBOARD_STEP = 16;
 const BLOCK_SLOT_PLACEHOLDER = '\u25BE';
+const MAX_VOICE_DURATION_MS = 10_000;
+const VOICE_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'];
 
 const messages = defineMessages({
     panelLabel: {
@@ -102,6 +104,51 @@ const messages = defineMessages({
         id: 'gui.hrai.stageSuccess',
         defaultMessage: 'Hotovo, když',
         description: 'heading for the deterministic lesson completion condition'
+    },
+    voiceStart: {
+        id: 'gui.hrai.voiceStart',
+        defaultMessage: 'Nahrát hlas',
+        description: 'button to start an hrai voice recording'
+    },
+    voiceStop: {
+        id: 'gui.hrai.voiceStop',
+        defaultMessage: 'Zastavit nahrávání',
+        description: 'button to stop an hrai voice recording'
+    },
+    voiceTranscribe: {
+        id: 'gui.hrai.voiceTranscribe',
+        defaultMessage: 'Přepsat nahrávku',
+        description: 'button to transcribe a recorded hrai voice message'
+    },
+    voiceDiscard: {
+        id: 'gui.hrai.voiceDiscard',
+        defaultMessage: 'Zahodit nahrávku',
+        description: 'button to discard an hrai voice recording'
+    },
+    voiceTranscribing: {
+        id: 'gui.hrai.voiceTranscribing',
+        defaultMessage: 'Přepisuji nahrávku…',
+        description: 'status shown while hrai transcribes a voice recording'
+    },
+    voiceUnavailable: {
+        id: 'gui.hrai.voiceUnavailable',
+        defaultMessage: 'Hlasové zadávání teď není k dispozici.',
+        description: 'status shown when local hrai speech recognition is unavailable'
+    },
+    voicePermissionDenied: {
+        id: 'gui.hrai.voicePermissionDenied',
+        defaultMessage: 'Povol mikrofon v nastavení prohlížeče, nebo napiš zprávu.',
+        description: 'status shown when microphone permission is denied'
+    },
+    voiceUnsupported: {
+        id: 'gui.hrai.voiceUnsupported',
+        defaultMessage: 'Tento prohlížeč neumí nahrávat hlas.',
+        description: 'status shown when browser recording is unsupported'
+    },
+    voiceFailed: {
+        id: 'gui.hrai.voiceFailed',
+        defaultMessage: 'Nahrávku se nepodařilo přepsat. Zkus to znovu, nebo napiš zprávu.',
+        description: 'status shown when voice transcription fails'
     }
 });
 
@@ -290,13 +337,29 @@ const HraiPanel = ({
     lessonProgress,
     onNextStage,
     rung,
-    onAliasClick
+    onAliasClick,
+    onVoiceSubmit,
+    voiceCapabilities,
+    voiceErrorCode,
+    voiceStatus,
+    voiceTranscript
 }) => {
     const intl = useIntl();
     const [draft, setDraft] = useState('');
     const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT_WIDTH);
+    const [voicePhase, setVoicePhase] = useState('idle');
+    const [voiceBlob, setVoiceBlob] = useState(null);
+    const [voiceUrl, setVoiceUrl] = useState(null);
+    const [voiceRequestId, setVoiceRequestId] = useState(null);
+    const [voiceLocalError, setVoiceLocalError] = useState(null);
     const resizeState = useRef(null);
     const messagesEndRef = useRef(null);
+    const recorderRef = useRef(null);
+    const streamRef = useRef(null);
+    const chunksRef = useRef([]);
+    const recordingStartedAtRef = useRef(0);
+    const recordingDurationRef = useRef(0);
+    const recordingTimerRef = useRef(null);
 
     const formatBlockReference = useCallback(alias => intl.formatMessage(
         messages.blockReference,
@@ -314,6 +377,171 @@ const HraiPanel = ({
         }
     }, [onAliasClick]);
 
+    const stopStream = useCallback(() => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+    }, []);
+
+    const resetVoice = useCallback((clearDraft = false) => {
+        if (recordingTimerRef.current) {
+            clearTimeout(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+        }
+        stopStream();
+        if (voiceUrl) {
+            URL.revokeObjectURL(voiceUrl);
+        }
+        recorderRef.current = null;
+        chunksRef.current = [];
+        setVoiceBlob(null);
+        setVoiceUrl(null);
+        setVoiceRequestId(null);
+        setVoicePhase('idle');
+        setVoiceLocalError(null);
+        if (clearDraft) {
+            setDraft('');
+        }
+    }, [stopStream, voiceUrl]);
+
+    useEffect(() => () => {
+        if (recordingTimerRef.current) {
+            clearTimeout(recordingTimerRef.current);
+        }
+        stopStream();
+        if (voiceUrl) {
+            URL.revokeObjectURL(voiceUrl);
+        }
+    }, [stopStream, voiceUrl]);
+
+    useEffect(() => {
+        if (!voiceTranscript || (voiceRequestId && voiceTranscript.requestId !== voiceRequestId)) {
+            return;
+        }
+        if (!voiceRequestId) {
+            setVoiceRequestId(voiceTranscript.requestId);
+        }
+        setDraft(voiceTranscript.text);
+        setVoicePhase('transcript');
+        setVoiceLocalError(null);
+    }, [voiceRequestId, voiceTranscript]);
+
+    useEffect(() => {
+        if (voiceErrorCode && (!voiceErrorCode.requestId || voiceErrorCode.requestId === voiceRequestId)) {
+            setVoicePhase('error');
+        }
+    }, [voiceErrorCode, voiceRequestId]);
+
+    const startRecording = useCallback(async () => {
+        setVoiceLocalError(null);
+        if (!voiceCapabilities.available) {
+            setVoiceLocalError('unavailable');
+            return;
+        }
+        if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+            setVoiceLocalError('unsupported');
+            return;
+        }
+
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({audio: true});
+        } catch (error) {
+            if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+                setVoiceLocalError('permission_denied');
+            } else {
+                setVoiceLocalError('recording_failed');
+            }
+            return;
+        }
+
+        const mimeType = VOICE_MIME_TYPES.find(type => MediaRecorder.isTypeSupported(type));
+        const recorder = mimeType ? new MediaRecorder(stream, {mimeType}) : new MediaRecorder(stream);
+        streamRef.current = stream;
+        recorderRef.current = recorder;
+        chunksRef.current = [];
+        recordingStartedAtRef.current = performance.now();
+        recorder.ondataavailable = event => {
+            if (event.data.size > 0) {
+                chunksRef.current.push(event.data);
+            }
+        };
+        recorder.onstop = () => {
+            if (recordingTimerRef.current) {
+                clearTimeout(recordingTimerRef.current);
+                recordingTimerRef.current = null;
+            }
+            recordingDurationRef.current = Math.max(1, Math.min(
+                MAX_VOICE_DURATION_MS,
+                Math.round(performance.now() - recordingStartedAtRef.current)
+            ));
+            const blob = new Blob(chunksRef.current, {type: recorder.mimeType});
+            stopStream();
+            recorderRef.current = null;
+            if (blob.size === 0) {
+                setVoiceLocalError('recording_failed');
+                setVoicePhase('error');
+                return;
+            }
+            setVoiceBlob(blob);
+            setVoiceUrl(URL.createObjectURL(blob));
+            setVoicePhase('review');
+        };
+        recorder.start();
+        setVoicePhase('recording');
+        recordingTimerRef.current = setTimeout(() => {
+            if (recorder.state === 'recording') {
+                recorder.stop();
+            }
+        }, MAX_VOICE_DURATION_MS);
+    }, [voiceCapabilities.available, stopStream]);
+
+    const stopRecording = useCallback(() => {
+        if (recordingTimerRef.current) {
+            clearTimeout(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+        }
+        if (recorderRef.current?.state === 'recording') {
+            recorderRef.current.stop();
+        }
+    }, []);
+
+    const transcribeRecording = useCallback(async () => {
+        if (!voiceBlob || voicePhase === 'transcribing') {
+            return;
+        }
+        const requestId = `voice-${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}`;
+        setVoiceRequestId(requestId);
+        setVoicePhase('transcribing');
+        setVoiceLocalError(null);
+        try {
+            onVoiceSubmit({
+                requestId,
+                mimeType: voiceBlob.type,
+                durationMs: recordingDurationRef.current,
+                audio: await voiceBlob.arrayBuffer()
+            });
+        } catch {
+            setVoiceLocalError('recording_failed');
+            setVoicePhase('error');
+        }
+    }, [onVoiceSubmit, voiceBlob, voicePhase]);
+
+    const handleVoiceButton = useCallback(() => {
+        if (voicePhase === 'recording') {
+            stopRecording();
+        } else {
+            void startRecording();
+        }
+    }, [startRecording, stopRecording, voicePhase]);
+
+    const discardVoice = useCallback(() => {
+        resetVoice(voicePhase !== 'transcript');
+    }, [resetVoice, voicePhase]);
+
     const submitDraft = useCallback(() => {
         const trimmed = draft.trim();
         if (!trimmed) {
@@ -322,7 +550,8 @@ const HraiPanel = ({
 
         onSend(trimmed);
         setDraft('');
-    }, [draft, onSend]);
+        resetVoice();
+    }, [draft, onSend, resetVoice]);
 
     const handleInputChange = useCallback(event => {
         setDraft(event.target.value);
@@ -417,6 +646,22 @@ const HraiPanel = ({
     const hintExplanation = hintMaxReached ?
         intl.formatMessage(messages.hintMaxReached) :
         null;
+    const voiceErrorMessage = {
+        unavailable: messages.voiceUnavailable,
+        stt_unavailable: messages.voiceUnavailable,
+        permission_denied: messages.voicePermissionDenied,
+        unsupported: messages.voiceUnsupported,
+        recording_failed: messages.voiceFailed,
+        invalid_payload: messages.voiceFailed,
+        size_limit: messages.voiceFailed,
+        duration_limit: messages.voiceFailed,
+        unsupported_format: messages.voiceFailed,
+        stt_failed: messages.voiceFailed,
+        empty_transcript: messages.voiceFailed
+    }[voiceLocalError || voiceErrorCode?.code];
+    const voiceButtonDisabled = !voiceCapabilities.available || isThinking ||
+        voicePhase === 'transcribing' || voicePhase === 'transcript' ||
+        Boolean(voiceBlob && voicePhase !== 'recording');
 
     return (
         <Box
@@ -521,6 +766,67 @@ const HraiPanel = ({
                 ) : null}
                 <div ref={messagesEndRef} />
             </div>
+            <div className={styles.voiceArea}>
+                {voiceUrl ? (
+                    <audio
+                        className={styles.voicePreview}
+                        controls
+                        src={voiceUrl}
+                    />
+                ) : null}
+                {voicePhase === 'transcribing' || voiceStatus?.status === 'transcribing' ? (
+                    <p
+                        className={styles.voiceStatus}
+                        aria-live="polite"
+                    >
+                        <FormattedMessage {...messages.voiceTranscribing} />
+                    </p>
+                ) : null}
+                {voiceErrorMessage ? (
+                    <p
+                        className={styles.voiceError}
+                        role="alert"
+                    >
+                        <FormattedMessage {...voiceErrorMessage} />
+                    </p>
+                ) : null}
+                <div className={styles.voiceControls}>
+                    <Button
+                        type="button"
+                        className={styles.voiceButton}
+                        disabled={voiceButtonDisabled}
+                        onClick={handleVoiceButton}
+                    >
+                        <FormattedMessage
+                            {...(voicePhase === 'recording' ? messages.voiceStop : messages.voiceStart)}
+                        />
+                    </Button>
+                    {voiceBlob && (voicePhase === 'review' || voicePhase === 'error') ? (
+                        <Button
+                            type="button"
+                            className={styles.voiceSecondaryButton}
+                            disabled={voicePhase === 'transcribing'}
+                            onClick={transcribeRecording}
+                        >
+                            <FormattedMessage {...messages.voiceTranscribe} />
+                        </Button>
+                    ) : null}
+                    {voiceBlob ? (
+                        <Button
+                            type="button"
+                            className={styles.voiceSecondaryButton}
+                            onClick={discardVoice}
+                        >
+                            <FormattedMessage {...messages.voiceDiscard} />
+                        </Button>
+                    ) : null}
+                </div>
+                {!voiceCapabilities.available && !voiceErrorMessage ? (
+                    <p className={styles.voiceStatus}>
+                        <FormattedMessage {...messages.voiceUnavailable} />
+                    </p>
+                ) : null}
+            </div>
             <div className={styles.hintArea}>
                 <Button
                     type="button"
@@ -593,7 +899,25 @@ HraiPanel.propTypes = {
     onHint: PropTypes.func.isRequired,
     onNextStage: PropTypes.func.isRequired,
     onSend: PropTypes.func.isRequired,
-    rung: PropTypes.number
+    onVoiceSubmit: PropTypes.func,
+    rung: PropTypes.number,
+    voiceCapabilities: PropTypes.shape({
+        available: PropTypes.bool,
+        languages: PropTypes.arrayOf(PropTypes.string)
+    }),
+    voiceErrorCode: PropTypes.shape({
+        code: PropTypes.string.isRequired,
+        requestId: PropTypes.string
+    }),
+    voiceStatus: PropTypes.shape({
+        requestId: PropTypes.string,
+        status: PropTypes.string
+    }),
+    voiceTranscript: PropTypes.shape({
+        language: PropTypes.string,
+        requestId: PropTypes.string,
+        text: PropTypes.string
+    })
 };
 
 HraiPanel.defaultProps = {
@@ -601,7 +925,12 @@ HraiPanel.defaultProps = {
     onAliasClick: null,
     lesson: null,
     lessonProgress: null,
-    rung: 0
+    onVoiceSubmit: () => {},
+    rung: 0,
+    voiceCapabilities: {available: false, languages: []},
+    voiceErrorCode: null,
+    voiceStatus: null,
+    voiceTranscript: null
 };
 
 export default HraiPanel;

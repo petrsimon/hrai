@@ -103,6 +103,24 @@ disabled so tutor replies stay concise. HRAI selects it with
 `HRAI_MODEL_BACKEND=llama.cpp`; Ollama remains the default for non-Compose
 development and evaluation commands.
 
+## Local voice input
+
+The Compose stack includes a whisper.cpp sidecar for optional voice input. The
+first start downloads the multilingual `ggml-small.bin` model into the
+persistent `whisper-model-cache` volume. HRAI converts browser WebM/Opus audio
+with ffmpeg and sends 16 kHz mono WAV to whisper.cpp. If the sidecar is not
+ready, text tutoring remains available and the editor disables its microphone
+button.
+
+Override the image, model file, or download URL when testing another model:
+
+```sh
+WHISPER_IMAGE=ghcr.io/ggml-org/whisper.cpp:main \
+HRAI_STT_MODEL_FILE=ggml-base.bin \
+HRAI_STT_MODEL_URL=https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin?download=true \
+docker compose -f docker-compose.yml up --build
+```
+
 ## Stop and remove
 
 Stop containers while retaining the downloaded model:

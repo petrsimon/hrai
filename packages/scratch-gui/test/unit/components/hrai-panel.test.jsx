@@ -1,5 +1,6 @@
 import React from 'react';
-import {screen} from '@testing-library/react';
+import {fireEvent, render, screen} from '@testing-library/react';
+import {IntlProvider} from 'react-intl';
 
 import HraiPanel from '../../../src/components/hrai-panel/hrai-panel.jsx';
 import {renderWithIntl} from '../../helpers/intl-helpers.jsx';
@@ -7,6 +8,34 @@ import {renderWithIntl} from '../../helpers/intl-helpers.jsx';
 describe('HraiPanel lesson guidance', () => {
     beforeAll(() => {
         window.HTMLElement.prototype.scrollIntoView = jest.fn();
+    });
+
+    test('lets the student edit a voice transcript before sending it', () => {
+        const onSend = jest.fn();
+        render(
+            <IntlProvider
+                locale="cs"
+                messages={{}}
+            >
+                <HraiPanel
+                    messages={[]}
+                    onHint={jest.fn()}
+                    onNextStage={jest.fn()}
+                    onSend={onSend}
+                    onVoiceSubmit={jest.fn()}
+                    voiceCapabilities={{available: true, languages: ['cs', 'en']}}
+                    voiceTranscript={{requestId: 'voice-1', text: 'Přidej zelenou vlajku'}}
+                    lesson={null}
+                    lessonProgress={null}
+                />
+            </IntlProvider>
+        );
+
+        const input = screen.getByLabelText('Zpráva pro hrai');
+        fireEvent.change(input, {target: {value: 'Přidej zelenou vlajku prosím'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+
+        expect(onSend).toHaveBeenCalledWith('Přidej zelenou vlajku prosím');
     });
 
     test('shows one concrete action and its completion condition', () => {

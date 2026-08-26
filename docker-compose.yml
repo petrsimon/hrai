@@ -24,6 +24,38 @@ services:
       - ${LLAMA_CACHE_DIR:-llama-cache}:/root/.cache/llama.cpp
     restart: unless-stopped
 
+  whisper-model:
+    image: alpine:3.22
+    command:
+      - sh
+      - -c
+      - >-
+        if [ ! -s /models/${HRAI_STT_MODEL_FILE:-ggml-small.bin} ]; then
+        wget -O /models/${HRAI_STT_MODEL_FILE:-ggml-small.bin}
+        "${HRAI_STT_MODEL_URL:-https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin?download=true}";
+        fi
+    volumes:
+      - whisper-model-cache:/models
+    restart: "no"
+
+  whisper:
+    image: ${WHISPER_IMAGE:-ghcr.io/ggml-org/whisper.cpp:main}
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        server=whisper-server;
+        if command -v whisper-whisper-server >/dev/null 2>&1; then server=whisper-whisper-server; fi;
+        exec "$$server" -m /models/${HRAI_STT_MODEL_FILE:-ggml-small.bin}
+        --host 0.0.0.0 --port 8080
+    volumes:
+      - whisper-model-cache:/models:ro
+    expose:
+      - "8080"
+    depends_on:
+      whisper-model:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   hrai:
     build:
       context: .
@@ -32,11 +64,13 @@ services:
       HRAI_MODEL_BACKEND: llama.cpp
       HRAI_MODEL_HOST: http://llama:8080
       HRAI_EVAL_MODEL: ${HRAI_MODEL_NAME:-Qwen3.5-27B}
+      HRAI_STT_HOST: http://whisper:8080
       HRAI_PORT: "8791"
     expose:
       - "8791"
     depends_on:
       - llama
+      - whisper
     restart: unless-stopped
 
   editor:
@@ -53,3 +87,4 @@ services:
 
 volumes:
   llama-cache:
+  whisper-model-cache:

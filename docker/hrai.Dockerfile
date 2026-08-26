@@ -6,6 +6,10 @@ RUN npm ci --omit=dev --workspace=@hrai/server --include-workspace-root=false
 
 FROM node:24-bookworm-slim
 
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HRAI_PORT=8791

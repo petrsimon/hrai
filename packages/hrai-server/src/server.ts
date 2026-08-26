@@ -11,8 +11,16 @@ import { PALETTE, labelText, opcodesNamedByLabel } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
 import type { RenderTarget } from "./render.ts";
+import {
+    MAX_VOICE_BYTES,
+    MAX_VOICE_DURATION_MS,
+    STT_LANGUAGES,
+    WhisperSpeechToText,
+    type SpeechToText,
+} from "./speech-to-text.ts";
 
 const PORT = Number(process.env.HRAI_PORT ?? 8791);
+const SOCKET_BUFFER_BYTES = MAX_VOICE_BYTES + 64 * 1024;
 
 /**
  * Narrows an incoming workspace push.
@@ -42,6 +50,45 @@ function parseQuestion(payload: unknown): string | null {
     if (typeof text !== "string") return null;
     const trimmed = text.trim();
     return trimmed.length > 0 ? trimmed : null;
+}
+
+interface VoiceSubmission {
+    requestId: string;
+    mimeType: string;
+    durationMs: number;
+    audio: Uint8Array;
+    languageHint?: string;
+};
+
+function parseVoiceSubmission(payload: unknown): VoiceSubmission | { code: string } {
+    if (typeof payload !== "object" || payload === null) return { code: "invalid_payload" };
+    const { requestId, mimeType, durationMs, audio, languageHint } = payload as Record<string, unknown>;
+    if (typeof requestId !== "string" || requestId.length === 0 || requestId.length > 128) {
+        return { code: "invalid_payload" };
+    }
+    if (typeof mimeType !== "string" || !["audio/webm", "audio/ogg"].some((type) => mimeType.startsWith(type))) {
+        return { code: "unsupported_format" };
+    }
+    if (typeof durationMs !== "number" || !Number.isInteger(durationMs) || durationMs < 1 || durationMs > MAX_VOICE_DURATION_MS) {
+        return { code: "duration_limit" };
+    }
+    if (!(audio instanceof Uint8Array) || audio.byteLength === 0 || audio.byteLength > MAX_VOICE_BYTES) {
+        return { code: "size_limit" };
+    }
+    if (languageHint !== undefined && (typeof languageHint !== "string" || !STT_LANGUAGES.includes(languageHint as typeof STT_LANGUAGES[number]))) {
+        return { code: "invalid_language" };
+    }
+    return {
+        requestId,
+        mimeType,
+        durationMs,
+        audio,
+        ...(typeof languageHint === "string" ? { languageHint } : {}),
+    };
+}
+
+interface ServerOptions {
+    speechToText?: SpeechToText;
 }
 
 const COMPLETION_CLAIM = /(?:^|\s)(?:ano|hotovo|m[aá]m|ud[eě]lal(?:a)?)(?:\s|[,.!?]|$)/iu;
@@ -87,17 +134,35 @@ function blocksNamedIn(text: string): Record<string, NamedBlock> {
 /**
  * Starts the socket server and begins accepting editor connections.
  * @param port TCP port to listen on.
+ * @param options Optional service dependencies.
+ * @param options.speechToText Speech-to-text implementation for voice requests.
  * @returns The listening http server, so callers can shut it down.
  */
-export function startServer(port = PORT) {
+export function startServer(port = PORT, options: ServerOptions = {}) {
     const http = createServer();
     const io = new Server(http, {
         // The editor is served from a different origin during development.
         cors: { origin: true },
+        maxHttpBufferSize: SOCKET_BUFFER_BYTES,
     });
+    const speechToText = options.speechToText ?? new WhisperSpeechToText();
 
     io.of("/hrai").on("connection", (socket) => {
         const session = new Session();
+        let pendingVoiceRequestId: string | null = null;
+        let voiceAvailable = false;
+        let announcedVoiceAvailability: boolean | undefined;
+
+        const announceVoiceCapabilities = async (): Promise<void> => {
+            const available = await speechToText.isAvailable();
+            voiceAvailable = available;
+            if (announcedVoiceAvailability === available) return;
+            announcedVoiceAvailability = available;
+            socket.emit("voice:capabilities", { available, languages: STT_LANGUAGES });
+        };
+        void announceVoiceCapabilities();
+        const voiceReadinessTimer = setInterval(() => void announceVoiceCapabilities(), 5_000);
+        socket.on("disconnect", () => clearInterval(voiceReadinessTimer));
 
         const emitLessonProgress = (): void => {
             const progress = session.lessonProgress;
@@ -188,6 +253,47 @@ export function startServer(port = PORT) {
         socket.on("hint", () => {
             session.escalate();
             answer("Nerozumím tomu, poraď mi víc.");
+        });
+
+        socket.on("voice:submit", (payload: unknown, acknowledge?: (result: { accepted: boolean; code?: string }) => void) => {
+            const parsed = parseVoiceSubmission(payload);
+            if ("code" in parsed) {
+                acknowledge?.({ accepted: false, code: parsed.code });
+                return;
+            }
+            if (!voiceAvailable) {
+                acknowledge?.({ accepted: false, code: "stt_unavailable" });
+                return;
+            }
+            if (pendingVoiceRequestId) {
+                acknowledge?.({ accepted: false, code: "duplicate_request" });
+                return;
+            }
+
+            pendingVoiceRequestId = parsed.requestId;
+            acknowledge?.({ accepted: true });
+            socket.emit("voice:status", { requestId: parsed.requestId, status: "accepted" });
+            socket.emit("voice:status", { requestId: parsed.requestId, status: "transcribing" });
+
+            void speechToText.transcribe(parsed)
+                .then((result) => {
+                    if (!result.text) {
+                        socket.emit("voice:failed", { requestId: parsed.requestId, code: "empty_transcript" });
+                        return;
+                    }
+                    socket.emit("voice:transcript", {
+                        requestId: parsed.requestId,
+                        text: result.text,
+                        language: result.language,
+                    });
+                })
+                .catch((error: unknown) => {
+                    console.error("hrai: voice transcription failed", error);
+                    socket.emit("voice:failed", { requestId: parsed.requestId, code: "stt_failed" });
+                })
+                .finally(() => {
+                    if (pendingVoiceRequestId === parsed.requestId) pendingVoiceRequestId = null;
+                });
         });
     });
 

@@ -46,6 +46,10 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
     const [isServerAvailable, setIsServerAvailable] = useState(false);
     const [rung, setRung] = useState(0);
     const [lessonProgress, setLessonProgress] = useState(null);
+    const [voiceCapabilities, setVoiceCapabilities] = useState({available: false, languages: []});
+    const [voiceStatus, setVoiceStatus] = useState(null);
+    const [voiceTranscript, setVoiceTranscript] = useState(null);
+    const [voiceErrorCode, setVoiceErrorCode] = useState(null);
     const activeLesson = lessons.find(lesson => lesson.id === activeLessonId);
     const socketRef = useRef(null);
     const messageIdCounter = useRef(0);
@@ -91,6 +95,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
 
         socket.on('connect', () => {
             setIsServerAvailable(true);
+            setVoiceCapabilities({available: false, languages: []});
             setChatMessages(prev => prev.filter(message => message.id !== HELPER_UNAVAILABLE_ID));
             pushWorkspace();
             if (activeLessonId) {
@@ -105,6 +110,34 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         socket.on('connect_error', markUnavailable);
         socket.on('disconnect', () => {
             setIsServerAvailable(false);
+            setVoiceCapabilities({available: false, languages: []});
+            setVoiceStatus(null);
+        });
+
+        socket.on('voice:capabilities', capabilities => {
+            setVoiceCapabilities({
+                available: Boolean(capabilities?.available),
+                languages: Array.isArray(capabilities?.languages) ? capabilities.languages : []
+            });
+        });
+
+        socket.on('voice:status', status => {
+            setVoiceStatus(status);
+            setVoiceErrorCode(null);
+        });
+
+        socket.on('voice:transcript', transcript => {
+            setVoiceTranscript(transcript);
+            setVoiceStatus(null);
+            setVoiceErrorCode(null);
+        });
+
+        socket.on('voice:failed', failure => {
+            setVoiceStatus(null);
+            setVoiceErrorCode({
+                requestId: failure?.requestId,
+                code: failure?.code || 'stt_failed'
+            });
         });
 
         socket.on('thinking', ({thinking}) => {
@@ -165,6 +198,10 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             socket.off('connect');
             socket.off('connect_error');
             socket.off('disconnect');
+            socket.off('voice:capabilities');
+            socket.off('voice:status');
+            socket.off('voice:transcript');
+            socket.off('voice:failed');
             socket.off('thinking');
             socket.off('token');
             socket.off('blocks');
@@ -229,6 +266,26 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         }
     }, [pushWorkspace]);
 
+    const handleVoiceSubmit = useCallback(payload => {
+        const socket = socketRef.current;
+        if (!socket?.connected) {
+            return;
+        }
+        setVoiceTranscript(null);
+        setVoiceErrorCode(null);
+        socket.emit('voice:submit', {
+            ...payload,
+            languageHint: intl.locale?.toLowerCase().startsWith('cs') ? 'cs' : 'en'
+        }, result => {
+            if (!result?.accepted) {
+                setVoiceErrorCode({
+                    requestId: payload.requestId,
+                    code: result?.code || 'invalid_payload'
+                });
+            }
+        });
+    }, [intl.locale]);
+
     const handleHint = useCallback(() => {
         if (socketRef.current?.connected) {
             pushWorkspace();
@@ -253,6 +310,11 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             lessonProgress={lessonProgress}
             onNextStage={handleNextStage}
             rung={rung}
+            voiceCapabilities={voiceCapabilities}
+            voiceStatus={voiceStatus}
+            voiceTranscript={voiceTranscript}
+            voiceErrorCode={voiceErrorCode}
+            onVoiceSubmit={handleVoiceSubmit}
         />
     );
 };
