@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import {connect} from 'react-redux';
 
 import fileIcon from './icon--file.svg';
-import {useIntl, FormattedMessage, defineMessage} from 'react-intl';
+import {useIntl, FormattedMessage, defineMessages} from 'react-intl';
 import MenuBarMenu from './menu-bar-menu.jsx';
 import {MenuItem, MenuSection} from '../menu/menu.jsx';
 import SB3Downloader from '../../containers/sb3-downloader.jsx';
@@ -16,10 +16,12 @@ import sharedMessages from '../../lib/shared-messages';
 
 import {saveProjectAsCopy} from '../../reducers/project-state';
 
-const fileMenu = defineMessage({
-    id: 'gui.aria.fileMenu',
-    defaultMessage: 'File menu',
-    description: 'accessibility label for file menu'
+const {fileMenu} = defineMessages({
+    fileMenu: {
+        id: 'gui.aria.fileMenu',
+        defaultMessage: 'File menu',
+        description: 'accessibility label for file menu'
+    }
 });
 
 const FileMenu = ({

@@ -3,7 +3,7 @@ import stylesMenuBar from './menu-bar.css';
 import classNames from 'classnames';
 import React from 'react';
 import useMenuNavigation from '../../hooks/use-menu-navigation';
-import {useIntl, FormattedMessage, defineMessage} from 'react-intl';
+import {useIntl, FormattedMessage, defineMessages} from 'react-intl';
 import {connect} from 'react-redux';
 import PropTypes from 'prop-types';
 
@@ -15,10 +15,12 @@ import MenuItemContainer from '../../containers/menu-item.jsx';
 import UserAvatar from './user-avatar.jsx';
 import dropdownCaret from './dropdown-caret.svg';
 
-const accountMenu = defineMessage({
-    id: 'gui.aria.accountMenu',
-    defaultMessage: 'Account menu',
-    description: 'accessibility label for account menu'
+const {accountMenu} = defineMessages({
+    accountMenu: {
+        id: 'gui.aria.accountMenu',
+        defaultMessage: 'Account menu',
+        description: 'accessibility label for account menu'
+    }
 });
 
 const AccountMenu = ({

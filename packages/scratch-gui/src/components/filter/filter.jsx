@@ -5,12 +5,14 @@ import React, {useCallback, useRef} from 'react';
 import filterIcon from './icon--filter.svg';
 import xIcon from './icon--x.svg';
 import styles from './filter.css';
-import {defineMessage, useIntl} from 'react-intl';
+import {defineMessages, useIntl} from 'react-intl';
 
-const ariaLabel = defineMessage({
-    id: 'gui.aria.clearButton',
-    defaultMessage: 'Clear',
-    description: 'ARIA label for the clear input button'
+const {ariaLabel} = defineMessages({
+    ariaLabel: {
+        id: 'gui.aria.clearButton',
+        defaultMessage: 'Clear',
+        description: 'ARIA label for the clear input button'
+    }
 });
 
 const FilterComponent = props => {

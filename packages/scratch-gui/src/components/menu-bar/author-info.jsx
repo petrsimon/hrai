@@ -1,15 +1,17 @@
 import PropTypes from 'prop-types';
 import React from 'react';
 import classNames from 'classnames';
-import {FormattedMessage, defineMessage, useIntl} from 'react-intl';
+import {FormattedMessage, defineMessages, useIntl} from 'react-intl';
 import UserAvatar from './user-avatar.jsx';
 
 import styles from './author-info.css';
 
-const authorInfo = defineMessage({
-    id: 'gui.aria.authorInfo',
-    defaultMessage: 'Project "{projectTitle}" by {username}',
-    description: 'accessibility label for author info'
+const {authorInfo} = defineMessages({
+    authorInfo: {
+        id: 'gui.aria.authorInfo',
+        defaultMessage: 'Project "{projectTitle}" by {username}',
+        description: 'accessibility label for author info'
+    }
 });
 
 const AuthorInfo = ({

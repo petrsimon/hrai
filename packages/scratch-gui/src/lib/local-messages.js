@@ -1,4 +1,39 @@
+/**
+ * Translations for message IDs the published scratch-l10n bundle does not carry, so that the
+ * editor does not fall back to English at runtime.
+ *
+ * Two groups end up here: hrai strings, which are not in Transifex at all, and upstream GUI
+ * strings that reach Transifex only from the next `i18n:push`. English is omitted for the latter
+ * because each of those messages already carries its own `defaultMessage`.
+ */
 const cs = {
+    'gui.aria.aboutMenu': 'Nabídka O aplikaci',
+    'gui.aria.accountMenu': 'Nabídka účtu',
+    'gui.aria.authorInfo': 'Projekt „{projectTitle}“ od {username}',
+    'gui.aria.clearButton': 'Vymazat',
+    'gui.aria.editMenu': 'Nabídka Upravit',
+    'gui.aria.fileMenu': 'Nabídka Soubor',
+    'gui.aria.languageMenu': 'Nabídka jazyků',
+    'gui.aria.modeMenu': 'Nabídka režimu',
+    'gui.aria.settingsMenu': 'Nabídka nastavení',
+    'gui.aria.startProjectButton': 'Spustit projekt',
+    'gui.aria.stopProjectButton': 'Zastavit projekt',
+    'gui.connection.auto-scanning.updatePeripheralPrompt':
+        'Pokud své zařízení nevidíš, možná ho je potřeba aktualizovat, aby fungovalo se Scratchem.',
+    'gui.connection.scanning.updatePeripheralPrompt':
+        'Pokud své zařízení nevidíš, možná ho je potřeba aktualizovat, aby fungovalo se Scratchem.',
+    'gui.connection.updatePeripheral.doNotDisconnect':
+        'Dokud aktualizace neskončí, neopouštěj Scratch, nenačítej ho znovu a neodpojuj {extensionName}.',
+    'gui.connection.updatePeripheral.updateMicroBitFirmware':
+        'Firmware svého micro:bitu aktualizuj na tomto odkazu: <a>{microBitFirmwareLink}</a>',
+    'gui.menuBar.colorMode': 'Barevný režim',
+    'gui.menuBar.theme': 'Vzhled',
+    'gui.sharedMessages.backdrop': 'pozadí{index}',
+    'gui.sharedMessages.costume': 'kostým{index}',
+    'gui.sharedMessages.loadFromComputerTitle': 'Načíst z počítače',
+    'gui.sharedMessages.pop': 'pop',
+    'gui.sharedMessages.replaceProjectWarning': 'Nahradit obsah současného projektu?',
+    'gui.sharedMessages.sprite': 'Postava{index}',
     'gui.hraiLessons.title': 'lekce hrai',
     'gui.hraiLessons.intro': 'Vyber si hru a postupně ji vytvoř.',
     'gui.hraiLessons.back': 'Zpět na lekce',

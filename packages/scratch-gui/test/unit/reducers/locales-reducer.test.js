@@ -11,6 +11,16 @@ test('includes local hrai messages in Czech locale', () => {
     expect(czechState.messages['gui.hrai.nextStage']).toBe('Další krok');
 });
 
+test('includes Czech messages the published bundle omits', () => {
+    let defaultState;
+    const initialState = localesReducer(defaultState, {type: 'anything'});
+    const localizedState = localesReducer(initialState, setLocales({cs: {}, en: {}}));
+    const czechState = localesReducer(localizedState, selectLocale('cs'));
+
+    expect(czechState.messages['gui.sharedMessages.backdrop']).toBe('pozadí{index}');
+    expect(czechState.messages['gui.aria.fileMenu']).toBe('Nabídka Soubor');
+});
+
 test('uses English hrai messages in other locales', () => {
     let defaultState;
     const initialState = localesReducer(defaultState, {type: 'anything'});

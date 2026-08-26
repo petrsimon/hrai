@@ -1,15 +1,17 @@
 import classNames from 'classnames';
 import PropTypes from 'prop-types';
 import React, {useCallback} from 'react';
-import {defineMessage, useIntl} from 'react-intl';
+import {defineMessages, useIntl} from 'react-intl';
 
 import greenFlagIcon from './icon--green-flag.svg';
 import styles from './green-flag.css';
 
-const startProjectMessage = defineMessage({
-    id: 'gui.aria.startProjectButton',
-    defaultMessage: 'Start project',
-    description: 'accessibility label for start project button'
+const {startProjectMessage} = defineMessages({
+    startProjectMessage: {
+        id: 'gui.aria.startProjectButton',
+        defaultMessage: 'Start project',
+        description: 'accessibility label for start project button'
+    }
 });
 
 const GreenFlagComponent = function (props) {

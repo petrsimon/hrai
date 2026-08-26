@@ -4,7 +4,7 @@ import classNames from 'classnames';
 import PropTypes from 'prop-types';
 import {connect} from 'react-redux';
 
-import {useIntl, FormattedMessage, defineMessage} from 'react-intl';
+import {useIntl, FormattedMessage, defineMessages} from 'react-intl';
 import MenuBarMenu from './menu-bar-menu.jsx';
 import {MenuItem, MenuSection} from '../menu/menu.jsx';
 import useMenuNavigation from '../../hooks/use-menu-navigation';
@@ -14,10 +14,12 @@ const EditorModes = {
     MODE_2020: '2020'
 };
 
-const modeMenu = defineMessage({
-    id: 'gui.aria.modeMenu',
-    defaultMessage: 'Mode menu',
-    description: 'accessibility label for mode menu'
+const {modeMenu} = defineMessages({
+    modeMenu: {
+        id: 'gui.aria.modeMenu',
+        defaultMessage: 'Mode menu',
+        description: 'accessibility label for mode menu'
+    }
 });
 
 const ModeMenu = ({

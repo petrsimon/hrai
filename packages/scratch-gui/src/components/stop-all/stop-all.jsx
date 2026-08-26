@@ -1,15 +1,17 @@
 import classNames from 'classnames';
 import PropTypes from 'prop-types';
 import React from 'react';
-import {defineMessage, useIntl} from 'react-intl';
+import {defineMessages, useIntl} from 'react-intl';
 
 import stopAllIcon from './icon--stop-all.svg';
 import styles from './stop-all.css';
 
-const stopProjectMessage = defineMessage({
-    id: 'gui.aria.stopProjectButton',
-    defaultMessage: 'Stop project',
-    description: 'accessibility label for stop project button'
+const {stopProjectMessage} = defineMessages({
+    stopProjectMessage: {
+        id: 'gui.aria.stopProjectButton',
+        defaultMessage: 'Stop project',
+        description: 'accessibility label for stop project button'
+    }
 });
 
 const StopAllComponent = function (props) {

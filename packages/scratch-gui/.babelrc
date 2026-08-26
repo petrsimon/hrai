@@ -1,6 +1,7 @@
 {
     "plugins": [
         ["react-intl", {
+            "additionalComponentNames": ["BalancedFormattedMessage"],
             "messagesDir": "./translations/messages/"
         }]],
     "presets": [

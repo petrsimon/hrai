@@ -110,6 +110,11 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 - Keep components presentational where possible; connect to Redux only in container files.
 - Use `react-intl` / `FormattedMessage` for all user-visible strings. Do not hardcode English in JSX.
 - After adding or changing messages, run `npm run i18n:src` to update the translation source file.
+- The extractor (`babel-plugin-react-intl`) only sees `defineMessages()`, `<FormattedMessage>`, and the wrappers
+  listed in `additionalComponentNames` in `.babelrc`. Messages declared with `defineMessage()` (singular) or as
+  a bare descriptor object in a prop are silently dropped from `translations/en.json` and never get translated.
+- `src/lib/local-messages.js` carries translations for message IDs the published `scratch-l10n` bundle does not
+  have yet. Remove entries from it once the bundle ships them.
 - Integration tests (`test/integration/`) require a browser environment via Jest + jsdom; they are slow and
   should not be run unnecessarily. Smoke tests (`test/smoke/`) require a live server.
 

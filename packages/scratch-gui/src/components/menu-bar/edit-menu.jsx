@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import {connect} from 'react-redux';
 
 import editIcon from './icon--edit.svg';
-import {useIntl, FormattedMessage, defineMessage} from 'react-intl';
+import {useIntl, FormattedMessage, defineMessages} from 'react-intl';
 import MenuBarMenu from './menu-bar-menu.jsx';
 import {MenuItem, MenuSection} from '../menu/menu.jsx';
 import useMenuNavigation from '../../hooks/use-menu-navigation';
@@ -13,10 +13,12 @@ import dropdownCaret from './dropdown-caret.svg';
 import DeletionRestorer from '../../containers/deletion-restorer.jsx';
 import TurboMode from '../../containers/turbo-mode.jsx';
 
-const editMenuAriaMessage = defineMessage({
-    id: 'gui.aria.editMenu',
-    defaultMessage: 'Edit menu',
-    description: 'accessibility label for edit menu'
+const {editMenuAriaMessage} = defineMessages({
+    editMenuAriaMessage: {
+        id: 'gui.aria.editMenu',
+        defaultMessage: 'Edit menu',
+        description: 'accessibility label for edit menu'
+    }
 });
 
 const EditMenu = ({
