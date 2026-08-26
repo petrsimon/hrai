@@ -6,6 +6,10 @@ All packages in this monorepo are published to npm with a shared version number.
 **Publish** workflow, triggered manually from the Actions tab. The next version number and the changelog are
 both computed from the Conventional Commits on the release branch.
 
+For the HRAI fork, `main` is the product and release branch. The upstream synchronization branch, `develop`, is
+not releasable. The inherited release configuration must be updated to match this policy before the first HRAI
+release.
+
 ## Releasing
 
 1. Push the commits you want included to the branch you want to release from.
@@ -21,7 +25,7 @@ If there are no relevant commits since the last release on that branch, the work
 
 | Branch                 | Acts as                | npm dist-tag      | Example version          |
 |------------------------|------------------------|-------------------|--------------------------|
-| `develop`              | primary release        | `latest`          | `13.8.0`                 |
+| `main`                 | primary release        | `latest`          | `13.8.0`                 |
 | `13.x`, `13.7.x`, etc. | maintenance            | matching the line | `13.7.5`                 |
 | `release/<topic>`      | long-lived prerelease  | `<topic>`         | `13.8.0-accessibility.3` |
 | `hotfix/<topic>`       | short-lived prerelease | `<topic>`         | `13.7.5-paint-fix.1`     |
@@ -29,8 +33,8 @@ If there are no relevant commits since the last release on that branch, the work
 The dist-tag for `release/*` and `hotfix/*` is the branch name with the prefix stripped. Pick a short, public-
 facing branch suffix — it becomes the dist-tag downstream consumers see.
 
-Other branches (`feat/*`, `fix/*`, `chore/*`, `feature/*`, bare names) are not releasable. The workflow run
-will fail at the branch-validation step.
+Other branches (`develop`, `feat/*`, `fix/*`, `chore/*`, `feature/*`, bare names) are not releasable. The
+workflow run will fail at the branch-validation step.
 
 ## Conventional Commits matter
 

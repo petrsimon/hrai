@@ -14,6 +14,7 @@ import fullScreenIcon from './icon--fullscreen.svg';
 import largeStageIcon from './icon--large-stage.svg';
 import smallStageIcon from './icon--small-stage.svg';
 import unFullScreenIcon from './icon--unfullscreen.svg';
+import hraiLogo from '../../../static/hrai/hrai-dragon-mark-256.png';
 
 import scratchLogo from '../menu-bar/scratch-logo.svg';
 import styles from './stage-header.css';
@@ -77,6 +78,16 @@ const messages = defineMessages({
         defaultMessage: 'Full Screen Control',
         description: 'Button to enter/exit full screen mode',
         id: 'gui.stageHeader.fullscreenControl'
+    },
+    hraiAssistantOn: {
+        defaultMessage: 'Vypnout asistenta hrai',
+        description: 'Button to hide the hrai assistant panel',
+        id: 'gui.stageHeader.hraiAssistantOn'
+    },
+    hraiAssistantOff: {
+        defaultMessage: 'Zapnout asistenta hrai',
+        description: 'Button to show the hrai assistant panel',
+        id: 'gui.stageHeader.hraiAssistantOff'
     }
 });
 
@@ -103,7 +114,10 @@ const StageHeaderComponent = function (props) {
         username,
         onShowSettingThumbnail,
         onShowThumbnailSuccess,
-        onShowThumbnailError
+        onShowThumbnailError,
+        showHraiAssistant,
+        hraiAssistantVisible,
+        onToggleHraiAssistant
     } = props;
     const intl = useIntl();
 
@@ -275,7 +289,16 @@ const StageHeaderComponent = function (props) {
                             iconClassName: styles.stageButtonIcon,
                             isSelected: stageSizeMode === STAGE_SIZE_MODES.large,
                             title: intl.formatMessage(messages.largeStageSizeMessage)
-                        }
+                        },
+                        ...(showHraiAssistant ? [{
+                            handleClick: onToggleHraiAssistant,
+                            icon: hraiLogo,
+                            iconClassName: styles.stageButtonIcon,
+                            isSelected: hraiAssistantVisible,
+                            title: intl.formatMessage(
+                                hraiAssistantVisible ? messages.hraiAssistantOn : messages.hraiAssistantOff
+                            )
+                        }] : [])
                     ]}
                 />
             );
@@ -372,6 +395,9 @@ StageHeaderComponent.propTypes = {
     projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
     showBranding: PropTypes.bool.isRequired,
     showNewFeatureCallouts: PropTypes.bool,
+    showHraiAssistant: PropTypes.bool,
+    hraiAssistantVisible: PropTypes.bool,
+    onToggleHraiAssistant: PropTypes.func,
     stageSizeMode: PropTypes.oneOf(Object.keys(STAGE_SIZE_MODES)),
     vm: PropTypes.instanceOf(VM).isRequired,
     userOwnsProject: PropTypes.bool,

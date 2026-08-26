@@ -58,6 +58,30 @@ describe('MenuBar Component', () => {
         expect(button).toBeTruthy();
     });
 
+    test('menu bar can use a product logo', () => {
+        const {container} = renderWithIntl(getComponent({
+            logo: 'static/hrai/hrai-logo-horizontal-800.png',
+            logoAlt: 'hrai'
+        }));
+        const logo = container.querySelector('#logo_img');
+
+        expect(logo.getAttribute('src')).toBe('static/hrai/hrai-logo-horizontal-800.png');
+        expect(logo.getAttribute('alt')).toBe('hrai');
+    });
+
+    test('menu bar shows hrai lessons in hrai mode', () => {
+        store.clearActions();
+        const {container} = renderWithIntl(getComponent({hraiLogo: true}));
+        const button = container.querySelector('button[aria-label="lekce hrai"]');
+
+        expect(button).toBeTruthy();
+        fireEvent.click(button);
+        expect(store.getActions()).toContainEqual({
+            type: 'scratch-gui/modals/OPEN_MODAL',
+            modal: 'hraiLessons'
+        });
+    });
+
     describe('triggering About button handler', () => {
         test('clicking on About button calls the handler', () => {
             const onClickAbout = jest.fn();
@@ -72,7 +96,8 @@ describe('MenuBar Component', () => {
             const onClickAbout = jest.fn();
             const {container} = renderWithIntl(getComponent({onClickAbout}));
             const button = container.querySelector('button[aria-label="About menu"]');
-    
+
+            expect(button).toBeTruthy();
             expect(onClickAbout).toHaveBeenCalledTimes(0);
         });
     });

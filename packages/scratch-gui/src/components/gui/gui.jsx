@@ -1,7 +1,7 @@
 import classNames from 'classnames';
 import omit from 'lodash.omit';
 import PropTypes from 'prop-types';
-import React, {useEffect, useCallback} from 'react';
+import React, {useEffect, useCallback, useState} from 'react';
 import {defineMessages, FormattedMessage, useIntl} from 'react-intl';
 import {connect} from 'react-redux';
 import MediaQuery from 'react-responsive';
@@ -48,6 +48,10 @@ import {setTheme} from '../../reducers/settings.js';
 import {PLATFORM} from '../../lib/platform.js';
 import {MenuRefProvider} from '../../contexts/menu-ref-context.jsx';
 import {ModalFocusProvider} from '../../contexts/modal-focus-context.jsx';
+import HraiPanel from '../../containers/hrai-panel.jsx';
+import HraiLessonsLibrary from '../../containers/hrai-lessons-library.jsx';
+
+const HRAI_LOGO = 'static/hrai/hrai-logo-horizontal-800.png';
 
 const ariaMessages = defineMessages({
     menuBar: {
@@ -191,6 +195,7 @@ const GUIComponent = props => {
         onTelemetryModalOptOut,
         onUpdateProjectThumbnail,
         showComingSoon,
+        showHraiPanel,
         showNewFeatureCallouts,
         soundsTabVisible,
         stageSizeMode,
@@ -207,6 +212,10 @@ const GUIComponent = props => {
         vm,
         ...componentProps
     } = omit(props, 'dispatch', 'setPlatform');
+    const [hraiAssistantVisible, setHraiAssistantVisible] = useState(showHraiPanel);
+    const toggleHraiAssistant = useCallback(() => {
+        setHraiAssistantVisible(visible => !visible);
+    }, []);
     if (children) {
         return <Box {...componentProps}>{children}</Box>;
     }
@@ -218,6 +227,10 @@ const GUIComponent = props => {
             setPlatform(props.platform);
         }
     }, [props.platform]);
+
+    useEffect(() => {
+        window.dispatchEvent(new Event('resize'));
+    }, [hraiAssistantVisible]);
 
     useEffect(() => {
         if (
@@ -273,6 +286,7 @@ const GUIComponent = props => {
             <ModalFocusProvider>
                 <Box
                     className={styles.pageWrapper}
+                    data-hrai-editor={showHraiPanel ? 'true' : null}
                     dir={isRtl ? 'rtl' : 'ltr'}
                     {...componentProps}
                 >
@@ -302,6 +316,7 @@ const GUIComponent = props => {
                             onTutorialSelect={onTutorialSelect}
                         />
                     ) : null}
+                    <HraiLessonsLibrary />
                     {cardsVisible ? (
                         <Cards />
                     ) : null}
@@ -355,11 +370,13 @@ const GUIComponent = props => {
                             hasActiveMembership={hasActiveMembership}
                             isShared={isShared}
                             isTotallyNormal={isTotallyNormal}
-                            logo={logo}
+                            hraiLogo={showHraiPanel}
+                            logo={showHraiPanel ? HRAI_LOGO : logo}
+                            logoAlt={showHraiPanel ? 'hrai' : 'Scratch'}
                             renderLogin={renderLogin}
                             showComingSoon={showComingSoon}
                             onClickAbout={onClickAbout}
-                            onClickLogo={onClickLogo}
+                            onClickLogo={showHraiPanel ? null : onClickLogo}
                             onLogOut={onLogOut}
                             onClickLogin={onClickLogin}
                             onOpenRegistration={onOpenRegistration}
@@ -552,6 +569,9 @@ const GUIComponent = props => {
                                 onSetManualThumbnailButtonClick={onSetManualThumbnailButtonClick}
                                 loading={loading}
                                 showNewFeatureCallouts={showNewFeatureCallouts}
+                                showHraiAssistant={showHraiPanel}
+                                hraiAssistantVisible={hraiAssistantVisible}
+                                onToggleHraiAssistant={toggleHraiAssistant}
                                 userOwnsProject={userOwnsProject}
                                 username={username}
                                 onUpdateProjectThumbnail={onUpdateProjectThumbnail}
@@ -570,6 +590,11 @@ const GUIComponent = props => {
                                 />
                             </Box>
                         </Box>
+                        {/* Hidden in fullscreen: .stage-wrapper.full-screen is position:fixed
+                            over the viewport, so the panel would render underneath it. */}
+                        {hraiAssistantVisible && !isFullScreen ? (
+                            <HraiPanel />
+                        ) : null}
                     </Box>
                     <DragLayer />
                 </Box>
@@ -653,6 +678,7 @@ GUIComponent.propTypes = {
     renderLogin: PropTypes.func,
     setTheme: PropTypes.func.isRequired,
     showComingSoon: PropTypes.bool,
+    showHraiPanel: PropTypes.bool,
     showNewFeatureCallouts: PropTypes.bool,
     soundsTabVisible: PropTypes.bool,
     stageSizeMode: PropTypes.oneOf(Object.keys(STAGE_SIZE_MODES)),
@@ -694,6 +720,7 @@ GUIComponent.defaultProps = {
     loading: false,
     menuBarHidden: false,
     showComingSoon: false,
+    showHraiPanel: false,
     showNewFeatureCallouts: false,
     stageSizeMode: STAGE_SIZE_MODES.large,
     useExternalPeripheralList: false

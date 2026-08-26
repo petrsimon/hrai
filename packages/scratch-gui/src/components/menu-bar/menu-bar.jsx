@@ -28,7 +28,7 @@ import EditMenu from './edit-menu.jsx';
 import ModeMenu from './mode-menu.jsx';
 import AboutMenu from './about-menu.jsx';
 
-import {openTipsLibrary, openDebugModal} from '../../reducers/modals';
+import {openTipsLibrary, openHraiLessons, openDebugModal} from '../../reducers/modals';
 import {setPlayer} from '../../reducers/mode';
 import {
     isTimeTravel220022BC,
@@ -70,6 +70,7 @@ import ninetiesLogo from './nineties_logo.svg';
 import catLogo from './cat_logo.svg';
 import prehistoricLogo from './prehistoric-logo.svg';
 import oldtimeyLogo from './oldtimey-logo.svg';
+import hraiMark from '../../../static/hrai/hrai-dragon-mark-256.png';
 
 import sharedMessages from '../../lib/shared-messages';
 
@@ -81,6 +82,11 @@ const ariaMessages = defineMessages({
         id: 'gui.menuBar.tutorialsLibrary',
         defaultMessage: 'Tutorials',
         description: 'accessibility text for the tutorials button'
+    },
+    hraiLessons: {
+        id: 'gui.menuBar.hraiLessonsLibrary',
+        defaultMessage: 'lekce hrai',
+        description: 'accessibility text for the hrai lessons button'
     },
     debug: {
         id: 'gui.menuBar.debug',
@@ -162,6 +168,7 @@ class MenuBar extends React.Component {
             'handleClickSeeCommunity',
             'handleClickShare',
             'handleSetMode',
+            'getLogo',
             'handleKeyPress',
             'handleRestoreOption',
             'getSaveToComputerHandler',
@@ -211,6 +218,9 @@ class MenuBar extends React.Component {
             }
         }
     }
+    getLogo () {
+        return this.props.logo || getScratchLogo(this.props.platform);
+    }
     handleSetMode (mode) {
         return () => {
             // Turn on/off filters for modes.
@@ -235,7 +245,7 @@ class MenuBar extends React.Component {
             } else if (mode === '220022BC') {
                 document.getElementById('logo_img').src = prehistoricLogo;
             } else {
-                document.getElementById('logo_img').src = getScratchLogo(this.props.platform);
+                document.getElementById('logo_img').src = this.getLogo();
             }
 
             this.props.onSetTimeTravelMode(mode);
@@ -334,12 +344,13 @@ class MenuBar extends React.Component {
                         >
                             <img
                                 id="logo_img"
-                                alt="Scratch"
+                                alt={this.props.logoAlt}
                                 className={classNames(styles.scratchLogo, {
-                                    [styles.clickable]: typeof this.props.onClickLogo !== 'undefined'
+                                    [styles.clickable]: typeof this.props.onClickLogo !== 'undefined',
+                                    [styles.hraiLogo]: this.props.hraiLogo
                                 })}
                                 draggable={false}
-                                src={getScratchLogo(this.props.platform)}
+                                src={this.getLogo()}
                             />
                         </button>
                         {(this.props.canChangeColorMode || this.props.canChangeLanguage || this.props.canChangeTheme) &&
@@ -472,6 +483,22 @@ class MenuBar extends React.Component {
                                 <FormattedMessage {...ariaMessages.tutorials} />
                             </span>
                         </button>
+                        {this.props.hraiLogo ? (
+                            <button
+                                aria-label={this.props.intl.formatMessage(ariaMessages.hraiLessons)}
+                                className={classNames(styles.menuBarItem, styles.noOffset, styles.hoverable)}
+                                onClick={this.props.onOpenHraiLessons}
+                            >
+                                <img
+                                    className={styles.hraiLessonsIcon}
+                                    src={hraiMark}
+                                    alt=""
+                                />
+                                <span className={styles.tutorialsLabel}>
+                                    <FormattedMessage {...ariaMessages.hraiLessons} />
+                                </span>
+                            </button>
+                        ) : null}
                         <button
                             aria-label={this.props.intl.formatMessage(ariaMessages.debug)}
                             className={classNames(styles.menuBarItem, styles.noOffset, styles.hoverable)}
@@ -662,6 +689,7 @@ MenuBar.propTypes = {
     currentLocale: PropTypes.string.isRequired,
     enableCommunity: PropTypes.bool,
     hasActiveMembership: PropTypes.bool,
+    hraiLogo: PropTypes.bool,
     intl: intlShape,
     isRtl: PropTypes.bool,
     isShared: PropTypes.bool,
@@ -671,6 +699,7 @@ MenuBar.propTypes = {
     locale: PropTypes.string.isRequired,
     loginMenuOpen: PropTypes.bool,
     logo: PropTypes.string,
+    logoAlt: PropTypes.string,
     mode1920: PropTypes.bool,
     mode1990: PropTypes.bool,
     mode2020: PropTypes.bool,
@@ -695,6 +724,7 @@ MenuBar.propTypes = {
     onLogOut: PropTypes.func,
     onOpenRegistration: PropTypes.func,
     onOpenTipLibrary: PropTypes.func,
+    onOpenHraiLessons: PropTypes.func,
     onOpenDebugModal: PropTypes.func,
     onProjectTelemetryEvent: PropTypes.func,
     onRequestCloseLogin: PropTypes.func,
@@ -718,7 +748,9 @@ MenuBar.propTypes = {
 };
 
 MenuBar.defaultProps = {
+    hraiLogo: false,
     logo: scratchLogo,
+    logoAlt: 'Scratch',
     onShare: () => {}
 };
 
@@ -772,6 +804,7 @@ const mapStateToProps = (state, ownProps) => {
 const mapDispatchToProps = (dispatch, ownProps) => ({
     autoUpdateProject: () => dispatch(autoUpdateProject()),
     onOpenTipLibrary: () => dispatch(openTipsLibrary()),
+    onOpenHraiLessons: () => dispatch(openHraiLessons()),
     onOpenDebugModal: () => dispatch(openDebugModal()),
     onClickNew: needSave => dispatch(requestNewProject(needSave)),
     onClickLogin: ownProps.onClickLogin ?? (() => dispatch(openLoginMenu())),

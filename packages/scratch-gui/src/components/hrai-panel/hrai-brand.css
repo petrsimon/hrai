@@ -1,0 +1,56 @@
+/*
+ * hrai brand tokens.
+ *
+ * One rule governs colour in this panel: **colour means "this is a block."** Block chips
+ * carry Scratch's own category colours, because their whole job is helping a child find
+ * that block in the palette by colour and shape rather than by reading. Everything else
+ * — header, buttons, bubbles — stays in the brand blue and neutrals, so nothing competes
+ * with the one signal that has to survive.
+ *
+ * The editor shell uses HRAI's blue identity palette and the official dragon mark from
+ * static/hrai. Scratch category colours remain reserved for block references. Light and
+ * dark panel surfaces are both defined.
+ */
+
+:root {
+  --hrai-brand: #3aa7e8;
+  --hrai-brand-hover: #228bc9;
+  --hrai-brand-contrast: #082532;
+
+  --hrai-surface: #ffffff;
+  --hrai-surface-sunken: #f1f6f8;
+  --hrai-bubble-tutor: #f1f6f8;
+  --hrai-bubble-learner: #e0f1f8;
+
+  --hrai-text: #17313d;
+  --hrai-text-muted: #5f7680;
+  --hrai-border: #cbdde4;
+
+  /* Scratch category colours, used only by block chips. */
+  --hrai-cat-motion: #4c97ff;
+  --hrai-cat-looks: #9966ff;
+  --hrai-cat-sound: #cf63cf;
+  --hrai-cat-events: #ffbf00;
+  --hrai-cat-control: #ffab19;
+  --hrai-cat-sensing: #5cb1d6;
+  --hrai-cat-operators: #59c059;
+  --hrai-cat-variables: #ff8c1a;
+  --hrai-cat-default: #5b6f75;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hrai-brand: #70c2f0;
+    --hrai-brand-hover: #9bd8f5;
+    --hrai-brand-contrast: #082532;
+
+    --hrai-surface: #122a35;
+    --hrai-surface-sunken: #0d2029;
+    --hrai-bubble-tutor: #1b3541;
+    --hrai-bubble-learner: #17485e;
+
+    --hrai-text: #e9f5fa;
+    --hrai-text-muted: #a7c2ce;
+    --hrai-border: #315363;
+  }
+}

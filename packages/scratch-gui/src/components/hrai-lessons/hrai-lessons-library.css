@@ -1,0 +1,150 @@
+@import "../../css/colors.css";
+@import "../../css/units.css";
+@import "../../../static/hrai/brand-tokens.css";
+
+.content {
+    position: relative;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 2rem 3rem 4rem;
+    background: var(--hrai-surface-sunken);
+    color: var(--hrai-text);
+}
+
+.intro,
+.detailHeading {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    max-width: 64rem;
+    margin: 0 auto 2rem;
+}
+
+.intro img,
+.detailHeading img {
+    width: 4rem;
+    height: 4rem;
+    object-fit: contain;
+}
+
+.intro h1,
+.detailHeading h1 {
+    margin: 0;
+    color: var(--hrai-brand);
+    font-size: 2rem;
+}
+
+.intro p,
+.detailHeading p {
+    margin: 0.25rem 0 0;
+    color: var(--hrai-text-muted);
+}
+
+.lesson-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1rem;
+    max-width: 64rem;
+    margin: 0 auto;
+}
+
+.lesson-card {
+    display: flex;
+    min-height: 12rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+    padding: 1rem;
+    border: 0.125rem solid var(--hrai-border);
+    border-radius: 0.75rem;
+    background: var(--hrai-surface);
+    color: var(--hrai-text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.lesson-card:hover,
+.lesson-card:focus-visible {
+    border-color: var(--hrai-brand);
+    box-shadow: 0 0 0 0.1875rem var(--hrai-bubble-learner);
+    outline: none;
+}
+
+.lesson-card img {
+    width: 2.25rem;
+    height: 2.25rem;
+    object-fit: contain;
+}
+
+.lesson-title {
+    font-size: 1.125rem;
+    font-weight: bold;
+    color: var(--hrai-brand);
+}
+
+.lesson-english,
+.meta {
+    color: var(--hrai-text-muted);
+    font-size: 0.75rem;
+}
+
+.lesson-goal {
+    margin-top: 0.5rem;
+    line-height: 1.4;
+}
+
+.detail {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding-bottom: 3rem;
+}
+
+.back-button {
+    margin-bottom: 2rem;
+    border: 0;
+    background: transparent;
+    color: var(--hrai-brand);
+    font: inherit;
+    cursor: pointer;
+}
+
+.goal {
+    margin: 0 0 1rem;
+    font-size: 1.25rem;
+    line-height: 1.5;
+}
+
+.detail h2 {
+    margin-top: 2rem;
+    color: var(--hrai-brand);
+}
+
+.stage-list {
+    display: grid;
+    gap: 0.75rem;
+    padding-left: 1.5rem;
+    line-height: 1.5;
+}
+
+.note {
+    margin-top: 2rem;
+    padding: 1rem;
+    border-left: 0.25rem solid var(--hrai-brand);
+    background: var(--hrai-bubble-tutor);
+    color: var(--hrai-text-muted);
+}
+
+.start-button {
+    margin-top: 1rem;
+    background: var(--hrai-brand);
+    color: var(--hrai-brand-contrast);
+    font-weight: bold;
+}
+
+.close-button {
+    position: fixed;
+    right: 2rem;
+    bottom: 1.5rem;
+    background: var(--hrai-brand);
+    color: var(--hrai-brand-contrast);
+}

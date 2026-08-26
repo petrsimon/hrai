@@ -5,8 +5,10 @@ import {TranslatorFunction} from '../../gui-config';
 import popWav from '!arraybuffer-loader!./83a9787d4cb6f3b7632b4ddfebf74367.wav?';
 import meowWav from '!arraybuffer-loader!./83c36d806dc92327b9e7049a565c6bff.wav?';
 import backdrop from '!raw-loader!./cd21514d0531fdffb22204e0ec5ed84a.svg?';
-import costume1 from '!raw-loader!./bcf454acf82e4504149f7ffe07081dbc.svg?';
-import costume2 from '!raw-loader!./0fb9be3e8397c983338cb71dc84d0b25.svg?';
+import costumeIdle from '!arraybuffer-loader!../../../static/hrai/sprites/dragon-idle.png?';
+import costumeFlyUp from '!arraybuffer-loader!../../../static/hrai/sprites/dragon-fly-up.png?';
+import costumeFire from '!arraybuffer-loader!../../../static/hrai/sprites/dragon-fire.png?';
+import costumeFlyDown from '!arraybuffer-loader!../../../static/hrai/sprites/dragon-fly-down.png?';
 
 
 declare function require (path: 'fastestsmallesttextencoderdecoder'): {TextEncoder: typeof TextEncoder};
@@ -45,15 +47,25 @@ const defaultProject = (translator?: TranslatorFunction) => {
         dataFormat: 'SVG',
         data: encoder.encode(backdrop)
     }, {
-        id: 'bcf454acf82e4504149f7ffe07081dbc',
-        assetType: 'ImageVector',
-        dataFormat: 'SVG',
-        data: encoder.encode(costume1)
+        id: '7f91a8cc4db049d193145cda079a510f',
+        assetType: 'ImageBitmap',
+        dataFormat: 'PNG',
+        data: new Uint8Array(costumeIdle)
     }, {
-        id: '0fb9be3e8397c983338cb71dc84d0b25',
-        assetType: 'ImageVector',
-        dataFormat: 'SVG',
-        data: encoder.encode(costume2)
+        id: '42217ca144971f0aa71196ebedec7b80',
+        assetType: 'ImageBitmap',
+        dataFormat: 'PNG',
+        data: new Uint8Array(costumeFlyUp)
+    }, {
+        id: '855d408d8dc17bad4865480447674fc9',
+        assetType: 'ImageBitmap',
+        dataFormat: 'PNG',
+        data: new Uint8Array(costumeFire)
+    }, {
+        id: '4375d2db113110fd1b242e50da526496',
+        assetType: 'ImageBitmap',
+        dataFormat: 'PNG',
+        data: new Uint8Array(costumeFlyDown)
     }];
 };
 

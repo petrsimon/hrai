@@ -53,6 +53,9 @@ StageHeader.propTypes = {
     isPlayerOnly: PropTypes.bool,
     onSetStageUnFull: PropTypes.func.isRequired,
     showBranding: PropTypes.bool,
+    showHraiAssistant: PropTypes.bool,
+    hraiAssistantVisible: PropTypes.bool,
+    onToggleHraiAssistant: PropTypes.func,
     stageSizeMode: PropTypes.oneOf(Object.keys(STAGE_SIZE_MODES)),
     vm: PropTypes.instanceOf(VM).isRequired
 };

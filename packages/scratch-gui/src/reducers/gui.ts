@@ -9,6 +9,7 @@ import blockDragReducer, {blockDragInitialState} from './block-drag';
 import dynamicAssetsReducer, {dynamicAssetsInitialState} from './dynamic-assets';
 import editorTabReducer, {editorTabInitialState} from './editor-tab';
 import hoveredTargetReducer, {hoveredTargetInitialState} from './hovered-target';
+import hraiLessonReducer, {hraiLessonInitialState} from './hrai-lesson';
 import menuReducer, {menuInitialState} from './menus';
 import micIndicatorReducer, {micIndicatorInitialState} from './mic-indicator';
 import modalReducer, {modalsInitialState} from './modals';
@@ -50,6 +51,7 @@ const buildInitialState = (config: GUIConfig) => ({
     editorTab: editorTabInitialState,
     mode: modeInitialState,
     hoveredTarget: hoveredTargetInitialState,
+    hraiLesson: hraiLessonInitialState,
     stageSize: stageSizeInitialState,
     menus: menuInitialState,
     micIndicator: micIndicatorInitialState,
@@ -160,6 +162,7 @@ const guiReducer = combineReducers({
     editorTab: editorTabReducer,
     mode: modeReducer,
     hoveredTarget: hoveredTargetReducer,
+    hraiLesson: hraiLessonReducer,
     stageSize: stageSizeReducer,
     menus: menuReducer,
     micIndicator: micIndicatorReducer,

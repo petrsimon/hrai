@@ -76,7 +76,8 @@ const baseConfig = new ScratchWebpackConfigBuilder(
         'process.env.DEBUG': Boolean(process.env.DEBUG),
         'process.env.GA_ID': `"${process.env.GA_ID || 'UA-000000-01'}"`,
         'process.env.GTM_ENV_AUTH': `"${process.env.GTM_ENV_AUTH || ''}"`,
-        'process.env.GTM_ID': process.env.GTM_ID ? `"${process.env.GTM_ID}"` : null
+        'process.env.GTM_ID': process.env.GTM_ID ? `"${process.env.GTM_ID}"` : null,
+        'process.env.HRAI_SERVER_URL': `"${process.env.HRAI_SERVER_URL || 'http://localhost:8791'}"`
     }))
     .addPlugin(new CopyWebpackPlugin({
         patterns: [

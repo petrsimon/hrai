@@ -1,0 +1,314 @@
+@import "../../css/colors.css";
+@import "../../css/units.css";
+@import "./hrai-brand.css";
+
+.hrai-panel {
+    flex: 0 0 auto;
+    width: 16rem;
+    min-width: 14rem;
+    max-width: 32rem;
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding: $space;
+    border-left: 1px solid var(--hrai-border);
+    background-color: var(--hrai-surface);
+    color: var(--hrai-text);
+}
+
+.resize-handle {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 1.25rem;
+    border: 0;
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.resize-handle::after {
+    position: absolute;
+    top: 50%;
+    left: 0.5rem;
+    width: 0.25rem;
+    height: 3rem;
+    border-radius: 0.125rem;
+    background-color: var(--hrai-border);
+    content: '';
+    transform: translateY(-50%);
+    transition: background-color 120ms ease, height 120ms ease;
+}
+
+.resize-handle:hover::after,
+.resize-handle:focus-visible::after {
+    height: 4rem;
+    background-color: var(--hrai-brand);
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: 0 0 $space;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.875rem;
+    font-weight: bold;
+    /* The name is always lowercase; never let a stylesheet capitalise it. */
+    text-transform: none;
+    color: var(--hrai-brand);
+}
+
+.logo {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex: 0 0 auto;
+    object-fit: contain;
+}
+
+.lesson-card {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: $space;
+    padding: 0.625rem;
+    border: 1px solid var(--hrai-border);
+    border-radius: 0.5rem;
+    background-color: var(--hrai-bubble-tutor);
+    color: var(--hrai-text);
+    font-size: 0.8125rem;
+}
+
+.lesson-card p {
+    margin: 0.25rem 0;
+    line-height: 1.4;
+}
+
+.lesson-stage-title {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+    color: var(--hrai-brand);
+}
+
+.lesson-instruction,
+.lesson-success {
+    padding: 0.375rem 0.5rem;
+    border-radius: 0.375rem;
+}
+
+.lesson-instruction {
+    border-left: 0.25rem solid var(--hrai-brand);
+    background-color: var(--hrai-surface);
+}
+
+.lesson-success {
+    border-left: 0.25rem solid var(--hrai-border);
+    color: var(--hrai-text-muted);
+}
+
+.next-stage-button {
+    align-self: flex-start;
+    min-height: 1.75rem;
+    border: 0;
+    border-radius: $form-radius;
+    background-color: var(--hrai-brand);
+    color: var(--hrai-brand-contrast);
+    font-size: 0.6875rem;
+    font-weight: bold;
+}
+
+.message-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: $space;
+    margin-bottom: $space;
+}
+
+.message-tutor,
+.message-learner {
+    display: flex;
+}
+
+.message-tutor {
+    justify-content: flex-start;
+}
+
+.message-learner {
+    justify-content: flex-end;
+}
+
+.message-tutor .message-bubble {
+    background-color: var(--hrai-bubble-tutor);
+    border-bottom-left-radius: 0.25rem;
+}
+
+.message-learner .message-bubble {
+    background-color: var(--hrai-bubble-learner);
+    border-bottom-right-radius: 0.25rem;
+}
+
+.message-bubble {
+    max-width: 100%;
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.75rem;
+    color: var(--hrai-text);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.block-ref {
+    display: inline;
+    margin: 0 0.125rem;
+    padding: 0.0625rem 0.375rem;
+    border: 1px solid var(--chip-colour, var(--hrai-cat-default));
+    border-left: 0.25rem solid var(--chip-colour, var(--hrai-cat-default));
+    border-radius: 0.5rem;
+    background-color: var(--hrai-surface);
+    color: var(--hrai-text);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: inherit;
+    font-weight: bold;
+    line-height: 1.2;
+    cursor: pointer;
+    vertical-align: baseline;
+}
+
+.block-ref:hover,
+.block-ref:focus {
+    background-color: $looks-light-transparent;
+    outline: none;
+    box-shadow: 0 0 0 0.125rem $looks-transparent;
+}
+
+.block-chip {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin: 0 0.125rem;
+    padding: 0.125rem 0.375rem;
+    border: 1px solid var(--chip-colour, var(--hrai-cat-default));
+    border-left: 0.25rem solid var(--chip-colour, var(--hrai-cat-default));
+    border-radius: 0.5rem;
+    background-color: var(--hrai-surface);
+    color: var(--hrai-text);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: inherit;
+    line-height: 1.2;
+    vertical-align: baseline;
+}
+
+.block-chip-label {
+    font-weight: bold;
+}
+
+.block-chip-category {
+    font-size: 0.625rem;
+    font-weight: normal;
+    color: var(--hrai-text-muted);
+}
+
+/*
+ * Colour in this panel means "this is a block". A chip wears its palette category's
+ * colour so a child can match it to the editor by colour, which is how an eight-year-old
+ * scans a palette — not by reading the label.
+ */
+.block-chip[data-category="motion"] { --chip-colour: var(--hrai-cat-motion); }
+.block-chip[data-category="looks"] { --chip-colour: var(--hrai-cat-looks); }
+.block-chip[data-category="sound"] { --chip-colour: var(--hrai-cat-sound); }
+.block-chip[data-category="events"] { --chip-colour: var(--hrai-cat-events); }
+.block-chip[data-category="control"] { --chip-colour: var(--hrai-cat-control); }
+.block-chip[data-category="sensing"] { --chip-colour: var(--hrai-cat-sensing); }
+.block-chip[data-category="operators"] { --chip-colour: var(--hrai-cat-operators); }
+.block-chip[data-category="variables"] { --chip-colour: var(--hrai-cat-variables); }
+
+.hint-area {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: $space;
+}
+
+.hint-button {
+    align-self: flex-start;
+    min-height: 2rem;
+    border: 1px solid transparent;
+    border-radius: $form-radius;
+    background-color: var(--hrai-brand);
+    color: var(--hrai-brand-contrast);
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.hint-button:hover:not(:disabled),
+.hint-button:focus:not(:disabled) {
+    background-color: var(--hrai-brand-hover);
+    box-shadow: 0 0 0 0.125rem var(--hrai-bubble-learner);
+}
+
+.hint-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.hint-explanation {
+    margin: 0;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.6875rem;
+    color: var(--hrai-text-muted);
+}
+
+.thinking {
+    margin: 0;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 0.6875rem;
+    font-style: italic;
+    color: var(--hrai-text-muted);
+}
+
+.input-area {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: $space;
+}
+
+.message-input {
+    width: 100%;
+    min-height: 2.5rem;
+    border-radius: $form-radius;
+    font-size: 1rem;
+    font-weight: normal;
+}
+
+.send-button {
+    align-self: flex-end;
+    min-height: 2rem;
+    border: 1px solid var(--hrai-border);
+    border-radius: $form-radius;
+    background-color: var(--hrai-surface);
+    color: var(--hrai-brand);
+}
+
+.send-button:hover:not(:disabled),
+.send-button:focus:not(:disabled) {
+    border-color: var(--hrai-brand);
+    box-shadow: 0 0 0 0.125rem var(--hrai-bubble-learner);
+}
+
+.send-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
