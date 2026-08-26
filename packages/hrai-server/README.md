@@ -44,6 +44,8 @@ still opens and says so calmly — a child should never meet a stack trace.
 Override the server location with `HRAI_SERVER_URL` at build time, and the port it
 listens on with `HRAI_PORT`.
 
+For local Docker deployment, see [`docker/README.md`](../../docker/README.md).
+
 ## Lesson bundle prototype
 
 The first game-specific bundle lives at `content/lessons/11-soldier-battle/`. It contains
