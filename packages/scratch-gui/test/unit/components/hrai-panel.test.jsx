@@ -155,7 +155,7 @@ describe('HraiPanel lesson guidance', () => {
                     />
                 </IntlProvider>
             );
-            await waitFor(() => expect(screen.getByRole('textbox').value).toBe(
+            await waitFor(() => expect(screen.getByLabelText('Zpráva pro hrai').value).toBe(
                 'Přidej zelenou vlajku'
             ));
         } finally {

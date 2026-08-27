@@ -474,10 +474,8 @@ const GameIdeaCard = ({idea, isPlanning, onIdeaChange, onSubmit}) => {
                 <FormattedMessage {...messages.gameDesignerTitle} />
             </h3>
             <form onSubmit={onSubmit}>
-                <Label
-                    above
-                    text={<FormattedMessage {...messages.gameIdeaLabel} />}
-                >
+                <label>
+                    <strong><FormattedMessage {...messages.gameIdeaLabel} /></strong>
                     <textarea
                         className={styles.gameIdeaInput}
                         disabled={isPlanning}
@@ -486,7 +484,7 @@ const GameIdeaCard = ({idea, isPlanning, onIdeaChange, onSubmit}) => {
                         value={idea}
                         onChange={onIdeaChange}
                     />
-                </Label>
+                </label>
                 <p className={styles.gameHelp}>
                     <FormattedMessage {...messages.gameIdeaHelp} />
                 </p>
