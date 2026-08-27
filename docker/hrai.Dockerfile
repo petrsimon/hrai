@@ -17,6 +17,7 @@ ENV HRAI_PORT=8791
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/packages/hrai-server/package.json ./packages/hrai-server/package.json
 COPY --from=dependencies /app/packages/hrai-server/src ./packages/hrai-server/src
+COPY --from=dependencies /app/packages/hrai-server/content ./packages/hrai-server/content
 
 EXPOSE 8791
 
