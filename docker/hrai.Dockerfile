@@ -2,7 +2,7 @@ FROM node:24-bookworm-slim AS dependencies
 
 WORKDIR /app
 COPY . .
-RUN npm ci --omit=dev --workspace=@hrai/server --include-workspace-root=false
+RUN npm ci --omit=dev --workspace=@hrai/server --include-workspace-root=false --ignore-scripts
 
 FROM node:24-bookworm-slim
 
