@@ -1122,24 +1122,36 @@ const HraiPanel = ({
                     onKeyDown={handleInputKeyDown}
                 />
                 <div className={styles.composerControls}>
-                    <Button
-                        type="button"
-                        className={styles.voiceButton}
-                        aria-label={intl.formatMessage(
-                            voicePhase === 'recording' ? messages.voiceStop :
+                    <div className={styles.composerActions}>
+                        <Button
+                            type="button"
+                            className={styles.voiceButton}
+                            aria-label={intl.formatMessage(
+                                voicePhase === 'recording' ? messages.voiceStop :
+                                    voicePhase === 'transcribing' ? messages.voiceTranscribing :
+                                        messages.voiceStart
+                            )}
+                            title={intl.formatMessage(
                                 voicePhase === 'transcribing' ? messages.voiceTranscribing :
-                                    messages.voiceStart
-                        )}
-                        title={intl.formatMessage(
-                            voicePhase === 'transcribing' ? messages.voiceTranscribing :
-                                voicePhase === 'recording' ? messages.voiceStop : messages.voiceStart
-                        )}
-                        disabled={voiceButtonDisabled}
-                        onClick={handleVoiceButton}
-                    >
-                        {voicePhase === 'recording' ? <StopIcon /> :
-                            voicePhase === 'transcribing' ? <ProgressIcon /> : <MicrophoneIcon />}
-                    </Button>
+                                    voicePhase === 'recording' ? messages.voiceStop : messages.voiceStart
+                            )}
+                            disabled={voiceButtonDisabled}
+                            onClick={handleVoiceButton}
+                        >
+                            {voicePhase === 'recording' ? <StopIcon /> :
+                                voicePhase === 'transcribing' ? <ProgressIcon /> : <MicrophoneIcon />}
+                        </Button>
+                        <Button
+                            type="button"
+                            className={styles.hintButton}
+                            disabled={hintDisabled}
+                            aria-label={intl.formatMessage(messages.hintButton)}
+                            title={hintExplanation || intl.formatMessage(messages.hintButton)}
+                            onClick={handleHintClick}
+                        >
+                            <span aria-hidden="true">🙏</span>
+                        </Button>
+                    </div>
                     <Button
                         type="submit"
                         className={styles.sendButton}
@@ -1163,24 +1175,12 @@ const HraiPanel = ({
                         <FormattedMessage {...messages.voiceUnavailable} />
                     </p>
                 ) : null}
-            </form>
-            <div className={styles.hintArea}>
-                <Button
-                    type="button"
-                    className={styles.hintButton}
-                    disabled={hintDisabled}
-                    aria-label={intl.formatMessage(messages.hintButton)}
-                    title={hintExplanation || intl.formatMessage(messages.hintButton)}
-                    onClick={handleHintClick}
-                >
-                    <span aria-hidden="true">🙏</span>
-                </Button>
                 {hintMaxReached ? (
                     <p className={styles.hintExplanation}>
                         {hintExplanation}
                     </p>
                 ) : null}
-            </div>
+            </form>
         </Box>
     );
 };

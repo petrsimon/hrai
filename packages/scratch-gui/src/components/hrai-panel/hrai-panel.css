@@ -362,14 +362,6 @@
 .block-chip[data-category="operators"] { --chip-colour: var(--hrai-cat-operators); }
 .block-chip[data-category="variables"] { --chip-colour: var(--hrai-cat-variables); }
 
-.hint-area {
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    margin-top: $space;
-}
-
 .hint-button {
     width: 2rem;
     height: 2rem;
@@ -478,6 +470,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+}
+
+.composer-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
 }
 
 .voice-button,
