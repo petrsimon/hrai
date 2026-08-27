@@ -24,6 +24,7 @@ describe("llama.cpp model client", () => {
                 stream: boolean;
                 temperature: number;
                 chat_template_kwargs: object;
+                response_format?: {type: string};
             };
             expect(request.chat_template_kwargs).toEqual({enable_thinking: false});
             expect(request.temperature).toBe(0);
@@ -43,12 +44,19 @@ describe("llama.cpp model client", () => {
         });
         vi.stubGlobal("fetch", fetchMock);
 
-        const {chat, chatStream, isModelAvailable} = await import("../src/model-client.ts");
+        const {chat, chatJson, chatStream, isModelAvailable} = await import("../src/model-client.ts");
         expect(await isModelAvailable("Qwen3.5-27B")).toBe(true);
 
         const deltas: string[] = [];
         expect((await chatStream("system", "user", (delta) => deltas.push(delta))).text).toBe("Ahoj světe");
         expect(deltas).toEqual(["Ahoj", " světe"]);
         expect((await chat("system", "user")).text).toBe("Hotovo");
+        expect((await chatJson("system", "user")).text).toBe("Hotovo");
+        const jsonRequest = fetchMock.mock.calls.find(([, init]) => {
+            if (!init?.body) return false;
+            const body = JSON.parse(init.body as string) as {response_format?: {type: string}};
+            return body.response_format?.type === "json_object";
+        });
+        expect(jsonRequest).toBeDefined();
     });
 });

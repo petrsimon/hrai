@@ -64,11 +64,12 @@ export async function isModelAvailable(model: string): Promise<boolean> {
     }
 }
 
-function ollamaRequestBody(system: string, user: string, stream: boolean, model: string) {
+function ollamaRequestBody(system: string, user: string, stream: boolean, model: string, json: boolean) {
     return {
         model,
         stream,
         think: false,
+        ...(json ? { format: "json" } : {}),
         messages: [
             { role: "system", content: system },
             { role: "user", content: user },
@@ -77,10 +78,11 @@ function ollamaRequestBody(system: string, user: string, stream: boolean, model:
     };
 }
 
-function llamaRequestBody(system: string, user: string, stream: boolean, model: string) {
+function llamaRequestBody(system: string, user: string, stream: boolean, model: string, json: boolean) {
     return {
         model,
         stream,
+        ...(json ? { response_format: { type: "json_object" } } : {}),
         messages: [
             { role: "system", content: system },
             { role: "user", content: user },
@@ -96,10 +98,10 @@ function requestUrl(): string {
     return isLlamaCpp() ? `${HOST}/v1/chat/completions` : `${HOST}/api/chat`;
 }
 
-function requestBody(system: string, user: string, stream: boolean, model: string) {
+function requestBody(system: string, user: string, stream: boolean, model: string, json = false) {
     return isLlamaCpp()
-        ? llamaRequestBody(system, user, stream, model)
-        : ollamaRequestBody(system, user, stream, model);
+        ? llamaRequestBody(system, user, stream, model, json)
+        : ollamaRequestBody(system, user, stream, model, json);
 }
 
 async function* responseLines(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
@@ -169,12 +171,12 @@ export async function chatStream(
     return { text: full.trim(), seconds: (performance.now() - started) / 1000 };
 }
 
-export async function chat(system: string, user: string, model = EVAL_MODEL): Promise<Reply> {
+async function complete(system: string, user: string, model: string, json: boolean): Promise<Reply> {
     const started = performance.now();
     const res = await fetch(requestUrl(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody(system, user, false, model)),
+        body: JSON.stringify(requestBody(system, user, false, model, json)),
     });
     if (!res.ok) throw new Error(`${HOST} returned ${res.status} ${res.statusText}`);
     const body = (await res.json()) as OpenAIChatResponse | { message?: { content?: string } };
@@ -183,6 +185,21 @@ export async function chat(system: string, user: string, model = EVAL_MODEL): Pr
         : (body as { message?: { content?: string } }).message?.content;
     if (typeof text !== "string") throw new Error(`${HOST} returned no message content`);
     return { text: text.trim(), seconds: (performance.now() - started) / 1000 };
+}
+
+export async function chat(system: string, user: string, model = EVAL_MODEL): Promise<Reply> {
+    return complete(system, user, model, false);
+}
+
+/**
+ * Requests a non-streamed JSON object using the backend's structured-output mode.
+ * @param system System prompt.
+ * @param user User turn.
+ * @param model Model name.
+ * @returns JSON text and elapsed seconds.
+ */
+export async function chatJson(system: string, user: string, model = EVAL_MODEL): Promise<Reply> {
+    return complete(system, user, model, true);
 }
 
 /**

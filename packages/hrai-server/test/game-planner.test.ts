@@ -42,4 +42,16 @@ describe("game planner", () => {
         expect(complete.mock.calls[0]?.[0]).toContain("Nevypisuj bloky");
         expect(complete.mock.calls[0]?.[1]).toContain("Drak hledá poklad.");
     });
+
+    it("retries once when the model returns malformed structured output", async () => {
+        const complete = vi.fn()
+            .mockResolvedValueOnce({text: '{"title":', seconds: 1})
+            .mockResolvedValueOnce({text: RESPONSE, seconds: 1});
+
+        const plan = await planGame("Drak hledá poklad.", complete);
+
+        expect(plan.title).toBe("Dračí bludiště");
+        expect(complete).toHaveBeenCalledTimes(2);
+        expect(complete.mock.calls[1]?.[1]).toContain("Předchozí odpověď nebyla platný plán");
+    });
 });
