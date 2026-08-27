@@ -124,6 +124,22 @@ describe("goal-driven game session", () => {
         expect(session.rung).toBe(1);
     });
 
+    it("restores an accepted milestone without trusting prior completion", () => {
+        const session = new Session();
+        session.remember("learner", "Starý chat");
+        session.escalate();
+
+        expect(session.restoreGamePlan(PLAN, 1)).toEqual(PLAN);
+        expect(session.gameProgress).toMatchObject({
+            milestoneIndex: 1,
+            milestone: PLAN.milestones[1],
+            complete: false,
+        });
+        expect(session.history).toEqual([]);
+        expect(session.rung).toBe(1);
+        expect(session.restoreGamePlan(PLAN, PLAN.milestones.length)).toBeNull();
+    });
+
     it("activating an authored lesson replaces the custom game plan", () => {
         const session = new Session();
         session.proposeGamePlan(PLAN);

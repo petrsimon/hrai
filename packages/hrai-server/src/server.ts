@@ -9,6 +9,7 @@ import { Server } from "socket.io";
 import { EVAL_MODEL, chat } from "./model-client.ts";
 import { planGame } from "./game-planner.ts";
 import { MAX_GAME_IDEA_LENGTH } from "./game-plan.ts";
+import { parseGameRestore } from "./game-restore.ts";
 import { PALETTE, labelText, opcodesNamedByLabel } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
@@ -209,6 +210,14 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
                     });
                 })
                 .finally(() => socket.emit("thinking", { thinking: false }));
+        });
+
+        socket.on("gameRestore", (payload: unknown) => {
+            const restored = parseGameRestore(payload);
+            if (restored && session.restoreGamePlan(restored.plan, restored.milestoneIndex)) {
+                emitGameProgress();
+                evaluateGameProgress();
+            }
         });
 
         socket.on("gamePlanAccept", () => {

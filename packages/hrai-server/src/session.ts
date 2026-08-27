@@ -77,22 +77,39 @@ export class Session {
         this.pendingGamePlan = plan;
     }
 
+    private activateGamePlan(plan: GamePlan, milestoneIndex: number): GamePlan {
+        this.activeGamePlan = plan;
+        this.pendingGamePlan = null;
+        this.activeGameMilestoneIndex = milestoneIndex;
+        this.gameMilestoneComplete = false;
+        this.activeLessonId = null;
+        this.stageComplete = false;
+        this.history.length = 0;
+        this.resetRung();
+        return plan;
+    }
+
     /**
      * Activates the proposed plan after explicit child approval.
      * @returns Accepted plan, or null when no proposal exists.
      */
     acceptGamePlan(): GamePlan | null {
         if (!this.pendingGamePlan) return null;
-        this.activeGamePlan = this.pendingGamePlan;
-        this.pendingGamePlan = null;
-        this.activeGameMilestoneIndex = 0;
-        this.gameMilestoneComplete = false;
-        this.activeLessonId = null;
-        this.stageComplete = false;
         // Earlier brainstorming must not compete with the child-approved north star.
-        this.history.length = 0;
-        this.resetRung();
-        return this.activeGamePlan;
+        return this.activateGamePlan(this.pendingGamePlan, 0);
+    }
+
+    /**
+     * Restores a plan previously accepted in this browser and project.
+     * @param plan Revalidated canonical plan.
+     * @param milestoneIndex Previously active milestone.
+     * @returns Restored plan, or null when the index is outside it.
+     */
+    restoreGamePlan(plan: GamePlan, milestoneIndex: number): GamePlan | null {
+        if (!Number.isInteger(milestoneIndex) || milestoneIndex < 0 || milestoneIndex >= plan.milestones.length) {
+            return null;
+        }
+        return this.activateGamePlan(plan, milestoneIndex);
     }
 
     get gameProgress(): {

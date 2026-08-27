@@ -7,6 +7,7 @@ import {io} from 'socket.io-client';
 import VM from '@scratch/scratch-vm';
 
 import HraiPanelComponent from '../components/hrai-panel/hrai-panel.jsx';
+import {clearGameProgress, loadGameProgress, saveGameProgress} from '../lib/hrai-game-progress';
 import lessons from '../lib/hrai-lessons';
 import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
@@ -76,7 +77,6 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
 
     useEffect(() => {
         const socket = io(`${HRAI_SERVER_URL}/hrai`, {
-            reconnection: false,
             timeout: 5000
         });
         socketRef.current = socket;
@@ -108,6 +108,9 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
                     lessonId: activeLessonId,
                     stageIndex: saved?.stageIndex || 0
                 });
+            } else {
+                const saved = loadGameProgress(projectId, projectTitle);
+                if (saved) socket.emit('gameRestore', saved);
             }
         });
 
@@ -174,6 +177,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         });
 
         socket.on('gameProgress', progress => {
+            saveGameProgress(projectId, progress, projectTitle);
             setGamePlan(null);
             setGameProgress(progress);
             setIsPlanning(false);
@@ -246,6 +250,9 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         setIsPlanning(false);
         const saved = activeLessonId ? loadLessonProgress(projectId, activeLessonId, projectTitle) : null;
         setLessonProgress(saved ? {stageIndex: saved.stageIndex, complete: false} : null);
+        if (activeLessonId) {
+            clearGameProgress(projectId, projectTitle);
+        }
         if (activeLessonId && socketRef.current?.connected) {
             socketRef.current.emit('lessonStart', {
                 lessonId: activeLessonId,

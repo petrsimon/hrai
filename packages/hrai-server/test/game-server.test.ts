@@ -145,6 +145,33 @@ describe("goal-driven game protocol", () => {
         });
     });
 
+    it("restores accepted progress without trusting persisted completion", async () => {
+        const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+        await new Promise<void>((resolve, reject) => {
+            connected.on("connect", resolve);
+            connected.on("connect_error", reject);
+        });
+
+        try {
+            const restored = new Promise<Record<string, unknown>>((resolve) => {
+                connected.once("gameProgress", resolve);
+            });
+            connected.emit("gameRestore", {
+                plan: PLAN,
+                milestoneIndex: 1,
+                complete: true,
+            });
+            expect(await restored).toMatchObject({
+                plan: PLAN,
+                milestoneIndex: 1,
+                milestone: PLAN.milestones[1],
+                complete: false,
+            });
+        } finally {
+            connected.close();
+        }
+    });
+
     it("evaluates cached workspace evidence as soon as a plan is accepted", async () => {
         const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
         await new Promise<void>((resolve, reject) => {

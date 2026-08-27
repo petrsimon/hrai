@@ -65,8 +65,14 @@ Socket events:
 
 - `gamePlan` `{text}` → `gamePlanProposed` with a validated plan
 - `gamePlanAccept` → `gameProgress` with the first active milestone
+- `gameRestore` with a browser-saved plan/index → canonical `gameProgress` after full revalidation
 - workspace evidence → `gameMilestoneComplete` once the current contract becomes true
 - `gameMilestoneNext` → `gameProgress` for the next milestone, only after completion
+
+The editor stores only accepted plan data and the active milestone under a versioned,
+project-scoped local-storage key. Reloads and Socket.IO reconnects restore that state through
+`gameRestore`. Stored completion, chat history, and hint rung are never trusted or restored;
+completion is recomputed from the current workspace.
 
 `game-design.test.ts` evaluates whether the configured local model can preserve a child's idea,
 scope a playable core before optional features, produce teachable milestones, and avoid giving
