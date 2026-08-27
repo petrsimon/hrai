@@ -377,7 +377,6 @@ const HraiPanel = ({
     onVoiceSubmit,
     voiceCapabilities,
     voiceErrorCode,
-    voiceStatus,
     voiceTranscript
 }) => {
     const intl = useIntl();
@@ -789,22 +788,6 @@ const HraiPanel = ({
                 ) : null}
                 <div ref={messagesEndRef} />
             </div>
-            <div className={styles.hintArea}>
-                <Button
-                    type="button"
-                    className={styles.hintButton}
-                    disabled={hintDisabled}
-                    title={hintExplanation}
-                    onClick={handleHintClick}
-                >
-                    <FormattedMessage {...messages.hintButton} />
-                </Button>
-                {hintMaxReached ? (
-                    <p className={styles.hintExplanation}>
-                        {hintExplanation}
-                    </p>
-                ) : null}
-            </div>
             <form
                 className={styles.inputArea}
                 onSubmit={handleSubmit}
@@ -846,14 +829,6 @@ const HraiPanel = ({
                         <span aria-hidden="true">↑</span>
                     </Button>
                 </div>
-                {voicePhase === 'transcribing' || voiceStatus?.status === 'transcribing' ? (
-                    <p
-                        className={styles.voiceStatus}
-                        aria-live="polite"
-                    >
-                        <FormattedMessage {...messages.voiceTranscribing} />
-                    </p>
-                ) : null}
                 {voiceErrorMessage ? (
                     <p
                         className={styles.voiceError}
@@ -868,6 +843,22 @@ const HraiPanel = ({
                     </p>
                 ) : null}
             </form>
+            <div className={styles.hintArea}>
+                <Button
+                    type="button"
+                    className={styles.hintButton}
+                    disabled={hintDisabled}
+                    title={hintExplanation}
+                    onClick={handleHintClick}
+                >
+                    <FormattedMessage {...messages.hintButton} />
+                </Button>
+                {hintMaxReached ? (
+                    <p className={styles.hintExplanation}>
+                        {hintExplanation}
+                    </p>
+                ) : null}
+            </div>
         </Box>
     );
 };
@@ -911,10 +902,6 @@ HraiPanel.propTypes = {
         code: PropTypes.string.isRequired,
         requestId: PropTypes.string
     }),
-    voiceStatus: PropTypes.shape({
-        requestId: PropTypes.string,
-        status: PropTypes.string
-    }),
     voiceTranscript: PropTypes.shape({
         language: PropTypes.string,
         requestId: PropTypes.string,
@@ -931,7 +918,6 @@ HraiPanel.defaultProps = {
     rung: 0,
     voiceCapabilities: {available: false, languages: []},
     voiceErrorCode: null,
-    voiceStatus: null,
     voiceTranscript: null
 };
 

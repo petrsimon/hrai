@@ -48,7 +48,6 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
     const [rung, setRung] = useState(0);
     const [lessonProgress, setLessonProgress] = useState(null);
     const [voiceCapabilities, setVoiceCapabilities] = useState({available: false, languages: []});
-    const [voiceStatus, setVoiceStatus] = useState(null);
     const [voiceTranscript, setVoiceTranscript] = useState(null);
     const [voiceErrorCode, setVoiceErrorCode] = useState(null);
     const activeLesson = lessons.find(lesson => lesson.id === activeLessonId);
@@ -112,7 +111,6 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         socket.on('disconnect', () => {
             setIsServerAvailable(false);
             setVoiceCapabilities({available: false, languages: []});
-            setVoiceStatus(null);
         });
 
         socket.on('voice:capabilities', capabilities => {
@@ -122,19 +120,12 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             });
         });
 
-        socket.on('voice:status', status => {
-            setVoiceStatus(status);
-            setVoiceErrorCode(null);
-        });
-
         socket.on('voice:transcript', transcript => {
             setVoiceTranscript(transcript);
-            setVoiceStatus(null);
             setVoiceErrorCode(null);
         });
 
         socket.on('voice:failed', failure => {
-            setVoiceStatus(null);
             setVoiceErrorCode({
                 requestId: failure?.requestId,
                 code: failure?.code || 'stt_failed'
@@ -200,7 +191,6 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             socket.off('connect_error');
             socket.off('disconnect');
             socket.off('voice:capabilities');
-            socket.off('voice:status');
             socket.off('voice:transcript');
             socket.off('voice:failed');
             socket.off('thinking');
@@ -312,7 +302,6 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             onNextStage={handleNextStage}
             rung={rung}
             voiceCapabilities={voiceCapabilities}
-            voiceStatus={voiceStatus}
             voiceTranscript={voiceTranscript}
             voiceErrorCode={voiceErrorCode}
             onVoiceSubmit={handleVoiceSubmit}

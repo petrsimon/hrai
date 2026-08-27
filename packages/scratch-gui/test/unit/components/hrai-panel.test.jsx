@@ -106,6 +106,7 @@ describe('HraiPanel lesson guidance', () => {
 
             fireEvent.click(screen.getByRole('button', {name: 'Zastavit nahrávání'}));
             expect(screen.getByRole('button', {name: 'Přepisuji nahrávku…'})).toBeTruthy();
+            expect(screen.queryByText('Přepisuji nahrávku…')).toBeNull();
             await waitFor(() => expect(onVoiceSubmit).toHaveBeenCalledWith(
                 expect.objectContaining({mimeType: 'audio/webm'})
             ));
