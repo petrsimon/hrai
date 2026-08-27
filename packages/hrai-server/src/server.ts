@@ -6,10 +6,12 @@
  */
 import { createServer } from "node:http";
 import { Server } from "socket.io";
-import { EVAL_MODEL, chatStream } from "./model-client.ts";
+import { EVAL_MODEL, chat } from "./model-client.ts";
+import { planGame } from "./game-planner.ts";
 import { PALETTE, labelText, opcodesNamedByLabel } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
+import { enforceTutorPolicy } from "./tutor-policy.ts";
 import type { RenderTarget } from "./render.ts";
 import {
     MAX_VOICE_BYTES,
@@ -89,6 +91,7 @@ function parseVoiceSubmission(payload: unknown): VoiceSubmission | { code: strin
 
 interface ServerOptions {
     speechToText?: SpeechToText;
+    gamePlanner?: typeof planGame;
 }
 
 const COMPLETION_CLAIM = /(?:^|\s)(?:ano|hotovo|m[aá]m|ud[eě]lal(?:a)?)(?:\s|[,.!?]|$)/iu;
@@ -136,6 +139,7 @@ function blocksNamedIn(text: string): Record<string, NamedBlock> {
  * @param port TCP port to listen on.
  * @param options Optional service dependencies.
  * @param options.speechToText Speech-to-text implementation for voice requests.
+ * @param options.gamePlanner Structured game-planning implementation.
  * @returns The listening http server, so callers can shut it down.
  */
 export function startServer(port = PORT, options: ServerOptions = {}) {
@@ -146,6 +150,7 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
         maxHttpBufferSize: SOCKET_BUFFER_BYTES,
     });
     const speechToText = options.speechToText ?? new WhisperSpeechToText();
+    const gamePlanner = options.gamePlanner ?? planGame;
 
     io.of("/hrai").on("connection", (socket) => {
         const session = new Session();
@@ -168,6 +173,34 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             const progress = session.lessonProgress;
             if (progress) socket.emit("lessonProgress", progress);
         };
+
+        const emitGameProgress = (): void => {
+            const progress = session.gameProgress;
+            if (progress) socket.emit("gameProgress", progress);
+        };
+
+        socket.on("gamePlan", (payload: unknown) => {
+            const idea = parseQuestion(payload);
+            if (!idea) return;
+            socket.emit("thinking", { thinking: true });
+            void gamePlanner(idea)
+                .then((plan) => {
+                    session.proposeGamePlan(plan);
+                    // Proposal does not steer tutoring until the child accepts it.
+                    socket.emit("gamePlanProposed", plan);
+                })
+                .catch((error: unknown) => {
+                    console.error("hrai: game planning failed", error);
+                    socket.emit("error", {
+                        message: "Plán hry se mi nepodařilo připravit. Zkus nápad popsat ještě jednou.",
+                    });
+                })
+                .finally(() => socket.emit("thinking", { thinking: false }));
+        });
+
+        socket.on("gamePlanAccept", () => {
+            if (session.acceptGamePlan()) emitGameProgress();
+        });
 
         socket.on("lessonStart", (payload: unknown) => {
             if (typeof payload !== "object" || payload === null) return;
@@ -199,6 +232,7 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             const id = `m${Date.now()}`;
             session.remember("learner", question);
             const progress = session.lessonProgress;
+            const context = session.tutorContext;
 
             if (progress?.complete) {
                 const text = `Tento krok je hotový: ${progress.stage.success} Klikni na Další krok a budeme pokračovat.`;
@@ -221,14 +255,21 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
 
             socket.emit("thinking", { thinking: true });
 
-            void chatStream(
-                systemPrompt(session.rung, progress?.stage),
+            // Buffer the model response so pedagogical constraints can be enforced
+            // before any prose reaches the child. Streaming raw tokens would make a
+            // post-generation safety check cosmetic rather than real.
+            void chat(
+                systemPrompt(session.rung, context),
                 userPrompt(session.render(), question, session.history.slice(0, -1)),
-                (delta) => socket.emit("token", { id, delta }),
             )
                 .then((reply) => {
-                    session.remember("tutor", reply.text);
-                    socket.emit("blocks", { id, blocks: blocksNamedIn(reply.text) });
+                    const text = enforceTutorPolicy(reply.text, {
+                        rung: session.rung,
+                        hasGoalContext: Boolean(context),
+                    });
+                    session.remember("tutor", text);
+                    socket.emit("token", { id, delta: text });
+                    socket.emit("blocks", { id, blocks: blocksNamedIn(text) });
                     socket.emit("done", { id, rung: session.rung });
                 })
                 .catch((error: unknown) => {
@@ -244,9 +285,9 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
         socket.on("ask", (payload: unknown) => {
             const question = parseQuestion(payload);
             if (!question) return;
-            // During a guided stage, follow-up messages concern the same task. Preserve
-            // the learner's requested hint depth until the stage changes.
-            if (!session.lessonProgress) session.resetRung();
+            // During a guided stage or game milestone, follow-up messages concern the
+            // same task. Preserve the learner's requested hint depth until it changes.
+            if (!session.tutorContext) session.resetRung();
             answer(question);
         });
 

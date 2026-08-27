@@ -8,7 +8,8 @@
  */
 import { renderProject, type RenderTarget } from "./render.ts";
 import { evaluateLessonStage, lessonStage, type LessonStage } from "./lesson.ts";
-import type { Turn } from "./prompt.ts";
+import type { GameMilestone, GamePlan } from "./game-plan.ts";
+import type { Turn, TutorPromptContext } from "./prompt.ts";
 
 /** The gentlest rung, and the most specific one the tutor will ever go to. */
 export const FIRST_RUNG = 1;
@@ -22,6 +23,10 @@ export class Session {
     private activeLessonId: string | null = null;
     private activeStageIndex = 0;
     private stageComplete = false;
+    private pendingGamePlan: GamePlan | null = null;
+    private activeGamePlan: GamePlan | null = null;
+    private activeGameMilestoneIndex = 0;
+    private gameMilestoneComplete = false;
     readonly history: Turn[] = [];
 
     /**
@@ -54,12 +59,107 @@ export class Session {
         this.currentRung = FIRST_RUNG;
     }
 
+    /**
+     * Plan waiting for the child to approve it.
+     * @returns Pending proposal, or null.
+     */
+    get proposedGamePlan(): GamePlan | null {
+        return this.pendingGamePlan;
+    }
+
+    /**
+     * Stores a model-generated proposal without changing what the tutor is teaching.
+     * The child owns the project direction, so only acceptance activates the plan.
+     * @param plan Validated plan proposal.
+     */
+    proposeGamePlan(plan: GamePlan): void {
+        this.pendingGamePlan = plan;
+    }
+
+    /**
+     * Activates the proposed plan after explicit child approval.
+     * @returns Accepted plan, or null when no proposal exists.
+     */
+    acceptGamePlan(): GamePlan | null {
+        if (!this.pendingGamePlan) return null;
+        this.activeGamePlan = this.pendingGamePlan;
+        this.pendingGamePlan = null;
+        this.activeGameMilestoneIndex = 0;
+        this.gameMilestoneComplete = false;
+        this.activeLessonId = null;
+        this.stageComplete = false;
+        // Earlier brainstorming must not compete with the child-approved north star.
+        this.history.length = 0;
+        this.resetRung();
+        return this.activeGamePlan;
+    }
+
+    get gameProgress(): {
+        plan: GamePlan;
+        milestoneIndex: number;
+        milestone: GameMilestone;
+        complete: boolean;
+    } | null {
+        if (!this.activeGamePlan) return null;
+        const milestone = this.activeGamePlan.milestones[this.activeGameMilestoneIndex];
+        if (!milestone) return null;
+        return {
+            plan: this.activeGamePlan,
+            milestoneIndex: this.activeGameMilestoneIndex,
+            milestone,
+            complete: this.gameMilestoneComplete,
+        };
+    }
+
+    /**
+     * Marks completion only after external deterministic evidence.
+     * This is deliberately separate from model replies and learner claims.
+     */
+    markGameMilestoneComplete(): void {
+        if (this.activeGamePlan) this.gameMilestoneComplete = true;
+    }
+
+    nextGameMilestone(): GameMilestone | null {
+        if (!this.activeGamePlan || !this.gameMilestoneComplete) return null;
+        const next = this.activeGamePlan.milestones[this.activeGameMilestoneIndex + 1];
+        if (!next) return null;
+        this.activeGameMilestoneIndex += 1;
+        this.gameMilestoneComplete = false;
+        this.resetRung();
+        return next;
+    }
+
+    /**
+     * Active goal context injected into every tutor turn.
+     * @returns Authored lesson or custom game milestone context.
+     */
+    get tutorContext(): TutorPromptContext | undefined {
+        const lesson = this.lessonProgress;
+        if (lesson) return lesson.stage;
+
+        const game = this.gameProgress;
+        if (!game) return undefined;
+        return {
+            originalGoal: game.plan.originalGoal,
+            coreLoop: game.plan.coreLoop,
+            title: game.milestone.title,
+            goal: game.milestone.outcome,
+            why: game.milestone.why,
+            concept: game.milestone.concept,
+            instruction: game.milestone.outcome,
+            success: game.milestone.doneWhen,
+        };
+    }
+
     startLesson(lessonId: string, stageIndex = 0): LessonStage | null {
         const stage = lessonStage(lessonId, stageIndex);
         if (!stage) return null;
         this.activeLessonId = lessonId;
         this.activeStageIndex = stageIndex;
         this.stageComplete = false;
+        this.activeGamePlan = null;
+        this.pendingGamePlan = null;
+        this.gameMilestoneComplete = false;
         this.resetRung();
         return stage;
     }

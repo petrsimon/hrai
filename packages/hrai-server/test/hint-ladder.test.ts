@@ -8,7 +8,7 @@
  */
 import { describe, expect, it, beforeAll } from "vitest";
 import { EVAL_MODEL, chat, isModelAvailable, warnSkipped } from "../src/model-client.ts";
-import { PALETTE } from "../src/palette.ts";
+import { PALETTE, opcodesNamedByLabel } from "../src/palette.ts";
 import { systemPrompt, userPrompt } from "../src/prompt.ts";
 
 const RENDER = `postava: Rover
@@ -29,7 +29,10 @@ beforeAll(async () => {
  * @returns The opcodes it cited.
  */
 function opcodesIn(text: string): string[] {
-    return [...new Set(text.match(/\b[a-z]+_[a-z0-9_]+\b/g) ?? [])].filter((o) => OPCODES.has(o));
+    return [...new Set([
+        ...(text.match(/\b[a-z]+_[a-z0-9_]+\b/g) ?? []),
+        ...opcodesNamedByLabel(text),
+    ])].filter((opcode) => OPCODES.has(opcode));
 }
 
 describe(`hint ladder (${EVAL_MODEL})`, () => {

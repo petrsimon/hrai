@@ -73,7 +73,7 @@ function ollamaRequestBody(system: string, user: string, stream: boolean, model:
             { role: "system", content: system },
             { role: "user", content: user },
         ],
-        options: { temperature: stream ? 0.3 : 0, num_ctx: stream ? 8192 : 4096 },
+        options: { temperature: 0, num_ctx: stream ? 8192 : 4096 },
     };
 }
 
@@ -85,7 +85,7 @@ function llamaRequestBody(system: string, user: string, stream: boolean, model: 
             { role: "system", content: system },
             { role: "user", content: user },
         ],
-        temperature: stream ? 0.3 : 0,
+        temperature: 0,
         max_tokens: 512,
         // Qwen3.5 otherwise emits a long reasoning trace before the tutor reply.
         chat_template_kwargs: { enable_thinking: false },

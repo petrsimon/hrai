@@ -20,8 +20,13 @@ describe("llama.cpp model client", () => {
                 return new Response(JSON.stringify({data: [{id: "Qwen3.5-27B-Q4_K_M.gguf"}]}));
             }
 
-            const request = JSON.parse(init?.body as string) as {stream: boolean; chat_template_kwargs: object};
+            const request = JSON.parse(init?.body as string) as {
+                stream: boolean;
+                temperature: number;
+                chat_template_kwargs: object;
+            };
             expect(request.chat_template_kwargs).toEqual({enable_thinking: false});
+            expect(request.temperature).toBe(0);
             if (!request.stream) {
                 return new Response(JSON.stringify({choices: [{message: {content: "Hotovo"}}]}));
             }

@@ -1,13 +1,13 @@
 # @hrai/server
 
-The hrai tutor server. Right now it contains only the **model evaluation harness** — the
-part that decides whether a given local model can tutor at all.
+The hrai tutor server. It renders a child's live Scratch project for a local model,
+keeps tutoring state, evaluates authored lesson progress, and runs model capability evals.
 
-## Why this exists before the server does
+## Why model evals are part of the server
 
 The hrai design bets that rendering a child's project as *pseudo-Scratch text* lets a small
-local model do what comparable systems need a frontier hosted model for. That bet is the
-riskiest thing in the plan, so it is measured here rather than assumed.
+local model do what comparable systems need a frontier hosted model for. Model comprehension
+and game-planning quality are measured rather than assumed.
 
 ## Running the evals
 
@@ -46,19 +46,48 @@ listens on with `HRAI_PORT`.
 
 For local Docker deployment, see [`docker/README.md`](../../docker/README.md).
 
+## Goal-driven custom games
+
+A custom game starts as a proposal, not an active tutorial. The server asks the model for a
+small, structured `GamePlan`, validates and normalizes it, and emits `gamePlanProposed`. Only
+`gamePlanAccept` activates it. The accepted plan keeps the child's original goal, core loop,
+and current learning milestone in every tutor prompt. This prevents a short chat history from
+silently replacing the game the child wanted to make.
+
+The planning model never supplies Scratch scripts or block sequences. Milestone advancement
+is also separate from model replies: `Session.markGameMilestoneComplete()` must be called from
+deterministic workspace or runtime evidence before the next milestone can start.
+
+Socket events in this first server-side slice:
+
+- `gamePlan` `{text}` → `gamePlanProposed` with a validated plan
+- `gamePlanAccept` → `gameProgress` with the first active milestone
+
+`game-design.test.ts` evaluates whether the configured local model can preserve a child's idea,
+scope a playable core before optional features, produce teachable milestones, and avoid giving
+away scripts:
+
+```sh
+HRAI_MODEL_BACKEND=llama.cpp \
+HRAI_EVAL_HOST=http://localhost:8080 \
+HRAI_EVAL_MODEL=Qwen3.5-27B \
+npm run eval:game-design --workspace=packages/hrai-server
+```
+
 ## Lesson bundle prototype
 
 The first game-specific bundle lives at `content/lessons/11-soldier-battle/`. It contains
-Czech and English guides, staged goals, the battle rules, and structural predicates for the
-future lesson runner. The editor lesson library starts the staged guide and the server evaluates
-its predicates against pushed workspace state; loading starter `.sb3` files remains the next content slice.
+Czech and English guides, staged goals, the battle rules, and structural predicates. The editor
+lesson library starts the staged guide and the server evaluates its predicates against pushed
+workspace state.
 
-## What the two suites do, and why both are needed
+## What the model suites do, and why they are needed
 
 | Suite | Asserts |
 | - | - |
 | `tutor-hints.test.ts` | Structural properties of a rung-1 hint: only real block aliases cited, asks rather than tells, no complete script, ≤3 sentences, answers in Czech |
 | `diagnosis.test.ts` | That the model actually *read* the project — names the block causing the reported symptom, and never claims a block is missing that is present |
+| `game-design.test.ts` | Preserves a child's game idea, scopes the playable core first, creates concrete learning milestones, and does not expose a script |
 
 **Neither is sufficient alone.** `qwen3:8b` passes every structural assertion in
 `tutor-hints` while asking the same generic question regardless of the bug, and then fails

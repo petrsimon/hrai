@@ -90,8 +90,8 @@ describe("hrai server", () => {
             client().emit("ask", { text: "proc rover porad utika pryc?" });
         });
 
-        // Streamed, not delivered in one lump.
-        expect(deltas.length).toBeGreaterThan(1);
+        // Buffered until the pedagogical policy has validated the complete reply.
+        expect(deltas.length).toBe(1);
         // Answered a Czech child in Czech.
         expect(answer.toLowerCase()).toMatch(/[ěščřžýáíéůú]/);
         // Rung 1 asks rather than tells.

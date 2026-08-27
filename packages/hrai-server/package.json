@@ -1,12 +1,13 @@
 {
   "name": "@hrai/server",
   "version": "0.0.0",
-  "description": "hrai tutor server. Currently only the model evaluation harness.",
+  "description": "Local-model Scratch tutor server and evaluation harness.",
   "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
   "scripts": {
     "eval": "vitest run --reporter=verbose",
+    "eval:game-design": "vitest run test/game-design.test.ts --reporter=verbose",
     "lint": "eslint",
     "start": "node --experimental-strip-types src/main.ts",
     "test": "vitest run"
