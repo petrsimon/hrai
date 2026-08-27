@@ -32,6 +32,8 @@ describe('HraiPanel lesson guidance', () => {
         );
 
         const input = screen.getByLabelText('Zpráva pro hrai');
+        expect(screen.getByRole('button', {name: 'Poradit'})).toBeTruthy();
+        expect(screen.queryByText('Poradit')).toBeNull();
         fireEvent.change(input, {target: {value: 'Přidej zelenou vlajku prosím'}});
         fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
 

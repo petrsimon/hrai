@@ -848,10 +848,11 @@ const HraiPanel = ({
                     type="button"
                     className={styles.hintButton}
                     disabled={hintDisabled}
-                    title={hintExplanation}
+                    aria-label={intl.formatMessage(messages.hintButton)}
+                    title={hintExplanation || intl.formatMessage(messages.hintButton)}
                     onClick={handleHintClick}
                 >
-                    <FormattedMessage {...messages.hintButton} />
+                    <span aria-hidden="true">🙏</span>
                 </Button>
                 {hintMaxReached ? (
                     <p className={styles.hintExplanation}>
