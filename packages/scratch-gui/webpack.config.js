@@ -26,6 +26,9 @@ const cssModuleExceptions = [
     /[\\/]driver\.js[\\/].*\.css$/ // driver.js CSS
 ];
 
+const hraiServerUrl = process.env.HRAI_SERVER_URL ||
+    (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8791');
+
 const baseConfig = new ScratchWebpackConfigBuilder(
     {
         rootPath: path.resolve(__dirname),
@@ -77,7 +80,7 @@ const baseConfig = new ScratchWebpackConfigBuilder(
         'process.env.GA_ID': `"${process.env.GA_ID || 'UA-000000-01'}"`,
         'process.env.GTM_ENV_AUTH': `"${process.env.GTM_ENV_AUTH || ''}"`,
         'process.env.GTM_ID': process.env.GTM_ID ? `"${process.env.GTM_ID}"` : null,
-        'process.env.HRAI_SERVER_URL': `"${process.env.HRAI_SERVER_URL || 'http://localhost:8791'}"`
+        'process.env.HRAI_SERVER_URL': JSON.stringify(hraiServerUrl)
     }))
     .addPlugin(new CopyWebpackPlugin({
         patterns: [
