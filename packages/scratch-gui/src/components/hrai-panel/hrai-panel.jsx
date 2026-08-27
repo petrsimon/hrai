@@ -357,6 +357,7 @@ const HraiPanel = ({
     const recorderRef = useRef(null);
     const streamRef = useRef(null);
     const chunksRef = useRef([]);
+    const appliedVoiceTranscriptRequestIdRef = useRef(null);
     const recordingStartedAtRef = useRef(0);
     const recordingDurationRef = useRef(0);
     const recordingTimerRef = useRef(null);
@@ -416,9 +417,12 @@ const HraiPanel = ({
     }, [stopStream, voiceUrl]);
 
     useEffect(() => {
-        if (!voiceTranscript || (voiceRequestId && voiceTranscript.requestId !== voiceRequestId)) {
+        if (!voiceTranscript ||
+            appliedVoiceTranscriptRequestIdRef.current === voiceTranscript.requestId ||
+            (voiceRequestId && voiceTranscript.requestId !== voiceRequestId)) {
             return;
         }
+        appliedVoiceTranscriptRequestIdRef.current = voiceTranscript.requestId;
         if (!voiceRequestId) {
             setVoiceRequestId(voiceTranscript.requestId);
         }

@@ -36,6 +36,7 @@ describe('HraiPanel lesson guidance', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
 
         expect(onSend).toHaveBeenCalledWith('Přidej zelenou vlajku prosím');
+        expect(input.value).toBe('');
     });
 
     test('shows one concrete action and its completion condition', () => {
