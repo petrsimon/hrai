@@ -11,11 +11,13 @@ llama.cpp server on one Ubuntu host.
 - Enough memory for the selected GGUF model
 
 The default model is Qwen3.5-27B Q4_K_M. It downloads into the persistent
-`llama-cache` volume on first startup. To reuse a model downloaded by the host
-`llama` command, point the volume at its cache instead:
+`llama-cache` volume on first startup. The current llama.cpp image uses the Hugging
+Face cache for `--hf-repo`; Compose mounts that cache path so container recreation
+does not download the model again. To reuse a model downloaded by the host `llama`
+command, point the volume at its cache instead:
 
 ```sh
-LLAMA_CACHE_DIR="$HOME/.cache/llama.cpp" \
+LLAMA_CACHE_DIR="$HOME/.cache/huggingface" \
 docker compose -f docker-compose.yml up --build
 ```
 
@@ -58,6 +60,8 @@ llama serve \
   -hf lmstudio-community/Qwen3.5-27B-GGUF:Q4_K_M \
   -ngl 999 \
   -c 8192 \
+  --parallel 1 \
+  --no-mmproj \
   --jinja \
   --reasoning off \
   --host 127.0.0.1 \
@@ -100,10 +104,10 @@ EDITOR_PORT=8080 \
 docker compose -f docker-compose.yml up --build
 ```
 
-The llama.cpp server uses its OpenAI-compatible API and starts with reasoning
-disabled so tutor replies stay concise. HRAI selects it with
-`HRAI_MODEL_BACKEND=llama.cpp`; Ollama remains the default for non-Compose
-development and evaluation commands.
+The llama.cpp server uses its OpenAI-compatible API with one request slot. The tutor
+is text-only, so the multimodal projector is disabled; reasoning is also disabled so
+replies stay concise. HRAI selects it with `HRAI_MODEL_BACKEND=llama.cpp`; Ollama
+remains the default for non-Compose development and evaluation commands.
 
 ## Local voice input
 

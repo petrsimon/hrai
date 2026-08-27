@@ -12,6 +12,9 @@ services:
       - "999"
       - --ctx-size
       - "8192"
+      - --parallel
+      - "1"
+      - --no-mmproj
       - --jinja
       - --reasoning
       - off
@@ -21,7 +24,7 @@ services:
       - "${VIDEO_GID:-44}"
       - "${RENDER_GID:-109}"
     volumes:
-      - ${LLAMA_CACHE_DIR:-llama-cache}:/root/.cache/llama.cpp
+      - ${LLAMA_CACHE_DIR:-llama-cache}:/root/.cache/huggingface
     restart: unless-stopped
 
   whisper-model:
