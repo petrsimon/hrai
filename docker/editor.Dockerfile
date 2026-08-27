@@ -7,7 +7,7 @@ ENV HRAI_SERVER_URL=${HRAI_SERVER_URL}
 ENV NODE_ENV=production
 
 COPY . .
-RUN npm ci
+RUN npm ci --include=dev
 # Build workspace packages that scratch-gui consumes before compiling the playground.
 RUN npm run build --workspaces --if-present
 
