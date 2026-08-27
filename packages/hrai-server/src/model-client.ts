@@ -49,13 +49,13 @@ function modelMatches(available: string, requested: string): boolean {
 export async function isModelAvailable(model: string): Promise<boolean> {
     try {
         if (isLlamaCpp()) {
-            const res = await fetch(`${HOST}/v1/models`, { signal: AbortSignal.timeout(2000) });
+            const res = await fetch(`${HOST}/v1/models`, { signal: AbortSignal.timeout(5000) });
             if (!res.ok) return false;
             const body = (await res.json()) as OpenAIModelsResponse;
             return (body.data ?? []).some((entry) => modelMatches(entry.id, model));
         }
 
-        const res = await fetch(`${HOST}/api/tags`, { signal: AbortSignal.timeout(2000) });
+        const res = await fetch(`${HOST}/api/tags`, { signal: AbortSignal.timeout(5000) });
         if (!res.ok) return false;
         const body = (await res.json()) as OllamaTagsResponse;
         return (body.models ?? []).some((entry) => modelMatches(entry.name, model));
@@ -88,7 +88,7 @@ function llamaRequestBody(system: string, user: string, stream: boolean, model: 
             { role: "user", content: user },
         ],
         temperature: 0,
-        max_tokens: 512,
+        max_tokens: json ? 768 : 512,
         // Qwen3.5 otherwise emits a long reasoning trace before the tutor reply.
         chat_template_kwargs: { enable_thinking: false },
     };

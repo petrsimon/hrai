@@ -12,6 +12,13 @@ const VALID_PLAN = {
             why: "Bez pohybu nemůže drak hledat poklad.",
             concept: "události a pohyb",
             doneWhen: "Každá šipka posune draka správným směrem.",
+            assessment: {
+                allOf: [{
+                    kind: "scriptContains",
+                    opcodes: ["event_whenkeypressed", "motion_changexby"],
+                    minimum: 2,
+                }],
+            },
         },
         {
             title: "Postav bludiště",
@@ -19,6 +26,13 @@ const VALID_PLAN = {
             why: "Stěny tvoří výzvu bludiště.",
             concept: "podmínky a dotyk",
             doneWhen: "Při dotyku stěny se drak vrátí před ni.",
+            assessment: {
+                allOf: [{
+                    kind: "scriptContains",
+                    opcodes: ["control_if", "sensing_touchingcolor"],
+                    minimum: 1,
+                }],
+            },
         },
         {
             title: "Najdi poklad",
@@ -26,6 +40,12 @@ const VALID_PLAN = {
             why: "Nalezení pokladu je cíl hry.",
             concept: "zprávy a stav hry",
             doneWhen: "Po dotyku pokladu hra oznámí výhru.",
+            assessment: {
+                allOf: [{
+                    kind: "projectContains",
+                    opcodes: ["sensing_touchingobject", "looks_say"],
+                }],
+            },
         },
     ],
 };
@@ -54,5 +74,38 @@ describe("game plan parser", () => {
     it("rejects missing or oversized goal fields", () => {
         expect(() => parseGamePlan(JSON.stringify({...VALID_PLAN, originalGoal: ""}))).toThrow(/originalGoal/);
         expect(() => parseGamePlan(JSON.stringify({...VALID_PLAN, coreLoop: "x".repeat(501)}))).toThrow(/coreLoop/);
+    });
+
+    it("rejects missing, unsupported, or oversized assessment contracts", () => {
+        const [firstMilestone, ...remainingMilestones] = VALID_PLAN.milestones;
+        if (!firstMilestone) throw new Error("fixture must contain a milestone");
+        const {assessment: _assessment, ...withoutAssessment} = firstMilestone;
+        expect(() => parseGamePlan(JSON.stringify({
+            ...VALID_PLAN,
+            milestones: [withoutAssessment, ...remainingMilestones],
+        }))).toThrow(/assessment/);
+
+        expect(() => parseGamePlan(JSON.stringify({
+            ...VALID_PLAN,
+            milestones: [{
+                ...firstMilestone,
+                assessment: {
+                    allOf: [{kind: "projectContains", opcodes: ["dragon_fly"]}],
+                },
+            }, ...remainingMilestones],
+        }))).toThrow(/opcode/);
+
+        expect(() => parseGamePlan(JSON.stringify({
+            ...VALID_PLAN,
+            milestones: [{
+                ...firstMilestone,
+                assessment: {
+                    allOf: Array.from({length: 5}, () => ({
+                        kind: "spriteCountAtLeast",
+                        minimum: 1,
+                    })),
+                },
+            }, ...remainingMilestones],
+        }))).toThrow(/allOf/);
     });
 });

@@ -15,6 +15,7 @@ const PANEL_MAX_WIDTH = 512;
 const PANEL_KEYBOARD_STEP = 16;
 const BLOCK_SLOT_PLACEHOLDER = '\u25BE';
 const MAX_VOICE_DURATION_MS = 10_000;
+const MAX_GAME_IDEA_LENGTH = 500;
 const VOICE_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'];
 
 const messages = defineMessages({
@@ -207,6 +208,21 @@ const messages = defineMessages({
         id: 'gui.hrai.milestoneConcept',
         defaultMessage: 'Co si procvičíš',
         description: 'heading for the programming concept in a milestone'
+    },
+    gameMilestoneComplete: {
+        id: 'gui.hrai.gameMilestoneComplete',
+        defaultMessage: 'Výborně! Tento milník je hotový.',
+        description: 'completion message for a custom game milestone'
+    },
+    nextGameMilestone: {
+        id: 'gui.hrai.nextGameMilestone',
+        defaultMessage: 'Další milník',
+        description: 'button to advance to the next custom game milestone'
+    },
+    gamePlanComplete: {
+        id: 'gui.hrai.gamePlanComplete',
+        defaultMessage: 'Dokončil jsi plán své hry!',
+        description: 'completion message for the final custom game milestone'
     }
 });
 
@@ -465,6 +481,7 @@ const GameIdeaCard = ({idea, isPlanning, onIdeaChange, onSubmit}) => {
                     <textarea
                         className={styles.gameIdeaInput}
                         disabled={isPlanning}
+                        maxLength={MAX_GAME_IDEA_LENGTH}
                         rows="3"
                         value={idea}
                         onChange={onIdeaChange}
@@ -547,8 +564,9 @@ GamePlanCard.propTypes = {
     plan: gamePlanShape.isRequired
 };
 
-const GameProgressCard = ({progress}) => {
-    const {milestone, milestoneIndex, plan} = progress;
+const GameProgressCard = ({onNext, progress}) => {
+    const {complete, milestone, milestoneIndex, plan} = progress;
+    const hasNextMilestone = milestoneIndex < plan.milestones.length - 1;
     return (
         <section className={styles.gameCard}>
             <h3 className={styles.gameCardTitle}>
@@ -579,6 +597,24 @@ const GameProgressCard = ({progress}) => {
                 <strong><FormattedMessage {...messages.stageSuccess} /></strong>
                 <p>{milestone.doneWhen}</p>
             </div>
+            {complete ? (
+                <>
+                    <strong>
+                        <FormattedMessage
+                            {...(hasNextMilestone ? messages.gameMilestoneComplete : messages.gamePlanComplete)}
+                        />
+                    </strong>
+                    {hasNextMilestone ? (
+                        <Button
+                            type="button"
+                            className={styles.nextStageButton}
+                            onClick={onNext}
+                        >
+                            <FormattedMessage {...messages.nextGameMilestone} />
+                        </Button>
+                    ) : null}
+                </>
+            ) : null}
             <ol className={styles.milestoneTrail}>
                 {plan.milestones.map((item, index) => (
                     <li
@@ -595,6 +631,7 @@ const GameProgressCard = ({progress}) => {
 };
 
 GameProgressCard.propTypes = {
+    onNext: PropTypes.func.isRequired,
     progress: PropTypes.shape({
         complete: PropTypes.bool.isRequired,
         milestone: milestoneShape.isRequired,
@@ -616,6 +653,7 @@ const HraiPanel = ({
     isThinking,
     lesson,
     lessonProgress,
+    onNextGameMilestone,
     onNextStage,
     rung,
     onAliasClick,
@@ -1028,7 +1066,10 @@ const HraiPanel = ({
             ) : null}
             {lesson ? null : (
                 gameProgress ? (
-                    <GameProgressCard progress={gameProgress} />
+                    <GameProgressCard
+                        progress={gameProgress}
+                        onNext={onNextGameMilestone}
+                    />
                 ) : gamePlan ? (
                     <GamePlanCard
                         isAccepting={isPlanning}
@@ -1184,6 +1225,7 @@ HraiPanel.propTypes = {
     onGamePlanEdit: PropTypes.func,
     onGamePlanRequest: PropTypes.func,
     onHint: PropTypes.func.isRequired,
+    onNextGameMilestone: PropTypes.func,
     onNextStage: PropTypes.func.isRequired,
     onSend: PropTypes.func.isRequired,
     onVoiceSubmit: PropTypes.func,
@@ -1214,6 +1256,7 @@ HraiPanel.defaultProps = {
     onGamePlanAccept: () => {},
     onGamePlanEdit: () => {},
     onGamePlanRequest: () => {},
+    onNextGameMilestone: () => {},
     onVoiceSubmit: () => {},
     rung: 0,
     voiceCapabilities: {available: false, languages: []},

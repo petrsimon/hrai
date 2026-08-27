@@ -8,6 +8,7 @@ import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { EVAL_MODEL, chat } from "./model-client.ts";
 import { planGame } from "./game-planner.ts";
+import { MAX_GAME_IDEA_LENGTH } from "./game-plan.ts";
 import { PALETTE, labelText, opcodesNamedByLabel } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
@@ -52,6 +53,11 @@ function parseQuestion(payload: unknown): string | null {
     if (typeof text !== "string") return null;
     const trimmed = text.trim();
     return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseGameIdea(payload: unknown): string | null {
+    const idea = parseQuestion(payload);
+    return idea && idea.length <= MAX_GAME_IDEA_LENGTH ? idea : null;
 }
 
 interface VoiceSubmission {
@@ -179,8 +185,15 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             if (progress) socket.emit("gameProgress", progress);
         };
 
+        const evaluateGameProgress = (): void => {
+            const progress = session.gameProgress;
+            if (progress && !progress.complete && session.evaluateGameMilestone()) {
+                socket.emit("gameMilestoneComplete", session.gameProgress);
+            }
+        };
+
         socket.on("gamePlan", (payload: unknown) => {
-            const idea = parseQuestion(payload);
+            const idea = parseGameIdea(payload);
             if (!idea) return;
             socket.emit("thinking", { thinking: true });
             void gamePlanner(idea)
@@ -199,7 +212,17 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
         });
 
         socket.on("gamePlanAccept", () => {
-            if (session.acceptGamePlan()) emitGameProgress();
+            if (session.acceptGamePlan()) {
+                emitGameProgress();
+                evaluateGameProgress();
+            }
+        });
+
+        socket.on("gameMilestoneNext", () => {
+            if (session.nextGameMilestone()) {
+                emitGameProgress();
+                evaluateGameProgress();
+            }
         });
 
         socket.on("lessonStart", (payload: unknown) => {
@@ -222,6 +245,7 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             if (progress && !progress.complete && session.evaluateLessonStage()) {
                 socket.emit("stageComplete", session.lessonProgress);
             }
+            evaluateGameProgress();
         });
 
         /**
@@ -232,6 +256,7 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             const id = `m${Date.now()}`;
             session.remember("learner", question);
             const progress = session.lessonProgress;
+            const gameProgress = session.gameProgress;
             const context = session.tutorContext;
 
             if (progress?.complete) {
@@ -243,9 +268,32 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
                 return;
             }
 
+            if (gameProgress?.complete) {
+                const hasNextMilestone = gameProgress.milestoneIndex < gameProgress.plan.milestones.length - 1;
+                const text = `Tento milník je hotový: ${gameProgress.milestone.doneWhen} ` +
+                    (hasNextMilestone ?
+                        "Až budeš připravený, klikni na Další milník." :
+                        "Dokončil jsi plán své hry.");
+                session.remember("tutor", text);
+                socket.emit("token", { id, delta: text });
+                socket.emit("blocks", { id, blocks: {} });
+                socket.emit("done", { id, rung: session.rung });
+                return;
+            }
+
             if (progress && COMPLETION_CLAIM.test(question)) {
                 const text = `Editor zatím nevidí splněnou podmínku: ${progress.stage.success} ` +
                     "Nemusíš mi psát „hotovo“ — Další krok se objeví automaticky, jakmile ji projekt splní.";
+                session.remember("tutor", text);
+                socket.emit("token", { id, delta: text });
+                socket.emit("blocks", { id, blocks: {} });
+                socket.emit("done", { id, rung: session.rung });
+                return;
+            }
+
+            if (gameProgress && COMPLETION_CLAIM.test(question)) {
+                const text = `Editor zatím nevidí důkazy pro milník: ${gameProgress.milestone.doneWhen} ` +
+                    "Nemusíš mi psát „hotovo“ — dokončení se objeví automaticky, jakmile je projekt splní.";
                 session.remember("tutor", text);
                 socket.emit("token", { id, delta: text });
                 socket.emit("blocks", { id, blocks: {} });

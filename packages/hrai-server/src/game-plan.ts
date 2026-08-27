@@ -1,3 +1,5 @@
+import {PALETTE} from "./palette.ts";
+
 /** A child-approved plan for turning their game idea into learning milestones. */
 export interface GamePlan {
     title: string;
@@ -20,11 +22,30 @@ export interface GameMilestone {
     concept: string;
     /** Observable evidence for a deterministic assessor or human test. */
     doneWhen: string;
+    /** Hidden, validated structural evidence evaluated by the server. */
+    assessment: GameAssessment;
 }
 
+export interface GameAssessment {
+    allOf: GameAssessmentCriterion[];
+}
+
+export type GameAssessmentCriterion =
+    | {kind: "projectContains"; opcodes: string[]}
+    | {kind: "scriptContains"; opcodes: string[]; minimum: number}
+    | {kind: "spriteCountAtLeast"; minimum: number}
+    | {kind: "variableCountAtLeast"; minimum: number};
+
+export const MAX_GAME_IDEA_LENGTH = 500;
+
 const MIN_MILESTONES = 3;
-const MAX_MILESTONES = 6;
-const MAX_FIELD_LENGTH = 500;
+const MAX_MILESTONES = 4;
+const MAX_FIELD_LENGTH = MAX_GAME_IDEA_LENGTH;
+const MIN_CRITERIA = 1;
+const MAX_CRITERIA = 4;
+const MAX_CRITERION_OPCODES = 5;
+const MAX_MINIMUM = 10;
+const PALETTE_OPCODES = new Set(PALETTE.map((entry) => entry.opcode));
 
 /**
  * Standing instructions for the planning call. Planning is separate from tutoring:
@@ -34,15 +55,25 @@ const MAX_FIELD_LENGTH = 500;
 export function gamePlanningSystemPrompt(): string {
     return [
         "Jsi návrhář výukových her pro osmileté děti, které programují ve Scratchi.",
-        "Převeď dohodnutý nápad dítěte na malou hratelnou hru a 3 až 6 výukových milníků.",
+        "Převeď dohodnutý nápad dítěte na malou hratelnou hru a 3 až 4 výukové milníky.",
         "Zachovej původní fantazii dítěte. Nezaměň ji za běžnou ukázkovou hru.",
         "Nejdřív naplánuj nejmenší hratelnou smyčku. Volitelné nepřátele, efekty a vylepšení dej až potom.",
+        "Piš stručně: title nejvýše 5 slov; outcome, why, concept a doneWhen každý nejvýše 12 slov.",
         "Každý milník musí mít jeden viditelný výsledek, jeden programovací pojem a pozorovatelnou podmínku hotovo.",
-        "Nevypisuj bloky, opcodes, hotové scénáře ani postup spojování bloků. Dítě bude programovat samo s nápovědou tutora.",
+        "Ke každému milníku přidej skrytý assessment: server ověří jeho allOf proti struktuře projektu.",
+        "projectContains znamená, že všechny opcodes existují někde v projektu.",
+        "scriptContains znamená, že všechny opcodes jsou v jednom propojeném skriptu; minimum je počet takových skriptů.",
+        "spriteCountAtLeast a variableCountAtLeast používají pouze minimum.",
+        "Assessment smí mít 1 až 4 podmínky, seznam opcodes 1 až 5 položek a minimum 1 až 10.",
+        `Používej pouze tyto přesné opcodes: ${[...PALETTE_OPCODES].join(", ")}`,
+        "Nevypisuj hotové scénáře ani postup spojování bloků. Dítě bude programovat samo s nápovědou tutora.",
+        "Opcodes patří pouze do skrytého assessment; nikdy je nevkládej do title, outcome, why, concept ani doneWhen.",
         "Odpověz pouze jedním JSON objektem bez Markdownu a bez dalšího textu.",
         "Použij přesně tento tvar:",
         '{"title":"...","originalGoal":"...","coreLoop":"...","milestones":[' +
-            '{"title":"...","outcome":"...","why":"...","concept":"...","doneWhen":"..."}]}'
+            '{"title":"...","outcome":"...","why":"...","concept":"...","doneWhen":"...",' +
+            '"assessment":{"allOf":[{"kind":"scriptContains","opcodes":["event_whenflagclicked"],' +
+            '"minimum":1}]}}]}'
     ].join("\n");
 }
 
@@ -75,6 +106,62 @@ function stringValue(value: unknown, field: string): string {
         throw new Error(`Game plan ${field} must contain 1-${MAX_FIELD_LENGTH} characters`);
     }
     return trimmed;
+}
+
+function minimumValue(value: unknown, field: string): number {
+    if (!Number.isInteger(value) || (value as number) < 1 || (value as number) > MAX_MINIMUM) {
+        throw new Error(`Game plan ${field} must be an integer from 1-${MAX_MINIMUM}`);
+    }
+    return value as number;
+}
+
+function opcodeList(value: unknown, field: string): string[] {
+    if (!Array.isArray(value) || value.length < 1 || value.length > MAX_CRITERION_OPCODES) {
+        throw new Error(`Game plan ${field} must contain 1-${MAX_CRITERION_OPCODES} opcodes`);
+    }
+    return value.map((opcode, index) => {
+        if (typeof opcode !== "string" || !PALETTE_OPCODES.has(opcode)) {
+            throw new Error(`Game plan ${field}[${index}] contains an unsupported opcode`);
+        }
+        return opcode;
+    });
+}
+
+function assessmentValue(value: unknown, field: string): GameAssessment {
+    const assessment = objectValue(value, field);
+    if (!Array.isArray(assessment.allOf) ||
+        assessment.allOf.length < MIN_CRITERIA ||
+        assessment.allOf.length > MAX_CRITERIA) {
+        throw new Error(`Game plan ${field}.allOf must contain ${MIN_CRITERIA}-${MAX_CRITERIA} criteria`);
+    }
+
+    return {
+        allOf: assessment.allOf.map((criterionValue, index) => {
+            const criterionField = `${field}.allOf[${index}]`;
+            const criterion = objectValue(criterionValue, criterionField);
+            switch (criterion.kind) {
+            case "projectContains":
+                return {
+                    kind: criterion.kind,
+                    opcodes: opcodeList(criterion.opcodes, `${criterionField}.opcodes`),
+                };
+            case "scriptContains":
+                return {
+                    kind: criterion.kind,
+                    opcodes: opcodeList(criterion.opcodes, `${criterionField}.opcodes`),
+                    minimum: minimumValue(criterion.minimum, `${criterionField}.minimum`),
+                };
+            case "spriteCountAtLeast":
+            case "variableCountAtLeast":
+                return {
+                    kind: criterion.kind,
+                    minimum: minimumValue(criterion.minimum, `${criterionField}.minimum`),
+                };
+            default:
+                throw new Error(`Game plan ${criterionField}.kind is unsupported`);
+            }
+        }),
+    };
 }
 
 /**
@@ -118,6 +205,7 @@ export function parseGamePlan(text: string): GamePlan {
                 why: stringValue(milestone.why, `milestones[${index}].why`),
                 concept: stringValue(milestone.concept, `milestones[${index}].concept`),
                 doneWhen: stringValue(milestone.doneWhen, `milestones[${index}].doneWhen`),
+                assessment: assessmentValue(milestone.assessment, `milestones[${index}].assessment`),
             };
         }),
     };

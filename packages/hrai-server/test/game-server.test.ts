@@ -17,6 +17,13 @@ const PLAN: GamePlan = {
             why: "Drak musí hledat cestu.",
             concept: "události",
             doneWhen: "Šipky pohybují drakem.",
+            assessment: {
+                allOf: [{
+                    kind: "scriptContains",
+                    opcodes: ["event_whenkeypressed", "motion_changexby"],
+                    minimum: 1,
+                }],
+            },
         },
         {
             id: "milestone-2",
@@ -25,6 +32,12 @@ const PLAN: GamePlan = {
             why: "Stěny tvoří bludiště.",
             concept: "podmínky",
             doneWhen: "Drak neprojde stěnou.",
+            assessment: {
+                allOf: [{
+                    kind: "projectContains",
+                    opcodes: ["control_if", "sensing_touchingcolor"],
+                }],
+            },
         },
         {
             id: "milestone-3",
@@ -33,8 +46,42 @@ const PLAN: GamePlan = {
             why: "Poklad je cíl hry.",
             concept: "dotyk",
             doneWhen: "Dotyk pokladu oznámí výhru.",
+            assessment: {
+                allOf: [{
+                    kind: "projectContains",
+                    opcodes: ["sensing_touchingobject", "looks_say"],
+                }],
+            },
         },
     ],
+};
+
+const COMPLETING_WORKSPACE = {
+    focusedTargetId: "dragon",
+    targets: [{
+        id: "dragon",
+        name: "Drak",
+        isStage: false,
+        blocks: {
+            event: {
+                id: "event",
+                opcode: "event_whenkeypressed",
+                next: "move",
+                parent: null,
+                inputs: {},
+                fields: {},
+                topLevel: true,
+            },
+            move: {
+                id: "move",
+                opcode: "motion_changexby",
+                next: null,
+                parent: "event",
+                inputs: {},
+                fields: {},
+            },
+        },
+    }],
 };
 
 const gamePlanner = vi.fn().mockResolvedValue(PLAN);
@@ -78,5 +125,46 @@ describe("goal-driven game protocol", () => {
             milestone: PLAN.milestones[0],
             complete: false,
         });
+    });
+
+    it("emits deterministic completion and advances only after the child continues", async () => {
+        if (!socket) throw new Error("socket was never connected");
+
+        const completed = new Promise<Record<string, unknown>>((resolve) => {
+            socket?.once("gameMilestoneComplete", resolve);
+        });
+        socket.emit("workspace", COMPLETING_WORKSPACE);
+        expect(await completed).toMatchObject({milestoneIndex: 0, complete: true});
+
+        const advanced = new Promise<Record<string, unknown>>((resolve) => socket?.once("gameProgress", resolve));
+        socket.emit("gameMilestoneNext");
+        expect(await advanced).toMatchObject({
+            milestoneIndex: 1,
+            milestone: PLAN.milestones[1],
+            complete: false,
+        });
+    });
+
+    it("evaluates cached workspace evidence as soon as a plan is accepted", async () => {
+        const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+        await new Promise<void>((resolve, reject) => {
+            connected.on("connect", resolve);
+            connected.on("connect_error", reject);
+        });
+
+        try {
+            connected.emit("workspace", COMPLETING_WORKSPACE);
+            const proposed = new Promise<GamePlan>((resolve) => connected.once("gamePlanProposed", resolve));
+            connected.emit("gamePlan", {text: "Drak hledá poklad v bludišti."});
+            await proposed;
+
+            const completed = new Promise<Record<string, unknown>>((resolve) => {
+                connected.once("gameMilestoneComplete", resolve);
+            });
+            connected.emit("gamePlanAccept");
+            expect(await completed).toMatchObject({milestoneIndex: 0, complete: true});
+        } finally {
+            connected.close();
+        }
     });
 });

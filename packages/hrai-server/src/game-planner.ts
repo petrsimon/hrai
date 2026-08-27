@@ -23,7 +23,12 @@ export async function planGame(idea: string, complete: Complete = chatJson): Pro
         ].join("\n");
         const reply = await complete(system, `${basePrompt}${correction}`);
         try {
-            return parseGamePlan(reply.text);
+            return {
+                ...parseGamePlan(reply.text),
+                // The model may summarize or embellish this field. The north star is
+                // child-authored data, so preserve the accepted idea byte-for-byte.
+                originalGoal: idea,
+            };
         } catch (error) {
             validationError = error;
         }

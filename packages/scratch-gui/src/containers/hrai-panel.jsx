@@ -179,6 +179,10 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             setIsPlanning(false);
         });
 
+        socket.on('gameMilestoneComplete', progress => {
+            setGameProgress(progress);
+        });
+
         socket.on('lessonProgress', progress => {
             saveLessonProgress(projectId, progress.lessonId, progress.stageIndex, projectTitle);
             setLessonProgress(progress);
@@ -217,6 +221,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             socket.off('done');
             socket.off('gamePlanProposed');
             socket.off('gameProgress');
+            socket.off('gameMilestoneComplete');
             socket.off('lessonProgress');
             socket.off('stageComplete');
             socket.off('error');
@@ -327,6 +332,12 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         }
     }, [pushWorkspace]);
 
+    const handleNextGameMilestone = useCallback(() => {
+        if (socketRef.current?.connected && gameProgress?.complete) {
+            socketRef.current.emit('gameMilestoneNext');
+        }
+    }, [gameProgress]);
+
     const handleNextStage = useCallback(() => {
         if (socketRef.current?.connected) {
             socketRef.current.emit('lessonNext');
@@ -348,6 +359,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             isThinking={isThinking && isServerAvailable && !isPlanning}
             lesson={activeLesson}
             lessonProgress={lessonProgress}
+            onNextGameMilestone={handleNextGameMilestone}
             onNextStage={handleNextStage}
             rung={rung}
             voiceCapabilities={voiceCapabilities}

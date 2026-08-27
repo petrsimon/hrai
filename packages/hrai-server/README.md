@@ -54,14 +54,19 @@ small, structured `GamePlan`, validates and normalizes it, and emits `gamePlanPr
 and current learning milestone in every tutor prompt. This prevents a short chat history from
 silently replacing the game the child wanted to make.
 
-The planning model never supplies Scratch scripts or block sequences. Milestone advancement
-is also separate from model replies: `Session.markGameMilestoneComplete()` must be called from
-deterministic workspace or runtime evidence before the next milestone can start.
+The planning model never supplies child-visible Scratch scripts or block sequences. Each milestone
+also carries a hidden, validated structural evidence contract. The contract uses only four bounded
+criterion types (`projectContains`, `scriptContains`, `spriteCountAtLeast`, and
+`variableCountAtLeast`) and palette-validated opcodes; it cannot contain generated code. The server
+evaluates all criteria against normalized workspace pushes. Model replies, learner claims, and UI
+controls cannot mark a milestone complete.
 
-Socket events in this first server-side slice:
+Socket events:
 
 - `gamePlan` `{text}` → `gamePlanProposed` with a validated plan
 - `gamePlanAccept` → `gameProgress` with the first active milestone
+- workspace evidence → `gameMilestoneComplete` once the current contract becomes true
+- `gameMilestoneNext` → `gameProgress` for the next milestone, only after completion
 
 `game-design.test.ts` evaluates whether the configured local model can preserve a child's idea,
 scope a playable core before optional features, produce teachable milestones, and avoid giving

@@ -8,6 +8,7 @@
  */
 import { renderProject, type RenderTarget } from "./render.ts";
 import { evaluateLessonStage, lessonStage, type LessonStage } from "./lesson.ts";
+import { evaluateGameAssessment } from "./game-assessor.ts";
 import type { GameMilestone, GamePlan } from "./game-plan.ts";
 import type { Turn, TutorPromptContext } from "./prompt.ts";
 
@@ -112,11 +113,15 @@ export class Session {
     }
 
     /**
-     * Marks completion only after external deterministic evidence.
-     * This is deliberately separate from model replies and learner claims.
+     * Checks the current milestone against the latest normalized workspace.
+     * @returns Whether the current milestone is complete.
      */
-    markGameMilestoneComplete(): void {
-        if (this.activeGamePlan) this.gameMilestoneComplete = true;
+    evaluateGameMilestone(): boolean {
+        if (!this.activeGamePlan || this.gameMilestoneComplete) return this.gameMilestoneComplete;
+        const milestone = this.activeGamePlan.milestones[this.activeGameMilestoneIndex];
+        if (!milestone) return false;
+        this.gameMilestoneComplete = evaluateGameAssessment(milestone.assessment, this.targets);
+        return this.gameMilestoneComplete;
     }
 
     nextGameMilestone(): GameMilestone | null {

@@ -292,4 +292,47 @@ describe('HraiPanel custom game planning', () => {
         expect(screen.getByText('1 z 2')).toBeTruthy();
         expect(screen.queryByRole('button', {name: /hotovo/i})).toBeNull();
     });
+
+    test('offers the next milestone only after deterministic completion', () => {
+        const onNextGameMilestone = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                gameProgress={{
+                    plan: GAME_PLAN,
+                    milestoneIndex: 0,
+                    milestone: GAME_PLAN.milestones[0],
+                    complete: true
+                }}
+                messages={[]}
+                onHint={jest.fn()}
+                onNextGameMilestone={onNextGameMilestone}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        expect(screen.getByText('Výborně! Tento milník je hotový.')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', {name: 'Další milník'}));
+        expect(onNextGameMilestone).toHaveBeenCalledTimes(1);
+    });
+
+    test('celebrates the final milestone without offering a nonexistent next step', () => {
+        renderWithIntl(
+            <HraiPanel
+                gameProgress={{
+                    plan: GAME_PLAN,
+                    milestoneIndex: 1,
+                    milestone: GAME_PLAN.milestones[1],
+                    complete: true
+                }}
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        expect(screen.getByText('Dokončil jsi plán své hry!')).toBeTruthy();
+        expect(screen.queryByRole('button', {name: 'Další milník'})).toBeNull();
+    });
 });
