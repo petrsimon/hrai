@@ -137,6 +137,76 @@ const messages = defineMessages({
         id: 'gui.hrai.voiceFailed',
         defaultMessage: 'Nahrávku se nepodařilo přepsat. Zkus to znovu, nebo napiš zprávu.',
         description: 'status shown when voice transcription fails'
+    },
+    gameDesignerTitle: {
+        id: 'gui.hrai.gameDesignerTitle',
+        defaultMessage: 'Navrhni vlastní hru',
+        description: 'heading for the custom game idea form'
+    },
+    gameIdeaLabel: {
+        id: 'gui.hrai.gameIdeaLabel',
+        defaultMessage: 'Jakou hru chceš vytvořit?',
+        description: 'label for the child game idea field'
+    },
+    gameIdeaHelp: {
+        id: 'gui.hrai.gameIdeaHelp',
+        defaultMessage: 'Popiš hrdinu, jeho cíl a co má hráč dělat.',
+        description: 'short prompt helping a child describe a game idea'
+    },
+    gamePlanButton: {
+        id: 'gui.hrai.gamePlanButton',
+        defaultMessage: 'Navrhnout hru',
+        description: 'button that requests a game plan'
+    },
+    gamePlanning: {
+        id: 'gui.hrai.gamePlanning',
+        defaultMessage: 'Připravuji malou hratelnou verzi…',
+        description: 'status shown while the game plan is generated'
+    },
+    originalGoal: {
+        id: 'gui.hrai.originalGoal',
+        defaultMessage: 'Tvůj nápad',
+        description: 'heading for the child original game goal'
+    },
+    coreLoop: {
+        id: 'gui.hrai.coreLoop',
+        defaultMessage: 'Jak se hra hraje',
+        description: 'heading for the proposed playable game loop'
+    },
+    gameMilestones: {
+        id: 'gui.hrai.gameMilestones',
+        defaultMessage: 'Cesta ke hře',
+        description: 'heading for custom game milestones'
+    },
+    acceptGamePlan: {
+        id: 'gui.hrai.acceptGamePlan',
+        defaultMessage: 'Tento plán se mi líbí',
+        description: 'button for a child to accept the proposed game plan'
+    },
+    editGameIdea: {
+        id: 'gui.hrai.editGameIdea',
+        defaultMessage: 'Upravit nápad',
+        description: 'button for returning to the game idea form'
+    },
+    currentGame: {
+        id: 'gui.hrai.currentGame',
+        defaultMessage: 'Tvoje hra: {title}',
+        description: 'heading for the accepted custom game'
+    },
+    currentGameMilestone: {
+        id: 'gui.hrai.currentGameMilestone',
+        defaultMessage: '{current} z {total}',
+        description: 'current custom game milestone count'
+    },
+    milestoneWhy: {
+        id: 'gui.hrai.milestoneWhy',
+        defaultMessage: 'Proč teď',
+        description: 'heading for why a milestone advances the game'
+    },
+    milestoneConcept: {
+        id: 'gui.hrai.milestoneConcept',
+        defaultMessage: 'Co si procvičíš',
+        description: 'heading for the programming concept in a milestone'
     }
 });
 
@@ -364,8 +434,183 @@ HraiMessage.defaultProps = {
     onAliasClick: null
 };
 
+const milestoneShape = PropTypes.shape({
+    concept: PropTypes.string.isRequired,
+    doneWhen: PropTypes.string.isRequired,
+    id: PropTypes.string.isRequired,
+    outcome: PropTypes.string.isRequired,
+    title: PropTypes.string.isRequired,
+    why: PropTypes.string.isRequired
+});
+
+const gamePlanShape = PropTypes.shape({
+    coreLoop: PropTypes.string.isRequired,
+    milestones: PropTypes.arrayOf(milestoneShape).isRequired,
+    originalGoal: PropTypes.string.isRequired,
+    title: PropTypes.string.isRequired
+});
+
+const GameIdeaCard = ({idea, isPlanning, onIdeaChange, onSubmit}) => {
+    const canSubmit = idea.trim().length > 0 && !isPlanning;
+    return (
+        <section className={styles.gameCard}>
+            <h3 className={styles.gameCardTitle}>
+                <FormattedMessage {...messages.gameDesignerTitle} />
+            </h3>
+            <form onSubmit={onSubmit}>
+                <Label
+                    above
+                    text={<FormattedMessage {...messages.gameIdeaLabel} />}
+                >
+                    <textarea
+                        className={styles.gameIdeaInput}
+                        disabled={isPlanning}
+                        rows="3"
+                        value={idea}
+                        onChange={onIdeaChange}
+                    />
+                </Label>
+                <p className={styles.gameHelp}>
+                    <FormattedMessage {...messages.gameIdeaHelp} />
+                </p>
+                <Button
+                    type="submit"
+                    className={styles.gamePrimaryButton}
+                    aria-disabled={!canSubmit}
+                    disabled={!canSubmit}
+                >
+                    <FormattedMessage {...messages.gamePlanButton} />
+                </Button>
+                {isPlanning ? (
+                    <p
+                        className={styles.gamePlanning}
+                        aria-live="polite"
+                    >
+                        <FormattedMessage {...messages.gamePlanning} />
+                    </p>
+                ) : null}
+            </form>
+        </section>
+    );
+};
+
+GameIdeaCard.propTypes = {
+    idea: PropTypes.string.isRequired,
+    isPlanning: PropTypes.bool.isRequired,
+    onIdeaChange: PropTypes.func.isRequired,
+    onSubmit: PropTypes.func.isRequired
+};
+
+const GamePlanCard = ({isAccepting, onAccept, onEdit, plan}) => (
+    <section className={styles.gameCard}>
+        <h3 className={styles.gameCardTitle}>{plan.title}</h3>
+        <strong><FormattedMessage {...messages.originalGoal} /></strong>
+        <p>{plan.originalGoal}</p>
+        <strong><FormattedMessage {...messages.coreLoop} /></strong>
+        <p>{plan.coreLoop}</p>
+        <strong><FormattedMessage {...messages.gameMilestones} /></strong>
+        <ol className={styles.milestoneList}>
+            {plan.milestones.map(milestone => (
+                <li key={milestone.id}>
+                    <strong>{milestone.title}</strong>
+                    <span>{milestone.outcome}</span>
+                </li>
+            ))}
+        </ol>
+        <div className={styles.gameActions}>
+            <Button
+                type="button"
+                className={styles.gamePrimaryButton}
+                aria-disabled={isAccepting}
+                disabled={isAccepting}
+                onClick={onAccept}
+            >
+                <FormattedMessage {...messages.acceptGamePlan} />
+            </Button>
+            <Button
+                type="button"
+                className={styles.gameSecondaryButton}
+                aria-disabled={isAccepting}
+                disabled={isAccepting}
+                onClick={onEdit}
+            >
+                <FormattedMessage {...messages.editGameIdea} />
+            </Button>
+        </div>
+    </section>
+);
+
+GamePlanCard.propTypes = {
+    isAccepting: PropTypes.bool.isRequired,
+    onAccept: PropTypes.func.isRequired,
+    onEdit: PropTypes.func.isRequired,
+    plan: gamePlanShape.isRequired
+};
+
+const GameProgressCard = ({progress}) => {
+    const {milestone, milestoneIndex, plan} = progress;
+    return (
+        <section className={styles.gameCard}>
+            <h3 className={styles.gameCardTitle}>
+                <FormattedMessage
+                    {...messages.currentGame}
+                    values={{title: plan.title}}
+                />
+            </h3>
+            <strong><FormattedMessage {...messages.originalGoal} /></strong>
+            <p>{plan.originalGoal}</p>
+            <span className={styles.milestoneCounter}>
+                <FormattedMessage
+                    {...messages.currentGameMilestone}
+                    values={{current: milestoneIndex + 1, total: plan.milestones.length}}
+                />
+            </span>
+            <h4 className={styles.currentMilestoneTitle}>{milestone.title}</h4>
+            <p>{milestone.outcome}</p>
+            <div className={styles.milestoneDetail}>
+                <strong><FormattedMessage {...messages.milestoneWhy} /></strong>
+                <p>{milestone.why}</p>
+            </div>
+            <div className={styles.milestoneDetail}>
+                <strong><FormattedMessage {...messages.milestoneConcept} /></strong>
+                <p>{milestone.concept}</p>
+            </div>
+            <div className={styles.milestoneDone}>
+                <strong><FormattedMessage {...messages.stageSuccess} /></strong>
+                <p>{milestone.doneWhen}</p>
+            </div>
+            <ol className={styles.milestoneTrail}>
+                {plan.milestones.map((item, index) => (
+                    <li
+                        key={item.id}
+                        className={index === milestoneIndex ? styles.milestoneCurrent : null}
+                        aria-current={index === milestoneIndex ? 'step' : null}
+                    >
+                        {item.title}
+                    </li>
+                ))}
+            </ol>
+        </section>
+    );
+};
+
+GameProgressCard.propTypes = {
+    progress: PropTypes.shape({
+        complete: PropTypes.bool.isRequired,
+        milestone: milestoneShape.isRequired,
+        milestoneIndex: PropTypes.number.isRequired,
+        plan: gamePlanShape.isRequired
+    }).isRequired
+};
+
 const HraiPanel = ({
+    gamePlan,
+    gameProgress,
+    isPlanning,
     messages: chatMessages,
+    onGamePlanAccept,
+    onGamePlanEdit,
+    onGamePlanRequest,
     onSend,
     onHint,
     isThinking,
@@ -381,6 +626,7 @@ const HraiPanel = ({
 }) => {
     const intl = useIntl();
     const [draft, setDraft] = useState('');
+    const [gameIdea, setGameIdea] = useState('');
     const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT_WIDTH);
     const [voicePhase, setVoicePhase] = useState('idle');
     const [voiceRequestId, setVoiceRequestId] = useState(null);
@@ -592,6 +838,23 @@ const HraiPanel = ({
         submitDraft();
     }, [submitDraft]);
 
+    const handleGameIdeaChange = useCallback(event => {
+        setGameIdea(event.target.value);
+    }, []);
+
+    const handleGameIdeaSubmit = useCallback(event => {
+        event.preventDefault();
+        const idea = gameIdea.trim();
+        if (idea && !isPlanning) {
+            onGamePlanRequest(idea);
+        }
+    }, [gameIdea, isPlanning, onGamePlanRequest]);
+
+    const handleGamePlanEdit = useCallback(() => {
+        setGameIdea(gamePlan?.originalGoal || '');
+        onGamePlanEdit();
+    }, [gamePlan, onGamePlanEdit]);
+
     const handleHintClick = useCallback(() => {
         onHint();
     }, [onHint]);
@@ -763,6 +1026,25 @@ const HraiPanel = ({
                     ) : null}
                 </section>
             ) : null}
+            {lesson ? null : (
+                gameProgress ? (
+                    <GameProgressCard progress={gameProgress} />
+                ) : gamePlan ? (
+                    <GamePlanCard
+                        isAccepting={isPlanning}
+                        plan={gamePlan}
+                        onAccept={onGamePlanAccept}
+                        onEdit={handleGamePlanEdit}
+                    />
+                ) : (
+                    <GameIdeaCard
+                        idea={gameIdea}
+                        isPlanning={isPlanning}
+                        onIdeaChange={handleGameIdeaChange}
+                        onSubmit={handleGameIdeaSubmit}
+                    />
+                )
+            )}
             <div
                 className={styles.messageList}
                 aria-label={intl.formatMessage(messages.messageListLabel)}
@@ -865,6 +1147,14 @@ const HraiPanel = ({
 };
 
 HraiPanel.propTypes = {
+    gamePlan: gamePlanShape,
+    gameProgress: PropTypes.shape({
+        complete: PropTypes.bool.isRequired,
+        milestone: milestoneShape.isRequired,
+        milestoneIndex: PropTypes.number.isRequired,
+        plan: gamePlanShape.isRequired
+    }),
+    isPlanning: PropTypes.bool,
     isThinking: PropTypes.bool,
     lesson: PropTypes.shape({
         stages: PropTypes.arrayOf(PropTypes.string).isRequired,
@@ -890,6 +1180,9 @@ HraiPanel.propTypes = {
         text: PropTypes.string.isRequired
     })).isRequired,
     onAliasClick: PropTypes.func,
+    onGamePlanAccept: PropTypes.func,
+    onGamePlanEdit: PropTypes.func,
+    onGamePlanRequest: PropTypes.func,
     onHint: PropTypes.func.isRequired,
     onNextStage: PropTypes.func.isRequired,
     onSend: PropTypes.func.isRequired,
@@ -911,10 +1204,16 @@ HraiPanel.propTypes = {
 };
 
 HraiPanel.defaultProps = {
+    gamePlan: null,
+    gameProgress: null,
+    isPlanning: false,
     isThinking: false,
     onAliasClick: null,
     lesson: null,
     lessonProgress: null,
+    onGamePlanAccept: () => {},
+    onGamePlanEdit: () => {},
+    onGamePlanRequest: () => {},
     onVoiceSubmit: () => {},
     rung: 0,
     voiceCapabilities: {available: false, languages: []},

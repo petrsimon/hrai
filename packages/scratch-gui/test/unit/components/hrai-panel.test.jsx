@@ -5,6 +5,30 @@ import {IntlProvider} from 'react-intl';
 import HraiPanel from '../../../src/components/hrai-panel/hrai-panel.jsx';
 import {renderWithIntl} from '../../helpers/intl-helpers.jsx';
 
+const GAME_PLAN = {
+    title: 'Dračí bludiště',
+    originalGoal: 'Drak najde poklad v bludišti.',
+    coreLoop: 'Veď draka chodbami k pokladu.',
+    milestones: [
+        {
+            id: 'milestone-1',
+            title: 'Pohyb draka',
+            outcome: 'Drak se pohybuje šipkami.',
+            why: 'Bez pohybu nemůže hledat poklad.',
+            concept: 'události',
+            doneWhen: 'Každá šipka posune draka správným směrem.'
+        },
+        {
+            id: 'milestone-2',
+            title: 'Poklad',
+            outcome: 'Drak může najít poklad.',
+            why: 'Poklad je cíl hry.',
+            concept: 'dotyk',
+            doneWhen: 'Dotyk pokladu oznámí výhru.'
+        }
+    ]
+};
+
 describe('HraiPanel lesson guidance', () => {
     beforeAll(() => {
         window.HTMLElement.prototype.scrollIntoView = jest.fn();
@@ -176,5 +200,96 @@ describe('HraiPanel lesson guidance', () => {
         expect(screen.getByText('Vyber Modry mec a přidej událost po kliknutí.')).toBeTruthy();
         expect(screen.getByText('Hotovo, když')).toBeTruthy();
         expect(screen.getByText('Modrý voják má událost po kliknutí.')).toBeTruthy();
+        expect(screen.queryByText('Navrhni vlastní hru')).toBeNull();
+    });
+});
+
+describe('HraiPanel custom game planning', () => {
+    beforeAll(() => {
+        window.HTMLElement.prototype.scrollIntoView = jest.fn();
+    });
+
+    test('submits the child game idea', () => {
+        const onGamePlanRequest = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                messages={[]}
+                onGamePlanRequest={onGamePlanRequest}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText('Jakou hru chceš vytvořit?'), {
+            target: {value: '  Drak hledá poklad v bludišti.  '}
+        });
+        fireEvent.click(screen.getByRole('button', {name: 'Navrhnout hru'}));
+
+        expect(onGamePlanRequest).toHaveBeenCalledWith('Drak hledá poklad v bludišti.');
+    });
+
+    test('locks the idea while the plan is being prepared', () => {
+        renderWithIntl(
+            <HraiPanel
+                isPlanning
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        expect(screen.getByLabelText('Jakou hru chceš vytvořit?').disabled).toBe(true);
+        expect(screen.getByRole('button', {name: 'Navrhnout hru'}).getAttribute('aria-disabled')).toBe('true');
+        expect(screen.getByText('Připravuji malou hratelnou verzi…')).toBeTruthy();
+    });
+
+    test('shows a proposal and requires explicit acceptance', () => {
+        const onGamePlanAccept = jest.fn();
+        const onGamePlanEdit = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                gamePlan={GAME_PLAN}
+                messages={[]}
+                onGamePlanAccept={onGamePlanAccept}
+                onGamePlanEdit={onGamePlanEdit}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        expect(screen.getByText('Dračí bludiště')).toBeTruthy();
+        expect(screen.getByText('Drak najde poklad v bludišti.')).toBeTruthy();
+        expect(screen.getByText('Pohyb draka')).toBeTruthy();
+        expect(screen.getByText('Poklad')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', {name: 'Tento plán se mi líbí'}));
+        fireEvent.click(screen.getByRole('button', {name: 'Upravit nápad'}));
+        expect(onGamePlanAccept).toHaveBeenCalledTimes(1);
+        expect(onGamePlanEdit).toHaveBeenCalledTimes(1);
+    });
+
+    test('keeps the north star and current milestone visible after acceptance', () => {
+        renderWithIntl(
+            <HraiPanel
+                gameProgress={{
+                    plan: GAME_PLAN,
+                    milestoneIndex: 0,
+                    milestone: GAME_PLAN.milestones[0],
+                    complete: false
+                }}
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        expect(screen.getByText('Drak najde poklad v bludišti.')).toBeTruthy();
+        expect(screen.getByText('Bez pohybu nemůže hledat poklad.')).toBeTruthy();
+        expect(screen.getByText('Každá šipka posune draka správným směrem.')).toBeTruthy();
+        expect(screen.getByText('1 z 2')).toBeTruthy();
+        expect(screen.queryByRole('button', {name: /hotovo/i})).toBeNull();
     });
 });

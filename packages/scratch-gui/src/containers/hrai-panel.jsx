@@ -47,6 +47,9 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
     const [isServerAvailable, setIsServerAvailable] = useState(false);
     const [rung, setRung] = useState(0);
     const [lessonProgress, setLessonProgress] = useState(null);
+    const [gamePlan, setGamePlan] = useState(null);
+    const [gameProgress, setGameProgress] = useState(null);
+    const [isPlanning, setIsPlanning] = useState(false);
     const [voiceCapabilities, setVoiceCapabilities] = useState({available: false, languages: []});
     const [voiceTranscript, setVoiceTranscript] = useState(null);
     const [voiceErrorCode, setVoiceErrorCode] = useState(null);
@@ -81,6 +84,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         const markUnavailable = () => {
             setIsServerAvailable(false);
             setIsThinking(false);
+            setIsPlanning(false);
             setChatMessages(prev => {
                 if (prev.some(message => message.id === HELPER_UNAVAILABLE_ID)) {
                     return prev;
@@ -111,6 +115,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         socket.on('disconnect', () => {
             setIsServerAvailable(false);
             setVoiceCapabilities({available: false, languages: []});
+            setIsPlanning(false);
         });
 
         socket.on('voice:capabilities', capabilities => {
@@ -162,6 +167,18 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             setRung(responseRung);
         });
 
+        socket.on('gamePlanProposed', plan => {
+            setGamePlan(plan);
+            setGameProgress(null);
+            setIsPlanning(false);
+        });
+
+        socket.on('gameProgress', progress => {
+            setGamePlan(null);
+            setGameProgress(progress);
+            setIsPlanning(false);
+        });
+
         socket.on('lessonProgress', progress => {
             saveLessonProgress(projectId, progress.lessonId, progress.stageIndex, projectTitle);
             setLessonProgress(progress);
@@ -183,6 +200,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
                 text: message
             }]);
             setIsThinking(false);
+            setIsPlanning(false);
         });
 
         return () => {
@@ -197,6 +215,8 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             socket.off('token');
             socket.off('blocks');
             socket.off('done');
+            socket.off('gamePlanProposed');
+            socket.off('gameProgress');
             socket.off('lessonProgress');
             socket.off('stageComplete');
             socket.off('error');
@@ -216,6 +236,9 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         setChatMessages([]);
         setRung(0);
         setIsThinking(false);
+        setGamePlan(null);
+        setGameProgress(null);
+        setIsPlanning(false);
         const saved = activeLessonId ? loadLessonProgress(projectId, activeLessonId, projectTitle) : null;
         setLessonProgress(saved ? {stageIndex: saved.stageIndex, complete: false} : null);
         if (activeLessonId && socketRef.current?.connected) {
@@ -277,6 +300,26 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         });
     }, [intl.locale]);
 
+    const handleGamePlanRequest = useCallback(text => {
+        if (socketRef.current?.connected) {
+            setGamePlan(null);
+            setIsPlanning(true);
+            socketRef.current.emit('gamePlan', {text});
+        }
+    }, []);
+
+    const handleGamePlanAccept = useCallback(() => {
+        if (socketRef.current?.connected && gamePlan && !isPlanning) {
+            setIsPlanning(true);
+            socketRef.current.emit('gamePlanAccept');
+        }
+    }, [gamePlan, isPlanning]);
+
+    const handleGamePlanEdit = useCallback(() => {
+        setGamePlan(null);
+        setIsPlanning(false);
+    }, []);
+
     const handleHint = useCallback(() => {
         if (socketRef.current?.connected) {
             pushWorkspace();
@@ -293,10 +336,16 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
 
     return (
         <HraiPanelComponent
+            gamePlan={gamePlan}
+            gameProgress={gameProgress}
+            isPlanning={isPlanning}
             messages={chatMessages}
+            onGamePlanAccept={handleGamePlanAccept}
+            onGamePlanEdit={handleGamePlanEdit}
+            onGamePlanRequest={handleGamePlanRequest}
             onSend={handleSend}
             onHint={handleHint}
-            isThinking={isThinking && isServerAvailable}
+            isThinking={isThinking && isServerAvailable && !isPlanning}
             lesson={activeLesson}
             lessonProgress={lessonProgress}
             onNextStage={handleNextStage}

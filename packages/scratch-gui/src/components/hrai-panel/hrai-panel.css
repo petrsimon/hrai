@@ -123,6 +123,135 @@
     font-weight: bold;
 }
 
+.game-card {
+    flex: 0 1 auto;
+    max-height: 48%;
+    overflow-y: auto;
+    margin-bottom: $space;
+    padding: 0.625rem;
+    border: 1px solid var(--hrai-border);
+    border-top: 0.25rem solid var(--hrai-brand);
+    border-radius: 0.5rem;
+    background-color: var(--hrai-bubble-tutor);
+    color: var(--hrai-text);
+    font-size: 0.75rem;
+}
+
+.game-card p {
+    margin: 0.25rem 0 0.5rem;
+    line-height: 1.4;
+}
+
+.game-card-title,
+.current-milestone-title {
+    margin: 0 0 0.5rem;
+    color: var(--hrai-brand);
+}
+
+.game-card-title {
+    font-size: 0.9375rem;
+}
+
+.current-milestone-title {
+    font-size: 0.875rem;
+}
+
+.game-idea-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 4.5rem;
+    resize: vertical;
+    padding: 0.5rem;
+    border: 1px solid var(--hrai-border);
+    border-radius: $form-radius;
+    background-color: var(--hrai-surface);
+    color: var(--hrai-text);
+    font: inherit;
+    line-height: 1.4;
+}
+
+.game-idea-input:focus {
+    border-color: var(--hrai-brand);
+    outline: none;
+    box-shadow: 0 0 0 0.125rem var(--hrai-bubble-learner);
+}
+
+.game-help,
+.game-planning,
+.milestone-counter {
+    color: var(--hrai-text-muted);
+}
+
+.game-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+}
+
+.game-primary-button,
+.game-secondary-button {
+    min-height: 2rem;
+    border-radius: $form-radius;
+    font-size: 0.6875rem;
+    font-weight: bold;
+}
+
+.game-primary-button {
+    border: 0;
+    background-color: var(--hrai-brand);
+    color: var(--hrai-brand-contrast);
+}
+
+.game-secondary-button {
+    border: 1px solid var(--hrai-border);
+    background-color: var(--hrai-surface);
+    color: var(--hrai-text);
+}
+
+.game-primary-button[aria-disabled="true"],
+.game-secondary-button[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.milestone-list,
+.milestone-trail {
+    margin: 0.375rem 0 0;
+    padding-left: 1.25rem;
+}
+
+.milestone-list li {
+    margin-bottom: 0.375rem;
+}
+
+.milestone-list span {
+    display: block;
+    margin-top: 0.125rem;
+}
+
+.milestone-detail,
+.milestone-done {
+    margin-top: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    border-left: 0.25rem solid var(--hrai-border);
+    border-radius: 0.25rem;
+    background-color: var(--hrai-surface);
+}
+
+.milestone-done {
+    color: var(--hrai-text-muted);
+}
+
+.milestone-trail {
+    color: var(--hrai-text-muted);
+}
+
+.milestone-current {
+    color: var(--hrai-text);
+    font-weight: bold;
+}
+
 .message-list {
     flex: 1 1 auto;
     min-height: 0;
