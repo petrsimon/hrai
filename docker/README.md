@@ -79,7 +79,7 @@ docker compose -f docker-compose.yml up --build
 Open:
 
 ```text
-http://localhost:8080/?hrai=true
+http://localhost:8080/
 ```
 
 Only the editor port is published. HRAI and llama.cpp remain on the internal
@@ -89,7 +89,9 @@ added.
 
 ## Configuration
 
-Override the model or ports with environment variables:
+Override the model, HRAI server URL, or ports with environment variables. In the
+Docker deployment, leaving `HRAI_SERVER_URL` unset uses the editor's current
+origin, so it works through Tailscale or another hostname:
 
 ```sh
 HRAI_MODEL_REPOSITORY=lmstudio-community/Qwen3.5-27B-GGUF:Q4_K_M \

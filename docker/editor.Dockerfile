@@ -2,7 +2,7 @@ FROM node:24-bookworm-slim AS build
 
 WORKDIR /app
 
-ARG HRAI_SERVER_URL=http://localhost:8080
+ARG HRAI_SERVER_URL=
 ENV HRAI_SERVER_URL=${HRAI_SERVER_URL}
 ENV NODE_ENV=production
 

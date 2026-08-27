@@ -78,7 +78,7 @@ services:
       context: .
       dockerfile: docker/editor.Dockerfile
       args:
-        HRAI_SERVER_URL: ${HRAI_SERVER_URL:-http://localhost:8080}
+        HRAI_SERVER_URL: ${HRAI_SERVER_URL:-}
     ports:
       - "${EDITOR_PORT:-8080}:8080"
     depends_on:

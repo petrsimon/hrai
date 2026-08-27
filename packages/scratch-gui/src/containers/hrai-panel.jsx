@@ -11,7 +11,10 @@ import lessons from '../lib/hrai-lessons';
 import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
 
-const HRAI_SERVER_URL = process.env.HRAI_SERVER_URL || 'http://localhost:8791';
+const HRAI_SERVER_URL = process.env.HRAI_SERVER_URL ||
+    (process.env.NODE_ENV === 'production' && typeof window === 'object' ?
+        window.location.origin :
+        'http://localhost:8791');
 const HELPER_UNAVAILABLE_ID = 'helper-unavailable';
 
 const messages = defineMessages({
