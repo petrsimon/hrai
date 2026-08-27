@@ -4,8 +4,6 @@ import {defineMessages, FormattedMessage, useIntl} from 'react-intl';
 
 import Box from '../box/box.jsx';
 import Button from '../button/button.jsx';
-import Input from '../forms/input.jsx';
-import Label from '../forms/label.jsx';
 
 import hraiLogo from '../../../static/hrai/hrai-dragon-mark-256.png';
 import styles from './hrai-panel.css';
@@ -115,16 +113,6 @@ const messages = defineMessages({
         defaultMessage: 'Zastavit nahrávání',
         description: 'button to stop an hrai voice recording'
     },
-    voiceTranscribe: {
-        id: 'gui.hrai.voiceTranscribe',
-        defaultMessage: 'Přepsat nahrávku',
-        description: 'button to transcribe a recorded hrai voice message'
-    },
-    voiceDiscard: {
-        id: 'gui.hrai.voiceDiscard',
-        defaultMessage: 'Zahodit nahrávku',
-        description: 'button to discard an hrai voice recording'
-    },
     voiceTranscribing: {
         id: 'gui.hrai.voiceTranscribing',
         defaultMessage: 'Přepisuji nahrávku…',
@@ -157,6 +145,54 @@ const BLOCK_OPCODE_PATTERN = /\b[a-z]+_[a-z0-9_]+\b/;
 const TUTOR_TOKEN_PATTERN = /(\bb\d+\b|\b[a-z]+_[a-z0-9_]+\b)/;
 
 const formatBlockLabel = label => label.replace(/%\d+/g, BLOCK_SLOT_PLACEHOLDER);
+const MICROPHONE_PATH = [
+    'M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z',
+    'M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21H8v2h8v-2h-3v-3.08A7 7 0 0 0 19 11h-2Z'
+].join('');
+
+const MicrophoneIcon = () => (
+    <svg
+        aria-hidden="true"
+        className={styles.voiceIcon}
+        viewBox="0 0 24 24"
+    >
+        <path
+            d={MICROPHONE_PATH}
+        />
+    </svg>
+);
+
+const StopIcon = () => (
+    <svg
+        aria-hidden="true"
+        className={styles.voiceIcon}
+        viewBox="0 0 24 24"
+    >
+        <rect
+            x="6"
+            y="6"
+            width="12"
+            height="12"
+            rx="1"
+        />
+    </svg>
+);
+
+const ProgressIcon = () => (
+    <svg
+        aria-hidden="true"
+        className={`${styles.voiceIcon} ${styles.voiceProgressIcon}`}
+        viewBox="0 0 24 24"
+    >
+        <circle
+            className={styles.voiceProgressTrack}
+            cx="12"
+            cy="12"
+            r="8"
+        />
+        <path d="M12 4a8 8 0 0 1 8 8" />
+    </svg>
+);
 
 const BlockRef = ({alias, onAliasClick, formatBlockReference}) => {
     const handleClick = useCallback(() => {
@@ -348,8 +384,6 @@ const HraiPanel = ({
     const [draft, setDraft] = useState('');
     const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT_WIDTH);
     const [voicePhase, setVoicePhase] = useState('idle');
-    const [voiceBlob, setVoiceBlob] = useState(null);
-    const [voiceUrl, setVoiceUrl] = useState(null);
     const [voiceRequestId, setVoiceRequestId] = useState(null);
     const [voiceLocalError, setVoiceLocalError] = useState(null);
     const resizeState = useRef(null);
@@ -391,30 +425,22 @@ const HraiPanel = ({
             recordingTimerRef.current = null;
         }
         stopStream();
-        if (voiceUrl) {
-            URL.revokeObjectURL(voiceUrl);
-        }
         recorderRef.current = null;
         chunksRef.current = [];
-        setVoiceBlob(null);
-        setVoiceUrl(null);
         setVoiceRequestId(null);
         setVoicePhase('idle');
         setVoiceLocalError(null);
         if (clearDraft) {
             setDraft('');
         }
-    }, [stopStream, voiceUrl]);
+    }, [stopStream]);
 
     useEffect(() => () => {
         if (recordingTimerRef.current) {
             clearTimeout(recordingTimerRef.current);
         }
         stopStream();
-        if (voiceUrl) {
-            URL.revokeObjectURL(voiceUrl);
-        }
-    }, [stopStream, voiceUrl]);
+    }, [stopStream]);
 
     useEffect(() => {
         if (!voiceTranscript ||
@@ -436,6 +462,29 @@ const HraiPanel = ({
             setVoicePhase('error');
         }
     }, [voiceErrorCode, voiceRequestId]);
+
+    const transcribeRecording = useCallback(async (blob, durationMs) => {
+        if (!blob || voicePhase === 'transcribing') {
+            return;
+        }
+        const requestId = `voice-${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}`;
+        setVoiceRequestId(requestId);
+        setVoicePhase('transcribing');
+        setVoiceLocalError(null);
+        try {
+            onVoiceSubmit({
+                requestId,
+                mimeType: blob.type,
+                durationMs,
+                audio: await blob.arrayBuffer()
+            });
+        } catch {
+            setVoiceLocalError('recording_failed');
+            setVoicePhase('error');
+        }
+    }, [onVoiceSubmit, voicePhase]);
 
     const startRecording = useCallback(async () => {
         setVoiceLocalError(null);
@@ -488,9 +537,7 @@ const HraiPanel = ({
                 setVoicePhase('error');
                 return;
             }
-            setVoiceBlob(blob);
-            setVoiceUrl(URL.createObjectURL(blob));
-            setVoicePhase('review');
+            void transcribeRecording(blob, recordingDurationRef.current);
         };
         recorder.start();
         setVoicePhase('recording');
@@ -499,7 +546,7 @@ const HraiPanel = ({
                 recorder.stop();
             }
         }, MAX_VOICE_DURATION_MS);
-    }, [voiceCapabilities.available, stopStream]);
+    }, [transcribeRecording, voiceCapabilities.available, stopStream]);
 
     const stopRecording = useCallback(() => {
         if (recordingTimerRef.current) {
@@ -511,29 +558,6 @@ const HraiPanel = ({
         }
     }, []);
 
-    const transcribeRecording = useCallback(async () => {
-        if (!voiceBlob || voicePhase === 'transcribing') {
-            return;
-        }
-        const requestId = `voice-${Date.now()}-${Math.random()
-            .toString(36)
-            .slice(2)}`;
-        setVoiceRequestId(requestId);
-        setVoicePhase('transcribing');
-        setVoiceLocalError(null);
-        try {
-            onVoiceSubmit({
-                requestId,
-                mimeType: voiceBlob.type,
-                durationMs: recordingDurationRef.current,
-                audio: await voiceBlob.arrayBuffer()
-            });
-        } catch {
-            setVoiceLocalError('recording_failed');
-            setVoicePhase('error');
-        }
-    }, [onVoiceSubmit, voiceBlob, voicePhase]);
-
     const handleVoiceButton = useCallback(() => {
         if (voicePhase === 'recording') {
             stopRecording();
@@ -541,10 +565,6 @@ const HraiPanel = ({
             void startRecording();
         }
     }, [startRecording, stopRecording, voicePhase]);
-
-    const discardVoice = useCallback(() => {
-        resetVoice(voicePhase !== 'transcript');
-    }, [resetVoice, voicePhase]);
 
     const submitDraft = useCallback(() => {
         const trimmed = draft.trim();
@@ -664,8 +684,7 @@ const HraiPanel = ({
         empty_transcript: messages.voiceFailed
     }[voiceLocalError || voiceErrorCode?.code];
     const voiceButtonDisabled = !voiceCapabilities.available || isThinking ||
-        voicePhase === 'transcribing' || voicePhase === 'transcript' ||
-        Boolean(voiceBlob && voicePhase !== 'recording');
+        voicePhase === 'transcribing';
 
     return (
         <Box
@@ -770,67 +789,6 @@ const HraiPanel = ({
                 ) : null}
                 <div ref={messagesEndRef} />
             </div>
-            <div className={styles.voiceArea}>
-                {voiceUrl ? (
-                    <audio
-                        className={styles.voicePreview}
-                        controls
-                        src={voiceUrl}
-                    />
-                ) : null}
-                {voicePhase === 'transcribing' || voiceStatus?.status === 'transcribing' ? (
-                    <p
-                        className={styles.voiceStatus}
-                        aria-live="polite"
-                    >
-                        <FormattedMessage {...messages.voiceTranscribing} />
-                    </p>
-                ) : null}
-                {voiceErrorMessage ? (
-                    <p
-                        className={styles.voiceError}
-                        role="alert"
-                    >
-                        <FormattedMessage {...voiceErrorMessage} />
-                    </p>
-                ) : null}
-                <div className={styles.voiceControls}>
-                    <Button
-                        type="button"
-                        className={styles.voiceButton}
-                        disabled={voiceButtonDisabled}
-                        onClick={handleVoiceButton}
-                    >
-                        <FormattedMessage
-                            {...(voicePhase === 'recording' ? messages.voiceStop : messages.voiceStart)}
-                        />
-                    </Button>
-                    {voiceBlob && (voicePhase === 'review' || voicePhase === 'error') ? (
-                        <Button
-                            type="button"
-                            className={styles.voiceSecondaryButton}
-                            disabled={voicePhase === 'transcribing'}
-                            onClick={transcribeRecording}
-                        >
-                            <FormattedMessage {...messages.voiceTranscribe} />
-                        </Button>
-                    ) : null}
-                    {voiceBlob ? (
-                        <Button
-                            type="button"
-                            className={styles.voiceSecondaryButton}
-                            onClick={discardVoice}
-                        >
-                            <FormattedMessage {...messages.voiceDiscard} />
-                        </Button>
-                    ) : null}
-                </div>
-                {!voiceCapabilities.available && !voiceErrorMessage ? (
-                    <p className={styles.voiceStatus}>
-                        <FormattedMessage {...messages.voiceUnavailable} />
-                    </p>
-                ) : null}
-            </div>
             <div className={styles.hintArea}>
                 <Button
                     type="button"
@@ -851,24 +809,64 @@ const HraiPanel = ({
                 className={styles.inputArea}
                 onSubmit={handleSubmit}
             >
-                <Label
-                    above
-                    text={intl.formatMessage(messages.inputLabel)}
-                >
-                    <Input
-                        className={styles.messageInput}
-                        value={draft}
-                        onChange={handleInputChange}
-                        onKeyDown={handleInputKeyDown}
-                    />
-                </Label>
-                <Button
-                    type="submit"
-                    className={styles.sendButton}
-                    disabled={!canSend}
-                >
-                    <FormattedMessage {...messages.sendButton} />
-                </Button>
+                <textarea
+                    className={styles.messageInput}
+                    aria-label={intl.formatMessage(messages.inputLabel)}
+                    rows="3"
+                    value={draft}
+                    onChange={handleInputChange}
+                    onKeyDown={handleInputKeyDown}
+                />
+                <div className={styles.composerControls}>
+                    <Button
+                        type="button"
+                        className={styles.voiceButton}
+                        aria-label={intl.formatMessage(
+                            voicePhase === 'recording' ? messages.voiceStop :
+                                voicePhase === 'transcribing' ? messages.voiceTranscribing :
+                                    messages.voiceStart
+                        )}
+                        title={intl.formatMessage(
+                            voicePhase === 'transcribing' ? messages.voiceTranscribing :
+                                voicePhase === 'recording' ? messages.voiceStop : messages.voiceStart
+                        )}
+                        disabled={voiceButtonDisabled}
+                        onClick={handleVoiceButton}
+                    >
+                        {voicePhase === 'recording' ? <StopIcon /> :
+                            voicePhase === 'transcribing' ? <ProgressIcon /> : <MicrophoneIcon />}
+                    </Button>
+                    <Button
+                        type="submit"
+                        className={styles.sendButton}
+                        aria-label={intl.formatMessage(messages.sendButton)}
+                        title={intl.formatMessage(messages.sendButton)}
+                        disabled={!canSend}
+                    >
+                        <span aria-hidden="true">↑</span>
+                    </Button>
+                </div>
+                {voicePhase === 'transcribing' || voiceStatus?.status === 'transcribing' ? (
+                    <p
+                        className={styles.voiceStatus}
+                        aria-live="polite"
+                    >
+                        <FormattedMessage {...messages.voiceTranscribing} />
+                    </p>
+                ) : null}
+                {voiceErrorMessage ? (
+                    <p
+                        className={styles.voiceError}
+                        role="alert"
+                    >
+                        <FormattedMessage {...voiceErrorMessage} />
+                    </p>
+                ) : null}
+                {!voiceCapabilities.available && !voiceErrorMessage ? (
+                    <p className={styles.voiceStatus}>
+                        <FormattedMessage {...messages.voiceUnavailable} />
+                    </p>
+                ) : null}
             </form>
         </Box>
     );
