@@ -156,26 +156,6 @@
     font-size: 0.875rem;
 }
 
-.game-idea-input {
-    box-sizing: border-box;
-    width: 100%;
-    min-height: 4.5rem;
-    resize: vertical;
-    padding: 0.5rem;
-    border: 1px solid var(--hrai-border);
-    border-radius: $form-radius;
-    background-color: var(--hrai-surface);
-    color: var(--hrai-text);
-    font: inherit;
-    line-height: 1.4;
-}
-
-.game-idea-input:focus {
-    border-color: var(--hrai-brand);
-    outline: none;
-    box-shadow: 0 0 0 0.125rem var(--hrai-bubble-learner);
-}
-
 .game-help,
 .game-planning,
 .milestone-counter {

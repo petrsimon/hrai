@@ -139,26 +139,6 @@ const messages = defineMessages({
         defaultMessage: 'Nahrávku se nepodařilo přepsat. Zkus to znovu, nebo napiš zprávu.',
         description: 'status shown when voice transcription fails'
     },
-    gameDesignerTitle: {
-        id: 'gui.hrai.gameDesignerTitle',
-        defaultMessage: 'Navrhni vlastní hru',
-        description: 'heading for the custom game idea form'
-    },
-    gameIdeaLabel: {
-        id: 'gui.hrai.gameIdeaLabel',
-        defaultMessage: 'Jakou hru chceš vytvořit?',
-        description: 'label for the child game idea field'
-    },
-    gameIdeaHelp: {
-        id: 'gui.hrai.gameIdeaHelp',
-        defaultMessage: 'Popiš hrdinu, jeho cíl a co má hráč dělat.',
-        description: 'short prompt helping a child describe a game idea'
-    },
-    gamePlanButton: {
-        id: 'gui.hrai.gamePlanButton',
-        defaultMessage: 'Navrhnout hru',
-        description: 'button that requests a game plan'
-    },
     gamePlanning: {
         id: 'gui.hrai.gamePlanning',
         defaultMessage: 'Připravuji malou hratelnou verzi…',
@@ -223,6 +203,37 @@ const messages = defineMessages({
         id: 'gui.hrai.gamePlanComplete',
         defaultMessage: 'Dokončil jsi plán své hry!',
         description: 'completion message for the final custom game milestone'
+    },
+    gameStartPrompt: {
+        id: 'gui.hrai.gameStartPrompt',
+        defaultMessage: 'Co chceš vytvořit? Napiš svůj nápad a společně z něj uděláme malou hru.',
+        description: 'introductory prompt for starting a custom game in the chat'
+    },
+    gamePlanQuestion: {
+        id: 'gui.hrai.gamePlanQuestion',
+        defaultMessage: 'Mám z tohoto nápadu připravit plán hry?',
+        description: 'question asking whether to prepare a game plan from the chat idea'
+    },
+    existingProjectQuestion: {
+        id: 'gui.hrai.existingProjectQuestion',
+        defaultMessage: 'V tomto projektu už něco máš. Pro nový nápad bude jednodušší ' +
+            'začít nový projekt. Co chceš udělat?',
+        description: 'question shown before starting a custom game in a non-empty project'
+    },
+    continueProject: {
+        id: 'gui.hrai.continueProject',
+        defaultMessage: 'Pokračovat v tomto projektu',
+        description: 'button for using the current project for a custom game'
+    },
+    startNewProject: {
+        id: 'gui.hrai.startNewProject',
+        defaultMessage: 'Začít nový projekt',
+        description: 'button for starting a custom game in a new project'
+    },
+    prepareGamePlan: {
+        id: 'gui.hrai.prepareGamePlan',
+        defaultMessage: 'Připravit plán hry',
+        description: 'button for preparing a game plan from the chat idea'
     }
 });
 
@@ -466,54 +477,68 @@ const gamePlanShape = PropTypes.shape({
     title: PropTypes.string.isRequired
 });
 
-const GameIdeaCard = ({idea, isPlanning, onIdeaChange, onSubmit}) => {
-    const canSubmit = idea.trim().length > 0 && !isPlanning;
+const GameStartCard = ({hasProjectContent, isBusy, idea, onNewProject, onPlan}) => {
+    const handleNewProject = useCallback(() => onNewProject(idea), [idea, onNewProject]);
+    const handlePlan = useCallback(() => onPlan(idea), [idea, onPlan]);
     return (
         <section className={styles.gameCard}>
-            <h3 className={styles.gameCardTitle}>
-                <FormattedMessage {...messages.gameDesignerTitle} />
-            </h3>
-            <form onSubmit={onSubmit}>
-                <label>
-                    <strong><FormattedMessage {...messages.gameIdeaLabel} /></strong>
-                    <textarea
-                        className={styles.gameIdeaInput}
-                        disabled={isPlanning}
-                        maxLength={MAX_GAME_IDEA_LENGTH}
-                        rows="3"
-                        value={idea}
-                        onChange={onIdeaChange}
-                    />
-                </label>
-                <p className={styles.gameHelp}>
-                    <FormattedMessage {...messages.gameIdeaHelp} />
-                </p>
-                <Button
-                    type="submit"
-                    className={styles.gamePrimaryButton}
-                    aria-disabled={!canSubmit}
-                    disabled={!canSubmit}
-                >
-                    <FormattedMessage {...messages.gamePlanButton} />
-                </Button>
-                {isPlanning ? (
-                    <p
-                        className={styles.gamePlanning}
-                        aria-live="polite"
+            <p className={styles.gameHelp}>
+                <FormattedMessage
+                    {...(hasProjectContent ? messages.existingProjectQuestion : messages.gamePlanQuestion)}
+                />
+            </p>
+            <div className={styles.gameActions}>
+                {hasProjectContent ? (
+                    <>
+                        <Button
+                            type="button"
+                            className={styles.gamePrimaryButton}
+                            aria-disabled={isBusy}
+                            disabled={isBusy}
+                            onClick={handleNewProject}
+                        >
+                            <FormattedMessage {...messages.startNewProject} />
+                        </Button>
+                        <Button
+                            type="button"
+                            className={styles.gameSecondaryButton}
+                            aria-disabled={isBusy}
+                            disabled={isBusy}
+                            onClick={handlePlan}
+                        >
+                            <FormattedMessage {...messages.continueProject} />
+                        </Button>
+                    </>
+                ) : (
+                    <Button
+                        type="button"
+                        className={styles.gamePrimaryButton}
+                        aria-disabled={isBusy}
+                        disabled={isBusy}
+                        onClick={handlePlan}
                     >
-                        <FormattedMessage {...messages.gamePlanning} />
-                    </p>
-                ) : null}
-            </form>
+                        <FormattedMessage {...messages.prepareGamePlan} />
+                    </Button>
+                )}
+            </div>
+            {isBusy ? (
+                <p
+                    className={styles.gamePlanning}
+                    aria-live="polite"
+                >
+                    <FormattedMessage {...messages.gamePlanning} />
+                </p>
+            ) : null}
         </section>
     );
 };
 
-GameIdeaCard.propTypes = {
+GameStartCard.propTypes = {
+    hasProjectContent: PropTypes.bool.isRequired,
+    isBusy: PropTypes.bool.isRequired,
     idea: PropTypes.string.isRequired,
-    isPlanning: PropTypes.bool.isRequired,
-    onIdeaChange: PropTypes.func.isRequired,
-    onSubmit: PropTypes.func.isRequired
+    onNewProject: PropTypes.func.isRequired,
+    onPlan: PropTypes.func.isRequired
 };
 
 const GamePlanCard = ({isAccepting, onAccept, onEdit, plan}) => (
@@ -641,11 +666,14 @@ GameProgressCard.propTypes = {
 const HraiPanel = ({
     gamePlan,
     gameProgress,
+    hasProjectContent,
     isPlanning,
+    isStartingNewProject,
     messages: chatMessages,
     onGamePlanAccept,
     onGamePlanEdit,
     onGamePlanRequest,
+    onStartNewProject,
     onSend,
     onHint,
     isThinking,
@@ -662,7 +690,8 @@ const HraiPanel = ({
 }) => {
     const intl = useIntl();
     const [draft, setDraft] = useState('');
-    const [gameIdea, setGameIdea] = useState('');
+    const [gameIdea, setGameIdea] = useState(null);
+    const [gameStartPending, setGameStartPending] = useState(false);
     const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT_WIDTH);
     const [voicePhase, setVoicePhase] = useState('idle');
     const [voiceRequestId, setVoiceRequestId] = useState(null);
@@ -676,6 +705,12 @@ const HraiPanel = ({
     const recordingStartedAtRef = useRef(0);
     const recordingDurationRef = useRef(0);
     const recordingTimerRef = useRef(null);
+
+    useEffect(() => {
+        if (gamePlan || gameProgress) {
+            setGameStartPending(false);
+        }
+    }, [gamePlan, gameProgress]);
 
     const formatBlockReference = useCallback(alias => intl.formatMessage(
         messages.blockReference,
@@ -853,10 +888,15 @@ const HraiPanel = ({
             return;
         }
 
+        const isGameStart = !lesson && !gamePlan && !gameProgress && chatMessages.length === 0;
         onSend(trimmed);
+        if (isGameStart) {
+            setGameIdea(trimmed);
+            setGameStartPending(true);
+        }
         setDraft('');
         resetVoice();
-    }, [draft, onSend, resetVoice]);
+    }, [chatMessages.length, draft, gamePlan, gameProgress, lesson, onSend, resetVoice]);
 
     const handleInputChange = useCallback(event => {
         setDraft(event.target.value);
@@ -874,20 +914,9 @@ const HraiPanel = ({
         submitDraft();
     }, [submitDraft]);
 
-    const handleGameIdeaChange = useCallback(event => {
-        setGameIdea(event.target.value);
-    }, []);
-
-    const handleGameIdeaSubmit = useCallback(event => {
-        event.preventDefault();
-        const idea = gameIdea.trim();
-        if (idea && !isPlanning) {
-            onGamePlanRequest(idea);
-        }
-    }, [gameIdea, isPlanning, onGamePlanRequest]);
-
     const handleGamePlanEdit = useCallback(() => {
         setGameIdea(gamePlan?.originalGoal || '');
+        setGameStartPending(true);
         onGamePlanEdit();
     }, [gamePlan, onGamePlanEdit]);
 
@@ -1062,28 +1091,19 @@ const HraiPanel = ({
                     ) : null}
                 </section>
             ) : null}
-            {lesson ? null : (
-                gameProgress ? (
-                    <GameProgressCard
-                        progress={gameProgress}
-                        onNext={onNextGameMilestone}
-                    />
-                ) : gamePlan ? (
-                    <GamePlanCard
-                        isAccepting={isPlanning}
-                        plan={gamePlan}
-                        onAccept={onGamePlanAccept}
-                        onEdit={handleGamePlanEdit}
-                    />
-                ) : (
-                    <GameIdeaCard
-                        idea={gameIdea}
-                        isPlanning={isPlanning}
-                        onIdeaChange={handleGameIdeaChange}
-                        onSubmit={handleGameIdeaSubmit}
-                    />
-                )
-            )}
+            {lesson ? null : gameProgress ? (
+                <GameProgressCard
+                    progress={gameProgress}
+                    onNext={onNextGameMilestone}
+                />
+            ) : gamePlan ? (
+                <GamePlanCard
+                    isAccepting={isPlanning}
+                    plan={gamePlan}
+                    onAccept={onGamePlanAccept}
+                    onEdit={handleGamePlanEdit}
+                />
+            ) : null}
             <div
                 className={styles.messageList}
                 aria-label={intl.formatMessage(messages.messageListLabel)}
@@ -1099,6 +1119,22 @@ const HraiPanel = ({
                         formatBlockOpcode={formatBlockOpcode}
                     />
                 ))}
+                {chatMessages.length === 0 && !lesson && !gamePlan && !gameProgress ? (
+                    <div className={styles.messageTutor}>
+                        <div className={styles.messageBubble}>
+                            <FormattedMessage {...messages.gameStartPrompt} />
+                        </div>
+                    </div>
+                ) : null}
+                {gameStartPending && gameIdea ? (
+                    <GameStartCard
+                        hasProjectContent={hasProjectContent}
+                        isBusy={isPlanning || isStartingNewProject}
+                        idea={gameIdea}
+                        onNewProject={onStartNewProject}
+                        onPlan={onGamePlanRequest}
+                    />
+                ) : null}
                 {isThinking ? (
                     <p
                         className={styles.thinking}
@@ -1116,6 +1152,7 @@ const HraiPanel = ({
                 <textarea
                     className={styles.messageInput}
                     aria-label={intl.formatMessage(messages.inputLabel)}
+                    maxLength={!lesson && chatMessages.length === 0 ? MAX_GAME_IDEA_LENGTH : null}
                     rows="3"
                     value={draft}
                     onChange={handleInputChange}
@@ -1193,7 +1230,9 @@ HraiPanel.propTypes = {
         milestoneIndex: PropTypes.number.isRequired,
         plan: gamePlanShape.isRequired
     }),
+    hasProjectContent: PropTypes.bool,
     isPlanning: PropTypes.bool,
+    isStartingNewProject: PropTypes.bool,
     isThinking: PropTypes.bool,
     lesson: PropTypes.shape({
         stages: PropTypes.arrayOf(PropTypes.string).isRequired,
@@ -1222,6 +1261,7 @@ HraiPanel.propTypes = {
     onGamePlanAccept: PropTypes.func,
     onGamePlanEdit: PropTypes.func,
     onGamePlanRequest: PropTypes.func,
+    onStartNewProject: PropTypes.func,
     onHint: PropTypes.func.isRequired,
     onNextGameMilestone: PropTypes.func,
     onNextStage: PropTypes.func.isRequired,
@@ -1246,7 +1286,9 @@ HraiPanel.propTypes = {
 HraiPanel.defaultProps = {
     gamePlan: null,
     gameProgress: null,
+    hasProjectContent: false,
     isPlanning: false,
+    isStartingNewProject: false,
     isThinking: false,
     onAliasClick: null,
     lesson: null,
@@ -1254,6 +1296,7 @@ HraiPanel.defaultProps = {
     onGamePlanAccept: () => {},
     onGamePlanEdit: () => {},
     onGamePlanRequest: () => {},
+    onStartNewProject: () => {},
     onNextGameMilestone: () => {},
     onVoiceSubmit: () => {},
     rung: 0,

@@ -211,7 +211,30 @@ describe('HraiPanel custom game planning', () => {
 
     test('submits the child game idea', () => {
         const onGamePlanRequest = jest.fn();
+        const onSend = jest.fn();
         renderWithIntl(
+            <HraiPanel
+                messages={[]}
+                onGamePlanRequest={onGamePlanRequest}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={onSend}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText('Zpráva pro hrai'), {
+            target: {value: '  Drak hledá poklad v bludišti.  '}
+        });
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+        fireEvent.click(screen.getByRole('button', {name: 'Připravit plán hry'}));
+
+        expect(onSend).toHaveBeenCalledWith('Drak hledá poklad v bludišti.');
+        expect(onGamePlanRequest).toHaveBeenCalledWith('Drak hledá poklad v bludišti.');
+    });
+
+    test('locks the idea while the plan is being prepared', () => {
+        const onGamePlanRequest = jest.fn();
+        const {rerender} = renderWithIntl(
             <HraiPanel
                 messages={[]}
                 onGamePlanRequest={onGamePlanRequest}
@@ -221,28 +244,58 @@ describe('HraiPanel custom game planning', () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText('Jakou hru chceš vytvořit?'), {
-            target: {value: '  Drak hledá poklad v bludišti.  '}
+        fireEvent.change(screen.getByLabelText('Zpráva pro hrai'), {
+            target: {value: 'Drak hledá poklad.'}
         });
-        fireEvent.click(screen.getByRole('button', {name: 'Navrhnout hru'}));
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+        fireEvent.click(screen.getByRole('button', {name: 'Připravit plán hry'}));
 
-        expect(onGamePlanRequest).toHaveBeenCalledWith('Drak hledá poklad v bludišti.');
+        rerender(
+            <IntlProvider
+                locale="cs"
+                messages={{}}
+            >
+                <HraiPanel
+                    isPlanning
+                    messages={[{id: 'idea', role: 'learner', text: 'Drak hledá poklad.'}]}
+                    onGamePlanRequest={onGamePlanRequest}
+                    onHint={jest.fn()}
+                    onNextStage={jest.fn()}
+                    onSend={jest.fn()}
+                />
+            </IntlProvider>
+        );
+
+        expect(screen.getByRole('button', {name: 'Připravit plán hry'}).getAttribute('aria-disabled')).toBe('true');
+        expect(screen.getByText('Připravuji malou hratelnou verzi…')).toBeTruthy();
     });
 
-    test('locks the idea while the plan is being prepared', () => {
+    test('offers a new project when the current project has work', () => {
+        const onGamePlanRequest = jest.fn();
+        const onStartNewProject = jest.fn();
         renderWithIntl(
             <HraiPanel
-                isPlanning
+                hasProjectContent
                 messages={[]}
+                onGamePlanRequest={onGamePlanRequest}
                 onHint={jest.fn()}
                 onNextStage={jest.fn()}
                 onSend={jest.fn()}
+                onStartNewProject={onStartNewProject}
             />
         );
 
-        expect(screen.getByLabelText('Jakou hru chceš vytvořit?').disabled).toBe(true);
-        expect(screen.getByRole('button', {name: 'Navrhnout hru'}).getAttribute('aria-disabled')).toBe('true');
-        expect(screen.getByText('Připravuji malou hratelnou verzi…')).toBeTruthy();
+        fireEvent.change(screen.getByLabelText('Zpráva pro hrai'), {
+            target: {value: 'Drak hledá poklad.'}
+        });
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+
+        expect(screen.getByText(/V tomto projektu už něco máš/)).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', {name: 'Začít nový projekt'}));
+        expect(onStartNewProject).toHaveBeenCalledWith('Drak hledá poklad.');
+
+        fireEvent.click(screen.getByRole('button', {name: 'Pokračovat v tomto projektu'}));
+        expect(onGamePlanRequest).toHaveBeenCalledWith('Drak hledá poklad.');
     });
 
     test('shows a proposal and requires explicit acceptance', () => {

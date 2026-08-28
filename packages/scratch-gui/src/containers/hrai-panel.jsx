@@ -11,6 +11,7 @@ import {clearGameProgress, loadGameProgress, saveGameProgress} from '../lib/hrai
 import lessons from '../lib/hrai-lessons';
 import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
+import {createProject} from '../reducers/project-state';
 
 const HRAI_SERVER_URL = process.env.HRAI_SERVER_URL ||
     (typeof window === 'object' ? window.location.origin : 'http://localhost:8791');
@@ -21,6 +22,12 @@ const messages = defineMessages({
         id: 'gui.hrai.helperUnavailable',
         defaultMessage: 'Pomocník teď není k dispozici.',
         description: 'calm message shown when the hrai tutor server cannot be reached'
+    },
+    newProjectConfirmation: {
+        id: 'gui.hrai.newProjectConfirmation',
+        defaultMessage: 'Tím nahradíš právě otevřený projekt novým. Současný projekt se nejdřív ' +
+            'uloží, pokud je potřeba. Pokračovat?',
+        description: 'confirmation before replacing the current project with a new custom game project'
     }
 });
 
@@ -41,7 +48,13 @@ const buildWorkspacePayload = vm => {
     };
 };
 
-const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) => {
+const hasMeaningfulWorkspace = vm => vm.runtime.targets.some(target => {
+    const blockCount = Object.keys(target.blocks?._blocks || {}).length;
+    const variableCount = Object.keys(target.variables || {}).length;
+    return blockCount > 0 || variableCount > 0;
+}) || vm.runtime.targets.filter(target => !target.isStage).length > 1;
+
+const HraiPanel = ({activeLessonId, onCreateProject, onNextStage, projectId, projectTitle, vm}) => {
     const intl = useIntl();
     const [chatMessages, setChatMessages] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
@@ -51,6 +64,8 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
     const [gamePlan, setGamePlan] = useState(null);
     const [gameProgress, setGameProgress] = useState(null);
     const [isPlanning, setIsPlanning] = useState(false);
+    const [isStartingNewProject, setIsStartingNewProject] = useState(false);
+    const pendingNewGameIdeaRef = useRef(null);
     const [voiceCapabilities, setVoiceCapabilities] = useState({available: false, languages: []});
     const [voiceTranscript, setVoiceTranscript] = useState(null);
     const [voiceErrorCode, setVoiceErrorCode] = useState(null);
@@ -60,6 +75,16 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
     const vmRef = useRef(vm);
 
     vmRef.current = vm;
+
+    const emitPendingGamePlan = useCallback(() => {
+        const socket = socketRef.current;
+        const idea = pendingNewGameIdeaRef.current;
+        if (!socket?.connected || !idea) return;
+        pendingNewGameIdeaRef.current = null;
+        setIsStartingNewProject(false);
+        setIsPlanning(true);
+        socket.emit('gamePlan', {text: idea});
+    }, []);
 
     const pushWorkspace = useCallback(() => {
         const socket = socketRef.current;
@@ -112,6 +137,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
                 const saved = loadGameProgress(projectId, projectTitle);
                 if (saved) socket.emit('gameRestore', saved);
             }
+            emitPendingGamePlan();
         });
 
         socket.on('connect_error', markUnavailable);
@@ -174,6 +200,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             setGamePlan(plan);
             setGameProgress(null);
             setIsPlanning(false);
+            setIsStartingNewProject(false);
         });
 
         socket.on('gameProgress', progress => {
@@ -181,6 +208,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             setGamePlan(null);
             setGameProgress(progress);
             setIsPlanning(false);
+            setIsStartingNewProject(false);
         });
 
         socket.on('gameMilestoneComplete', progress => {
@@ -209,6 +237,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             }]);
             setIsThinking(false);
             setIsPlanning(false);
+            setIsStartingNewProject(false);
         });
 
         return () => {
@@ -236,6 +265,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         activeLessonId,
         debouncedPushWorkspace,
         helperUnavailableText,
+        emitPendingGamePlan,
         projectId,
         projectTitle,
         pushWorkspace
@@ -266,17 +296,22 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
             debouncedPushWorkspace();
         };
 
+        const onProjectChanged = () => {
+            pushWorkspace();
+            emitPendingGamePlan();
+        };
+
         vm.addListener('workspaceUpdate', onWorkspaceChange);
         vm.addListener('targetsUpdate', onWorkspaceChange);
-        vm.addListener('PROJECT_CHANGED', onWorkspaceChange);
+        vm.addListener('PROJECT_CHANGED', onProjectChanged);
 
         return () => {
             vm.removeListener('workspaceUpdate', onWorkspaceChange);
             vm.removeListener('targetsUpdate', onWorkspaceChange);
-            vm.removeListener('PROJECT_CHANGED', onWorkspaceChange);
+            vm.removeListener('PROJECT_CHANGED', onProjectChanged);
             debouncedPushWorkspace.cancel();
         };
-    }, [vm, debouncedPushWorkspace]);
+    }, [emitPendingGamePlan, vm, debouncedPushWorkspace, pushWorkspace]);
 
     const handleSend = useCallback(text => {
         const learnerId = `learner-${messageIdCounter.current += 1}`;
@@ -314,11 +349,21 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
 
     const handleGamePlanRequest = useCallback(text => {
         if (socketRef.current?.connected) {
+            pendingNewGameIdeaRef.current = null;
             setGamePlan(null);
             setIsPlanning(true);
             socketRef.current.emit('gamePlan', {text});
         }
     }, []);
+
+    const handleStartNewProject = useCallback(text => {
+        // eslint-disable-next-line no-alert -- replacing the current project needs explicit confirmation
+        if (!window.confirm(intl.formatMessage(messages.newProjectConfirmation))) return;
+        clearGameProgress(projectId, projectTitle);
+        pendingNewGameIdeaRef.current = text;
+        setIsStartingNewProject(true);
+        onCreateProject();
+    }, [intl, onCreateProject, projectId, projectTitle]);
 
     const handleGamePlanAccept = useCallback(() => {
         if (socketRef.current?.connected && gamePlan && !isPlanning) {
@@ -356,11 +401,14 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
         <HraiPanelComponent
             gamePlan={gamePlan}
             gameProgress={gameProgress}
+            hasProjectContent={hasMeaningfulWorkspace(vm)}
             isPlanning={isPlanning}
+            isStartingNewProject={isStartingNewProject}
             messages={chatMessages}
             onGamePlanAccept={handleGamePlanAccept}
             onGamePlanEdit={handleGamePlanEdit}
             onGamePlanRequest={handleGamePlanRequest}
+            onStartNewProject={handleStartNewProject}
             onSend={handleSend}
             onHint={handleHint}
             isThinking={isThinking && isServerAvailable && !isPlanning}
@@ -379,6 +427,7 @@ const HraiPanel = ({activeLessonId, onNextStage, projectId, projectTitle, vm}) =
 
 HraiPanel.propTypes = {
     activeLessonId: PropTypes.string,
+    onCreateProject: PropTypes.func.isRequired,
     onNextStage: PropTypes.func.isRequired,
     projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     projectTitle: PropTypes.string,
@@ -397,6 +446,7 @@ const mapStateToProps = state => ({
 });
 
 const mapDispatchToProps = dispatch => ({
+    onCreateProject: () => dispatch(createProject()),
     onNextStage: () => dispatch(nextHraiStage())
 });
 
