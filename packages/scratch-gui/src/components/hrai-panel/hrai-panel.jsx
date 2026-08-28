@@ -712,6 +712,13 @@ const HraiPanel = ({
         }
     }, [gamePlan, gameProgress]);
 
+    useEffect(() => {
+        if (lesson) {
+            setGameIdea(null);
+            setGameStartPending(false);
+        }
+    }, [lesson]);
+
     const formatBlockReference = useCallback(alias => intl.formatMessage(
         messages.blockReference,
         {alias}

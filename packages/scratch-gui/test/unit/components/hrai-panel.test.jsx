@@ -298,6 +298,54 @@ describe('HraiPanel custom game planning', () => {
         expect(onGamePlanRequest).toHaveBeenCalledWith('Drak hledá poklad.');
     });
 
+    test('does not restore a pending game idea after an authored lesson', () => {
+        const {rerender} = renderWithIntl(
+            <HraiPanel
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText('Zpráva pro hrai'), {
+            target: {value: 'Drak hledá poklad.'}
+        });
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+        expect(screen.getByRole('button', {name: 'Připravit plán hry'})).toBeTruthy();
+
+        rerender(
+            <IntlProvider
+                locale="cs"
+                messages={{}}
+            >
+                <HraiPanel
+                    lesson={{title: 'Lekce', stages: ['První krok']}}
+                    lessonProgress={{complete: false, stageIndex: 0}}
+                    messages={[]}
+                    onHint={jest.fn()}
+                    onNextStage={jest.fn()}
+                    onSend={jest.fn()}
+                />
+            </IntlProvider>
+        );
+        rerender(
+            <IntlProvider
+                locale="cs"
+                messages={{}}
+            >
+                <HraiPanel
+                    messages={[]}
+                    onHint={jest.fn()}
+                    onNextStage={jest.fn()}
+                    onSend={jest.fn()}
+                />
+            </IntlProvider>
+        );
+
+        expect(screen.queryByRole('button', {name: 'Připravit plán hry'})).toBeNull();
+    });
+
     test('shows a proposal and requires explicit acceptance', () => {
         const onGamePlanAccept = jest.fn();
         const onGamePlanEdit = jest.fn();
