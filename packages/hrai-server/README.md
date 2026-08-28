@@ -48,9 +48,11 @@ For local Docker deployment, see [`docker/README.md`](../../docker/README.md).
 
 ## Goal-driven custom games
 
-A custom game starts as a proposal, not an active tutorial. The server asks the model for a
-small, structured `GamePlan`, validates and normalizes it, and emits `gamePlanProposed`. Only
-`gamePlanAccept` activates it. The accepted plan keeps the child's original goal, core loop,
+A custom game starts in the chat as a proposal, not an active tutorial. The editor collects the
+child's first idea through the normal composer, then offers to continue in the current project or
+start a new one when the workspace already contains meaningful work. The server asks the model
+for a small, structured `GamePlan`, validates and normalizes it, and emits `gamePlanProposed`.
+Only `gamePlanAccept` activates it. The accepted plan keeps the child's original goal, core loop,
 and current learning milestone in every tutor prompt. This prevents a short chat history from
 silently replacing the game the child wanted to make.
 

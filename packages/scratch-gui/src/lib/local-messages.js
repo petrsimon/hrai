@@ -70,11 +70,17 @@ const cs = {
     'gui.hrai.voicePermissionDenied': 'Povol mikrofon v nastavení prohlížeče, nebo napiš zprávu.',
     'gui.hrai.voiceUnsupported': 'Tento prohlížeč neumí nahrávat hlas.',
     'gui.hrai.voiceFailed': 'Nahrávku se nepodařilo přepsat. Zkus to znovu, nebo napiš zprávu.',
-    'gui.hrai.gameDesignerTitle': 'Navrhni vlastní hru',
-    'gui.hrai.gameIdeaLabel': 'Jakou hru chceš vytvořit?',
-    'gui.hrai.gameIdeaHelp': 'Popiš hrdinu, jeho cíl a co má hráč dělat.',
-    'gui.hrai.gamePlanButton': 'Navrhnout hru',
     'gui.hrai.gamePlanning': 'Připravuji malou hratelnou verzi…',
+    'gui.hrai.gameStartPrompt': 'Co chceš vytvořit? Napiš svůj nápad a společně z něj uděláme malou hru.',
+    'gui.hrai.gamePlanQuestion': 'Mám z tohoto nápadu připravit plán hry?',
+    'gui.hrai.existingProjectQuestion':
+        'V tomto projektu už něco máš. Pro nový nápad bude jednodušší ' +
+        'začít nový projekt. Co chceš udělat?',
+    'gui.hrai.continueProject': 'Pokračovat v tomto projektu',
+    'gui.hrai.startNewProject': 'Začít nový projekt',
+    'gui.hrai.prepareGamePlan': 'Připravit plán hry',
+    'gui.hrai.newProjectConfirmation':
+        'Tím nahradíš právě otevřený projekt novým. Současný projekt se nejdřív uloží, pokud je potřeba. Pokračovat?',
     'gui.hrai.originalGoal': 'Tvůj nápad',
     'gui.hrai.coreLoop': 'Jak se hra hraje',
     'gui.hrai.gameMilestones': 'Cesta ke hře',
@@ -130,11 +136,18 @@ const en = {
     'gui.hrai.voicePermissionDenied': 'Allow microphone access in browser settings, or type a message.',
     'gui.hrai.voiceUnsupported': 'This browser cannot record voice.',
     'gui.hrai.voiceFailed': 'The recording could not be transcribed. Try again, or type a message.',
-    'gui.hrai.gameDesignerTitle': 'Design your own game',
-    'gui.hrai.gameIdeaLabel': 'What game do you want to create?',
-    'gui.hrai.gameIdeaHelp': 'Describe the hero, their goal, and what the player does.',
-    'gui.hrai.gamePlanButton': 'Plan my game',
     'gui.hrai.gamePlanning': 'Preparing a small playable version…',
+    'gui.hrai.gameStartPrompt': 'What do you want to create? Share your idea and we will turn it into a small game.',
+    'gui.hrai.gamePlanQuestion': 'Should I prepare a game plan from this idea?',
+    'gui.hrai.existingProjectQuestion':
+        'You already have work in this project. Starting a new project will be easier ' +
+        'for a new idea. What do you want to do?',
+    'gui.hrai.continueProject': 'Continue in this project',
+    'gui.hrai.startNewProject': 'Start a new project',
+    'gui.hrai.prepareGamePlan': 'Prepare game plan',
+    'gui.hrai.newProjectConfirmation':
+        'This will replace the open project with a new one. The current project will be saved first ' +
+        'if needed. Continue?',
     'gui.hrai.originalGoal': 'Your idea',
     'gui.hrai.coreLoop': 'How the game plays',
     'gui.hrai.gameMilestones': 'Path to your game',
