@@ -76,6 +76,19 @@ services:
       - whisper
     restart: unless-stopped
 
+  game-design-eval:
+    profiles: [eval]
+    build:
+      context: .
+      dockerfile: docker/hrai-eval.Dockerfile
+    environment:
+      HRAI_MODEL_BACKEND: llama.cpp
+      HRAI_EVAL_HOST: http://llama:8080
+      HRAI_EVAL_MODEL: ${HRAI_MODEL_NAME:-Qwen3.5-27B}
+    depends_on:
+      llama:
+        condition: service_healthy
+
   editor:
     build:
       context: .

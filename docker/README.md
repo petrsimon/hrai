@@ -109,6 +109,29 @@ is text-only, so the multimodal projector is disabled; reasoning is also disable
 replies stay concise. HRAI selects it with `HRAI_MODEL_BACKEND=llama.cpp`; Ollama
 remains the default for non-Compose development and evaluation commands.
 
+## Run the game-design eval on Ubuntu
+
+The model capability eval runs as a one-shot, opt-in Compose service. It joins the
+internal Compose network and calls llama.cpp by service name; llama is not exposed
+on a host port and the normal deployment is unchanged.
+
+From the repository root:
+
+```sh
+docker compose --profile eval run --rm --build game-design-eval
+```
+
+The default model is `Qwen3.5-27B`, matching the deployment. Override it when testing
+another model:
+
+```sh
+HRAI_MODEL_NAME=Qwen3.5-27B-Q6_K \
+  docker compose --profile eval run --rm --build game-design-eval
+```
+
+A successful run prints one passing Vitest test. The service exits after the eval and
+never becomes a long-running container.
+
 ## Local voice input
 
 The Compose stack includes a whisper.cpp sidecar for optional voice input. The
