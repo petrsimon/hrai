@@ -88,7 +88,11 @@ describe("palette data", () => {
     });
 
     it("groups the prompt text under category headings", () => {
-        const text = paletteForPrompt(["event_whenkeypressed", "motion_movesteps"]);
+        const text = paletteForPrompt(["event_whenkeypressed", "motion_movesteps", "control_forever"]);
+        expect(text).toContain("BARVY KATEGORIÍ:");
+        expect(text).toContain("Události = žlutá");
+        expect(text).toContain("Ovládání = oranžová");
+        expect(text).toContain("Pohyb = modrá");
         expect(text).toContain("Události:");
         expect(text).toContain("Pohyb:");
         expect(text).toContain("event_whenkeypressed = po stisku klávesy %1");

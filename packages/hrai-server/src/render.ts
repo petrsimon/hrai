@@ -76,6 +76,8 @@ const INDENT = "  ";
 class RenderState {
     readonly lines: string[] = [];
     readonly aliases = new Map<string, string>();
+    readonly scriptRoots: string[] = [];
+    readonly branches: { parentId: string; name: string; childId: string | null }[] = [];
     private nextAlias = 1;
 
     /**
@@ -87,6 +89,18 @@ class RenderState {
         const alias = `b${this.nextAlias++}`;
         this.aliases.set(alias, blockId);
         return alias;
+    }
+
+    /**
+     * Finds the model-facing alias for a real VM block ID.
+     * @param blockId Real VM block ID.
+     * @returns The alias, or undefined when the block is not rendered.
+     */
+    aliasOf(blockId: string): string | undefined {
+        for (const [alias, id] of this.aliases) {
+            if (id === blockId) return alias;
+        }
+        return undefined;
     }
 }
 
@@ -163,6 +177,7 @@ function renderStack(
     depth: number,
     locale: string,
 ): void {
+    if (depth === 0 && startId) state.scriptRoots.push(startId);
     let currentId = startId;
     while (currentId) {
         const block = blocks[currentId];
@@ -174,6 +189,7 @@ function renderStack(
 
         const branches = Object.values(block.inputs).filter((i) => i.name.startsWith(BRANCH_PREFIX));
         for (const branch of branches) {
+            state.branches.push({ parentId: block.id, name: branch.name, childId: branch.block });
             renderStack(state, blocks, branch.block, depth + 1, locale);
         }
         if (branches.length > 0) {
@@ -184,6 +200,60 @@ function renderStack(
 
         currentId = block.next;
     }
+}
+
+/**
+ * Renders one `next` chain as an explicit connection fact.
+ * @param state Current aliases.
+ * @param blocks Blocks belonging to the focused target.
+ * @param startId First block in the chain.
+ * @returns Aliases joined in execution order and terminated by `konec`.
+ */
+function renderConnectionChain(state: RenderState, blocks: Record<string, Block>, startId: string): string {
+    const aliases: string[] = [];
+    const visited = new Set<string>();
+    let currentId: string | null = startId;
+    while (currentId && !visited.has(currentId)) {
+        visited.add(currentId);
+        const alias = state.aliasOf(currentId);
+        if (!alias) break;
+        aliases.push(alias);
+        currentId = blocks[currentId]?.next ?? null;
+    }
+    return `${aliases.join(" -> ")} -> konec`;
+}
+
+/**
+ * Appends a compact structural view alongside the indented pseudo-Scratch view.
+ * The model needs explicit edges because indentation alone is easy to misread.
+ * @param state Render state containing aliases and structural edges.
+ * @param blocks Blocks belonging to the focused target.
+ */
+function renderConnectionFacts(state: RenderState, blocks: Record<string, Block>): void {
+    if (state.scriptRoots.length === 0) return;
+
+    state.lines.push("");
+    state.lines.push("struktura spojení (-> navazuje, / SUBSTACK je větev, samostatný skript je oddělený):");
+    for (const rootId of state.scriptRoots) {
+        state.lines.push(`  samostatný skript: ${renderConnectionChain(state, blocks, rootId)}`);
+    }
+    for (const branch of state.branches) {
+        const parent = state.aliasOf(branch.parentId);
+        if (!parent) continue;
+        const chain = branch.childId
+            ? renderConnectionChain(state, blocks, branch.childId)
+            : "prázdná větev";
+        state.lines.push(`  ${parent} / ${branch.name}: ${chain}`);
+    }
+
+    const parentFacts = [...state.aliases]
+        .map(([alias, blockId]) => {
+            const parentId = blocks[blockId]?.parent;
+            const parent = parentId ? state.aliasOf(parentId) : undefined;
+            return parent ? `${alias} <- ${parent}` : null;
+        })
+        .filter((fact): fact is string => fact !== null);
+    if (parentFacts.length > 0) state.lines.push(`  rodičovské bloky: ${parentFacts.join(", ")}`);
 }
 
 /**
@@ -235,6 +305,7 @@ export function renderProject(targets: RenderTarget[], focusedTargetId: string, 
             if (index > 0) state.lines.push("");
             renderStack(state, target.blocks, root.id, 0, locale);
         });
+        renderConnectionFacts(state, target.blocks);
     }
 
     const others = targets.filter((t) => t.id !== focusedTargetId);

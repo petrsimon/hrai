@@ -22,6 +22,18 @@ export interface PaletteEntry {
 
 export const PALETTE = palette as PaletteEntry[];
 
+/** Scratch's stable category colours, named in Czech for the tutor prompt. */
+export const CATEGORY_COLORS: Record<string, string> = {
+    control: "oranžová",
+    events: "žlutá",
+    looks: "fialová",
+    motion: "modrá",
+    operators: "zelená",
+    sensing: "světle modrá",
+    sound: "růžová",
+    variables: "oranžová",
+};
+
 /**
  * Strips input-slot markers from a label template: `po stisku klávesy %1` -> `po stisku klávesy`.
  * @param template A label as stored in the catalogue, slots included.
@@ -78,7 +90,12 @@ export function paletteForPrompt(opcodes?: readonly string[]): string {
         byCategory.set(entry.category, list);
     }
 
-    const lines: string[] = [];
+    const lines: string[] = ["BARVY KATEGORIÍ:"];
+    for (const [category, entries] of byCategory) {
+        const categoryKey = entries[0]?.categoryKey;
+        lines.push(`  ${category} = ${categoryKey ? CATEGORY_COLORS[categoryKey] ?? "neuvedená" : "neuvedená"}`);
+    }
+    lines.push("");
     for (const [category, entries] of byCategory) {
         lines.push(`${category}:`);
         for (const entry of entries) {

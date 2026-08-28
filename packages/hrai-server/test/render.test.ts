@@ -50,6 +50,7 @@ describe("renderProject", () => {
 
         expect(text).toContain("when");
         expect(text).toContain("move 10 steps");
+        expect(text).toContain("samostatný skript: b1 -> b2 -> konec");
         expect(aliases.get("b1")).toBe("hat");
         expect(aliases.get("b2")).toBe("mv");
     });
@@ -81,6 +82,26 @@ describe("renderProject", () => {
         const moveLine = lines[move] ?? "";
         const foreverLine = lines[forever] ?? "";
         expect(moveLine.indexOf("move")).toBeGreaterThan(foreverLine.indexOf("forever"));
+        expect(text).toContain("samostatný skript: b1 -> b2 -> konec");
+        expect(text).toContain("b2 / SUBSTACK: b3 -> konec");
+    });
+
+    it("describes disconnected scripts and empty branches explicitly", () => {
+        const t = target("Rover", [
+            block("hat", "event_whenflagclicked", { topLevel: true, next: "loop" }),
+            block("loop", "control_forever", {
+                parent: "hat",
+                inputs: { SUBSTACK: { name: "SUBSTACK", block: null, shadow: null } },
+            }),
+            block("key", "event_whenkeypressed", { topLevel: true }),
+        ]);
+
+        const { text } = renderProject([t], "Rover");
+
+        expect(text).toContain("samostatný skript: b1 -> b2 -> konec");
+        expect(text).toContain("samostatný skript: b3 -> konec");
+        expect(text).toContain("b2 / SUBSTACK: prázdná větev");
+        expect(text).toContain("rodičovské bloky: b2 <- b1");
     });
 
     it("renders a boolean input inside angle brackets", () => {
