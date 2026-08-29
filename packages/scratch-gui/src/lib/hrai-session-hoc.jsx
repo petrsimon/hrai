@@ -171,7 +171,13 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
     }, []);
 
     const update = (field, value) => setPreferences((current) => ({...current, [field]: value}));
-    const updateBackend = (value) => setPreferences((current) => ({...current, modelBackend: value, modelName: ''}));
+    const updateBackend = (value) => setPreferences((current) => ({...current, modelBackend: value}));
+    const updateModel = (value) => setPreferences((current) => {
+        const modelByBackend = {...current.modelByBackend};
+        if (value === '') delete modelByBackend[current.modelBackend];
+        else modelByBackend[current.modelBackend] = value;
+        return {...current, modelByBackend};
+    });
     const save = async (event) => {
         event.preventDefault();
         setError(null);
@@ -190,6 +196,7 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
 
     const modelControlsDisabled = !modelCatalog || modelsFailed;
     const selectedBackend = modelCatalog?.backends.find((backend) => backend.id === preferences.modelBackend);
+    const selectedModel = preferences.modelByBackend[preferences.modelBackend] ?? '';
 
     return (
         <div style={panelStyle} role="dialog" aria-label={messages.assistantSettings.defaultMessage}>
@@ -233,19 +240,19 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
                 {modelControlsDisabled ? (
                     <label>
                         <FormattedMessage {...messages.model} />
-                        <select value={preferences.modelName} disabled>
-                            <option value={preferences.modelName}><FormattedMessage {...messages.loading} /></option>
+                        <select value={selectedModel} disabled>
+                            <option value={selectedModel}><FormattedMessage {...messages.loading} /></option>
                         </select>
                     </label>
                 ) : preferences.modelBackend === 'default' ? null : selectedBackend?.freeform ? (
                     <label>
                         <FormattedMessage {...messages.model} />
-                        <input value={preferences.modelName} maxLength={100} onChange={(event) => update('modelName', event.target.value)} />
+                        <input value={selectedModel} maxLength={100} onChange={(event) => updateModel(event.target.value)} />
                     </label>
                 ) : (
                     <label>
                         <FormattedMessage {...messages.model} />
-                        <select value={preferences.modelName} onChange={(event) => update('modelName', event.target.value)}>
+                        <select value={selectedModel} onChange={(event) => updateModel(event.target.value)}>
                             <option value=""><FormattedMessage {...messages.backendDefault} /></option>
                             {selectedBackend?.models.map((model) => <option key={model} value={model}>{model}</option>)}
                         </select>

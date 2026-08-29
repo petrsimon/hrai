@@ -14,6 +14,9 @@ const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
 export type AssistantPersona = "patient" | "socratic" | "coach";
 export type AssistantVerbosity = "concise" | "balanced" | "detailed";
 
+const KNOWN_BACKENDS: BackendId[] = ["ollama", "llama.cpp", "cursor", "pi", "codex"];
+const MODEL_NAME_PATTERN = /^[A-Za-z0-9._:/+-]+$/;
+
 export interface AssistantPreferences {
     assistantName: string;
     persona: AssistantPersona;
@@ -21,7 +24,7 @@ export interface AssistantPreferences {
     language: "cs";
     encouragement: boolean;
     modelBackend: BackendId | "default";
-    modelName: string;
+    modelByBackend: Partial<Record<BackendId, string>>;
 }
 
 export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
@@ -31,7 +34,7 @@ export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
     language: "cs",
     encouragement: true,
     modelBackend: "default",
-    modelName: "",
+    modelByBackend: {},
 };
 
 interface UserRecord {
@@ -94,12 +97,29 @@ function sessionKey(token: string): string {
     return createHash("sha256").update(token).digest("hex");
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+    const prototype: unknown = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
+
+function isValidModelName(value: unknown): value is string {
+    return value === "" ||
+        (typeof value === "string" &&
+            value.length <= 100 &&
+            !value.startsWith("-") &&
+            MODEL_NAME_PATTERN.test(value));
+}
+
 function publicUser(user: UserRecord): PublicUser {
     return {
         id: user.id,
         username: user.username,
         displayName: user.displayName,
-        assistantPreferences: { ...user.assistantPreferences },
+        assistantPreferences: {
+            ...user.assistantPreferences,
+            modelByBackend: { ...user.assistantPreferences.modelByBackend },
+        },
     };
 }
 
@@ -131,14 +151,16 @@ export function sanitizeAssistantPreferences(input: unknown): AssistantPreferenc
     const language = value.language;
     const encouragement = value.encouragement;
     const modelBackend = value.modelBackend === undefined ? DEFAULT_ASSISTANT_PREFERENCES.modelBackend : value.modelBackend;
-    const modelName = value.modelName === undefined ? DEFAULT_ASSISTANT_PREFERENCES.modelName : value.modelName;
-    const knownBackends: BackendId[] = ["ollama", "llama.cpp", "cursor", "pi", "codex"];
+    const modelByBackendValue = value.modelByBackend === undefined
+        ? DEFAULT_ASSISTANT_PREFERENCES.modelByBackend
+        : value.modelByBackend;
     // These model fields cross security boundaries into backend and CLI selection.
-    const validModelName = modelName === "" ||
-        (typeof modelName === "string" &&
-            modelName.length <= 100 &&
-            !modelName.startsWith("-") &&
-            /^[A-Za-z0-9._:/+-]+$/.test(modelName));
+    if (!isPlainObject(modelByBackendValue)) return null;
+    const modelByBackend: Partial<Record<BackendId, string>> = {};
+    for (const [backend, model] of Object.entries(modelByBackendValue)) {
+        if (!KNOWN_BACKENDS.includes(backend as BackendId) || !isValidModelName(model)) return null;
+        if (model !== "") modelByBackend[backend as BackendId] = model;
+    }
     if (
         assistantName.length < 1 ||
         assistantName.length > 40 ||
@@ -147,8 +169,7 @@ export function sanitizeAssistantPreferences(input: unknown): AssistantPreferenc
         !["concise", "balanced", "detailed"].includes(verbosity as string) ||
         language !== "cs" ||
         typeof encouragement !== "boolean" ||
-        (modelBackend !== "default" && !knownBackends.includes(modelBackend as BackendId)) ||
-        !validModelName
+        (modelBackend !== "default" && !KNOWN_BACKENDS.includes(modelBackend as BackendId))
     ) return null;
     return {
         assistantName,
@@ -157,7 +178,7 @@ export function sanitizeAssistantPreferences(input: unknown): AssistantPreferenc
         language: "cs",
         encouragement,
         modelBackend: modelBackend as BackendId | "default",
-        modelName,
+        modelByBackend,
     };
 }
 
@@ -185,6 +206,15 @@ export class HraiStore {
         try {
             const raw = await readFile(this.filePath, "utf8");
             this.data = JSON.parse(raw) as StoreData;
+            // Profiles written before a preference existed lack that key entirely. Filling the
+            // defaults here means the rest of the server can read preferences as a whole object
+            // instead of every caller guarding for a field that predates it.
+            for (const user of this.data.users) {
+                user.assistantPreferences = {
+                    ...DEFAULT_ASSISTANT_PREFERENCES,
+                    ...user.assistantPreferences,
+                };
+            }
         } catch (error: unknown) {
             if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
             this.data = emptyData();

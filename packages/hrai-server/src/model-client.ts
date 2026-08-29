@@ -36,19 +36,31 @@ export const EVAL_MODEL =
         ? process.env.HRAI_AGENT_MODEL ?? ""
         : "qwen3:14b");
 
+function perBackendEnv(backend: BackendId): string | undefined {
+    const envKey: Record<BackendId, string> = {
+        ollama: "HRAI_OLLAMA_MODEL",
+        "llama.cpp": "HRAI_LLAMA_MODEL",
+        cursor: "HRAI_CURSOR_MODEL",
+        pi: "HRAI_PI_MODEL",
+        codex: "HRAI_CODEX_MODEL",
+    };
+    return process.env[envKey[backend]];
+}
+
 /**
  * Default model for a backend.
  *
- * The model environment variables configure the backend the environment selected, so only that one
- * takes them. A backend chosen at runtime falls back to its own default instead of inheriting a
- * name meant for another: `qwen3:14b` would be rejected by `cursor-agent`, and an agent model name
- * means nothing to ollama. The empty string means "let the CLI pick", and leaves `--model` off.
+ * A backend-specific model environment variable takes priority. The remaining model environment
+ * variables configure the backend the environment selected, so only that one takes them. A backend
+ * chosen at runtime falls back to its own default instead of inheriting a name meant for another:
+ * `qwen3:14b` would be rejected by `cursor-agent`, and an agent model name means nothing to ollama.
+ * The empty string means "let the CLI pick", and leaves `--model` off.
  * @param backend Backend whose default model is needed.
  * @returns The model name, or the empty string for the CLI's own default.
  */
 export function defaultModelFor(backend: BackendId): string {
-    if (backend === defaultBackend()) return EVAL_MODEL;
-    return isAgentBackend(backend) ? "" : "qwen3:14b";
+    return perBackendEnv(backend) ??
+        (backend === defaultBackend() ? EVAL_MODEL : isAgentBackend(backend) ? "" : "qwen3:14b");
 }
 
 /**

@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -86,12 +87,12 @@ describe("HRAI self-hosted API", () => {
                 assistantName: "Sova",
                 persona: "socratic",
                 modelBackend: "default",
-                modelName: "",
+                modelByBackend: {},
             },
         });
         const defaultProfile = await api("/api/profile");
         expect(await defaultProfile.json()).toMatchObject({
-            assistantPreferences: { modelBackend: "default", modelName: "" },
+            assistantPreferences: { modelBackend: "default", modelByBackend: {} },
         });
 
         const withModel = await api("/api/profile/assistant", {
@@ -104,13 +105,16 @@ describe("HRAI self-hosted API", () => {
                 language: "cs",
                 encouragement: false,
                 modelBackend: "cursor",
-                modelName: "gpt-5.2",
+                modelByBackend: { cursor: "gpt-5.2", pi: "local/qwen3:14b" },
             }),
         });
         expect(withModel.status).toBe(200);
         const profile = await api("/api/profile");
         expect(await profile.json()).toMatchObject({
-            assistantPreferences: { modelBackend: "cursor", modelName: "gpt-5.2" },
+            assistantPreferences: {
+                modelBackend: "cursor",
+                modelByBackend: { cursor: "gpt-5.2", pi: "local/qwen3:14b" },
+            },
         });
     });
 
@@ -140,7 +144,7 @@ describe("HRAI self-hosted API", () => {
                 language: "cs",
                 encouragement: false,
                 modelBackend: "rm -rf",
-                modelName: "gpt-5.2",
+                modelByBackend: { cursor: "gpt-5.2" },
             }),
         });
         expect(response.status).toBe(400);
@@ -158,11 +162,70 @@ describe("HRAI self-hosted API", () => {
                 language: "cs",
                 encouragement: false,
                 modelBackend: "cursor",
-                modelName: "--dangerously-bypass-approvals-and-sandbox",
+                modelByBackend: { cursor: "--dangerously-bypass-approvals-and-sandbox" },
             }),
         });
         expect(response.status).toBe(400);
         expect(await response.json()).toEqual({ error: "invalid_assistant_preferences" });
+    });
+
+    it("rejects unknown model backend map keys", async () => {
+        const response = await api("/api/profile/assistant", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                assistantName: "Sova",
+                persona: "socratic",
+                verbosity: "balanced",
+                language: "cs",
+                encouragement: false,
+                modelBackend: "cursor",
+                modelByBackend: { "rm -rf": "x" },
+            }),
+        });
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: "invalid_assistant_preferences" });
+    });
+
+    it("rejects non-object model backend maps", async () => {
+        for (const modelByBackend of [[], "gpt-5.2"]) {
+            const response = await api("/api/profile/assistant", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    assistantName: "Sova",
+                    persona: "socratic",
+                    verbosity: "balanced",
+                    language: "cs",
+                    encouragement: false,
+                    modelBackend: "cursor",
+                    modelByBackend,
+                }),
+            });
+            expect(response.status).toBe(400);
+            expect(await response.json()).toEqual({ error: "invalid_assistant_preferences" });
+        }
+    });
+
+    it("drops empty model choices", async () => {
+        const response = await api("/api/profile/assistant", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                assistantName: "Sova",
+                persona: "socratic",
+                verbosity: "balanced",
+                language: "cs",
+                encouragement: false,
+                modelBackend: "cursor",
+                modelByBackend: { cursor: "" },
+            }),
+        });
+        expect(response.status).toBe(200);
+        const profile = await api("/api/profile");
+        expect(await profile.json()).toMatchObject({
+            assistantPreferences: { modelBackend: "cursor", modelByBackend: {} },
+        });
     });
 
     it("persists owned projects and rejects unauthenticated access", async () => {
@@ -213,5 +276,49 @@ describe("HRAI self-hosted API", () => {
         expect(saved.status).toBe(200);
         const loaded = await api("/api/assets/0123456789abcdef.png");
         expect(new Uint8Array(await loaded.arrayBuffer())).toEqual(bytes);
+    });
+});
+
+describe("legacy profiles on disk", () => {
+    it("fills in preferences that did not exist when the profile was written", async () => {
+        const legacyDirectory = await mkdtemp(join(tmpdir(), "hrai-legacy-"));
+        const token = "legacy-session-token";
+        await writeFile(join(legacyDirectory, "store.json"), JSON.stringify({
+            nextProjectId: 1,
+            sessions: {
+                [createHash("sha256").update(token).digest("hex")]: {
+                    userId: "u1",
+                    expiresAt: Date.now() + 60_000,
+                },
+            },
+            projects: [],
+            assets: {},
+            users: [{
+                id: "u1",
+                username: "kid",
+                displayName: "Kid",
+                passwordHash: "x",
+                createdAt: new Date().toISOString(),
+                // Written before the model preferences existed.
+                assistantPreferences: {
+                    assistantName: "hrai",
+                    persona: "patient",
+                    verbosity: "concise",
+                    language: "cs",
+                    encouragement: true,
+                },
+            }],
+        }));
+
+        const legacyStore = new HraiStore(legacyDirectory);
+        await legacyStore.load();
+        const user = await legacyStore.userForSession(token);
+
+        // resolveModelChoice reads both of these without guarding for a field older profiles lack.
+        expect(user?.assistantPreferences.modelBackend).toBe("default");
+        expect(user?.assistantPreferences.modelByBackend).toEqual({});
+        expect(user?.assistantPreferences.persona).toBe("patient");
+
+        await rm(legacyDirectory, {recursive: true, force: true});
     });
 });

@@ -51,9 +51,14 @@ directory, so it cannot reach the source tree and no `AGENTS.md` is pulled into 
 
 | Variable | Meaning |
 | - | - |
-| `HRAI_AGENT_MODEL` | model passed as `--model`/`-m`; unset lets the CLI choose |
+| `HRAI_OLLAMA_MODEL`, `HRAI_LLAMA_MODEL`, `HRAI_CURSOR_MODEL`, `HRAI_PI_MODEL`, `HRAI_CODEX_MODEL` | default model for that one backend; wins over everything below |
+| `HRAI_AGENT_MODEL` | model for the selected agent CLI when it has no per-backend variable |
 | `HRAI_AGENT_TIMEOUT_MS` | per-call timeout, default `120000` |
 | `HRAI_AGENT_CWD` | sandbox working directory, default a fresh empty temp dir |
+
+The per-backend variables exist because one global model name cannot serve five backends: a name
+`ollama` understands is rejected by `cursor-agent`, and the reverse. Unset means the backend picks —
+for an agent CLI that is the CLI's own default, so `--model` is left off entirely.
 
 `HRAI_MODEL_HOST` and `HRAI_EVAL_HOST` configure whichever backend `HRAI_MODEL_BACKEND` selects.
 A backend picked at runtime uses `HRAI_OLLAMA_HOST` or `HRAI_LLAMA_HOST` instead, because a host
@@ -96,6 +101,12 @@ what fills the provider and model controls in assistant settings. Choosing a pro
 overrides `HRAI_MODEL_BACKEND` for that profile; leaving it on *Server default* keeps the
 environment's choice. A profile naming a backend that has since become unavailable falls back to
 the default with a warning rather than failing the child's question.
+
+The model is remembered **per provider**, in a `modelByBackend` map on the profile, so switching
+from Cursor to pi and back keeps each one's choice. An absent entry means that backend's own
+default. Both the map's keys and its values are validated on the way in: a key must be a known
+backend id, and a value must be at most 100 characters of `[A-Za-z0-9._:/+-]` and may not start with
+`-`, because it becomes an argv token handed to a spawned CLI.
 
 For local Docker deployment, see [`docker/README.md`](../../docker/README.md).
 

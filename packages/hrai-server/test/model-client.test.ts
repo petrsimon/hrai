@@ -18,6 +18,11 @@ const ENV_KEYS = [
     "HRAI_EVAL_HOST",
     "HRAI_EVAL_MODEL",
     "HRAI_AGENT_MODEL",
+    "HRAI_OLLAMA_MODEL",
+    "HRAI_LLAMA_MODEL",
+    "HRAI_CURSOR_MODEL",
+    "HRAI_PI_MODEL",
+    "HRAI_CODEX_MODEL",
     "HRAI_OLLAMA_HOST",
     "HRAI_LLAMA_HOST",
 ] as const;
@@ -159,6 +164,14 @@ describe("llama.cpp model client", () => {
         expect(defaultModelFor("ollama")).toBe("qwen3:14b");
         // cursor-agent would reject --model qwen3:14b.
         expect(defaultModelFor("cursor")).toBe("");
+    });
+
+    it("uses the backend-specific model environment variable", async () => {
+        process.env.HRAI_CURSOR_MODEL = "gpt-5.2";
+        const {defaultModelFor} = await loadModelClient();
+
+        expect(defaultModelFor("cursor")).toBe("gpt-5.2");
+        expect(defaultModelFor("ollama")).toBe("qwen3:14b");
     });
 
     it("omits the model for an agent backend when none is configured", async () => {

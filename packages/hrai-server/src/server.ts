@@ -188,7 +188,7 @@ async function resolveModelChoice(
     }
     return {
         backend,
-        model: preferences.modelName === "" ? defaultModelFor(backend) : preferences.modelName,
+        model: preferences.modelByBackend[backend] ?? defaultModelFor(backend),
     };
 }
 
