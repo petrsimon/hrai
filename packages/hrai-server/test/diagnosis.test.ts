@@ -18,6 +18,7 @@
  */
 import { describe, expect, it, beforeAll } from "vitest";
 import fixtures from "./fixtures/tutor-fixtures.json" with { type: "json" };
+import { ABSENCE_CLAIMS, scriptsFor } from "./false-absence.ts";
 import { EVAL_MODEL, chat, warnSkipped, isModelAvailable } from "../src/model-client.ts";
 
 const DIAGNOSTIC_SYSTEM = [
@@ -31,14 +32,6 @@ const DIAGNOSTIC_SYSTEM = [
     "Use 'none' when the child reports no failure symptom and only asks what to do next; do not invent a defect in valid code.",
     "For a vague failure such as 'nothing works', identify the most likely structural blockage.",
 ].join("\n");
-
-/**
- * Claims of the form "the move block is missing" about a project that plainly
- * contains one. This was qwen3:8b's defining failure — it could not tell what
- * sat inside a `forever` — and it is the single most important regression to
- * catch, because the tutor would then teach a child to add a block they have.
- */
-const FALSE_ABSENCE = /missing.{0,40}(move|10 steps|script|end\b|"end")|no move/i;
 
 let available = false;
 beforeAll(async () => {
@@ -66,11 +59,12 @@ describe(`diagnosis (${EVAL_MODEL})`, () => {
             ).toBe(true);
 
             // Both models name b3 on the vague fixture; only the reason separates them.
-            // qwen3:8b claims the `end` marker is missing from a render that contains it.
-            if (c.render.includes("move 10 steps") || c.render.includes("end b")) {
+            // qwen3:8b claims the `end` marker is missing from a script that contains it.
+            const scripts = scriptsFor(c.render, named.filter((n) => n !== "none"));
+            for (const {claimed, present} of ABSENCE_CLAIMS) {
                 expect(
-                    FALSE_ABSENCE.test(tail),
-                    `claimed a block is missing that the project contains:\n${text}`,
+                    claimed.test(tail) && present.test(scripts),
+                    `claimed something is missing that the named script contains:\n${text}`,
                 ).toBe(false);
             }
 
