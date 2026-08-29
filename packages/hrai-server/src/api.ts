@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { listBackends } from "./model-catalog.ts";
+import { defaultBackend, EVAL_MODEL } from "./model-client.ts";
 import { parseCookies, HraiStore, SESSION_COOKIE, type AuthenticatedUser } from "./store.ts";
 
 const MAX_JSON_BYTES = 32 * 1024 * 1024;
@@ -167,6 +169,14 @@ export async function handleApiRequest(
 
         if (!user) {
             sendError(response, 401, "authentication_required");
+            return;
+        }
+
+        if (request.method === "GET" && url.pathname === "/api/models") {
+            sendJson(response, 200, {
+                default: { backend: defaultBackend(), model: EVAL_MODEL },
+                backends: await listBackends(),
+            });
             return;
         }
 

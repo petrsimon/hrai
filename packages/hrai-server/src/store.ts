@@ -2,6 +2,7 @@ import { createHash, randomBytes, scrypt as nodeScrypt, timingSafeEqual } from "
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
+import type { BackendId } from "./model-client.ts";
 
 const scrypt = promisify(nodeScrypt);
 
@@ -19,6 +20,8 @@ export interface AssistantPreferences {
     verbosity: AssistantVerbosity;
     language: "cs";
     encouragement: boolean;
+    modelBackend: BackendId | "default";
+    modelName: string;
 }
 
 export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
@@ -27,6 +30,8 @@ export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
     verbosity: "concise",
     language: "cs",
     encouragement: true,
+    modelBackend: "default",
+    modelName: "",
 };
 
 interface UserRecord {
@@ -125,6 +130,15 @@ export function sanitizeAssistantPreferences(input: unknown): AssistantPreferenc
     const verbosity = value.verbosity;
     const language = value.language;
     const encouragement = value.encouragement;
+    const modelBackend = value.modelBackend === undefined ? DEFAULT_ASSISTANT_PREFERENCES.modelBackend : value.modelBackend;
+    const modelName = value.modelName === undefined ? DEFAULT_ASSISTANT_PREFERENCES.modelName : value.modelName;
+    const knownBackends: BackendId[] = ["ollama", "llama.cpp", "cursor", "pi", "codex"];
+    // These model fields cross security boundaries into backend and CLI selection.
+    const validModelName = modelName === "" ||
+        (typeof modelName === "string" &&
+            modelName.length <= 100 &&
+            !modelName.startsWith("-") &&
+            /^[A-Za-z0-9._:/+-]+$/.test(modelName));
     if (
         assistantName.length < 1 ||
         assistantName.length > 40 ||
@@ -132,7 +146,9 @@ export function sanitizeAssistantPreferences(input: unknown): AssistantPreferenc
         !["patient", "socratic", "coach"].includes(persona as string) ||
         !["concise", "balanced", "detailed"].includes(verbosity as string) ||
         language !== "cs" ||
-        typeof encouragement !== "boolean"
+        typeof encouragement !== "boolean" ||
+        (modelBackend !== "default" && !knownBackends.includes(modelBackend as BackendId)) ||
+        !validModelName
     ) return null;
     return {
         assistantName,
@@ -140,6 +156,8 @@ export function sanitizeAssistantPreferences(input: unknown): AssistantPreferenc
         verbosity: verbosity as AssistantVerbosity,
         language: "cs",
         encouragement,
+        modelBackend: modelBackend as BackendId | "default",
+        modelName,
     };
 }
 

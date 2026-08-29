@@ -2,9 +2,20 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { handleApiRequest } from "../src/api.ts";
+import { defaultBackend, EVAL_MODEL } from "../src/model-client.ts";
 import { HraiStore } from "../src/store.ts";
+
+vi.mock("../src/model-catalog.ts", () => ({
+    listBackends: vi.fn(() => Promise.resolve([{
+        id: "cursor",
+        label: "Cursor",
+        available: true,
+        freeform: false,
+        models: ["gpt-5.2"],
+    }])),
+}));
 
 let directory: string;
 let server: Server;
@@ -37,6 +48,13 @@ afterAll(async () => {
 });
 
 describe("HRAI self-hosted API", () => {
+    it("requires authentication to list models", async () => {
+        cookie = "";
+        const response = await api("/api/models");
+        expect(response.status).toBe(401);
+        expect(await response.json()).toEqual({ error: "authentication_required" });
+    });
+
     it("registers and authenticates a profile with assistant preferences", async () => {
         const response = await api("/api/auth/register", {
             method: "POST",
@@ -48,8 +66,8 @@ describe("HRAI self-hosted API", () => {
         expect(cookie).toMatch(/^hrai_session=/);
         expect(await response.json()).toMatchObject({ username: "ada", displayName: "Ada" });
 
-        const profile = await api("/api/auth/me");
-        expect(await profile.json()).toMatchObject({ username: "ada" });
+        const me = await api("/api/auth/me");
+        expect(await me.json()).toMatchObject({ username: "ada" });
 
         const preferences = await api("/api/profile/assistant", {
             method: "PUT",
@@ -63,7 +81,88 @@ describe("HRAI self-hosted API", () => {
             }),
         });
         expect(preferences.status).toBe(200);
-        expect(await preferences.json()).toMatchObject({ assistantPreferences: { assistantName: "Sova", persona: "socratic" } });
+        expect(await preferences.json()).toMatchObject({
+            assistantPreferences: {
+                assistantName: "Sova",
+                persona: "socratic",
+                modelBackend: "default",
+                modelName: "",
+            },
+        });
+        const defaultProfile = await api("/api/profile");
+        expect(await defaultProfile.json()).toMatchObject({
+            assistantPreferences: { modelBackend: "default", modelName: "" },
+        });
+
+        const withModel = await api("/api/profile/assistant", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                assistantName: "Sova",
+                persona: "socratic",
+                verbosity: "balanced",
+                language: "cs",
+                encouragement: false,
+                modelBackend: "cursor",
+                modelName: "gpt-5.2",
+            }),
+        });
+        expect(withModel.status).toBe(200);
+        const profile = await api("/api/profile");
+        expect(await profile.json()).toMatchObject({
+            assistantPreferences: { modelBackend: "cursor", modelName: "gpt-5.2" },
+        });
+    });
+
+    it("lists the configured default and available model backends", async () => {
+        const response = await api("/api/models");
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            default: { backend: defaultBackend(), model: EVAL_MODEL },
+            backends: [{
+                id: "cursor",
+                label: "Cursor",
+                available: true,
+                freeform: false,
+                models: ["gpt-5.2"],
+            }],
+        });
+    });
+
+    it("rejects unknown model backends", async () => {
+        const response = await api("/api/profile/assistant", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                assistantName: "Sova",
+                persona: "socratic",
+                verbosity: "balanced",
+                language: "cs",
+                encouragement: false,
+                modelBackend: "rm -rf",
+                modelName: "gpt-5.2",
+            }),
+        });
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: "invalid_assistant_preferences" });
+    });
+
+    it("rejects model names that start with a dash", async () => {
+        const response = await api("/api/profile/assistant", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                assistantName: "Sova",
+                persona: "socratic",
+                verbosity: "balanced",
+                language: "cs",
+                encouragement: false,
+                modelBackend: "cursor",
+                modelName: "--dangerously-bypass-approvals-and-sandbox",
+            }),
+        });
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: "invalid_assistant_preferences" });
     });
 
     it("persists owned projects and rejects unauthenticated access", async () => {
