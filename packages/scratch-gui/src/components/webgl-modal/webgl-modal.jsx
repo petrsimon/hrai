@@ -34,7 +34,7 @@ const WebGlModal = props => {
                     <p>
                         { /* eslint-disable @stylistic/max-len */ }
                         <FormattedMessage
-                            defaultMessage="Unfortunately it looks like your browser or computer <a>{webGlLink}</a>. This technology is needed for Scratch 3.0 to run."
+                            defaultMessage="Unfortunately it looks like your browser or computer <a>{webGlLink}</a>. This technology is needed for HRAI Studio to run."
                             description="WebGL missing message"
                             id="gui.webglModal.description"
                             values={{
@@ -73,23 +73,23 @@ const WebGlModal = props => {
                     </Box>
                     <div className={styles.faqLinkText}>
                         <FormattedMessage
-                            defaultMessage="To learn more, go to the <a>{previewFaqLink}</a>."
-                            description="Scratch 3.0 FAQ description"
-                            id="gui.webglModal.previewfaq"
+                            defaultMessage="For more information about WebGL, visit the <a>{webglGuideLink}</a>."
+                            description="Link to WebGL requirements"
+                            id="gui.webglModal.webglGuide"
                             values={{
-                                previewFaqLink: (
+                                webglGuideLink: (
                                     <FormattedMessage
-                                        defaultMessage="FAQ"
-                                        description="link to Scratch 3.0 FAQ page"
-                                        id="gui.webglModal.previewfaqlinktext"
+                                        defaultMessage="WebGL guide"
+                                        description="Link text for WebGL requirements"
+                                        id="gui.webglModal.webglGuidelinktext"
                                     />
                                 ),
-                                a: previewFaqLink => (
+                                a: webglGuideLink => (
                                     <a
                                         className={styles.faqLink}
-                                        href="//scratch.mit.edu/3faq"
+                                        href="https://get.webgl.org/"
                                     >
-                                        {previewFaqLink}
+                                        {webglGuideLink}
                                     </a>
                                 )
                             }}

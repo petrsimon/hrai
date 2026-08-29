@@ -55,7 +55,7 @@ describe('HraiPanel lesson guidance', () => {
             </IntlProvider>
         );
 
-        const input = screen.getByLabelText('Zpráva pro hrai');
+        const input = screen.getByLabelText('Zpráva pro HRAI');
         expect(screen.getByRole('button', {name: 'Poradit'})).toBeTruthy();
         expect(screen.queryByText('Poradit')).toBeNull();
         fireEvent.change(input, {target: {value: 'Přidej zelenou vlajku prosím'}});
@@ -155,7 +155,7 @@ describe('HraiPanel lesson guidance', () => {
                     />
                 </IntlProvider>
             );
-            await waitFor(() => expect(screen.getByLabelText('Zpráva pro hrai').value).toBe(
+            await waitFor(() => expect(screen.getByLabelText('Zpráva pro HRAI').value).toBe(
                 'Přidej zelenou vlajku'
             ));
         } finally {
@@ -222,7 +222,7 @@ describe('HraiPanel custom game planning', () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText('Zpráva pro hrai'), {
+        fireEvent.change(screen.getByLabelText('Zpráva pro HRAI'), {
             target: {value: '  Drak hledá poklad v bludišti.  '}
         });
         fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
@@ -244,7 +244,7 @@ describe('HraiPanel custom game planning', () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText('Zpráva pro hrai'), {
+        fireEvent.change(screen.getByLabelText('Zpráva pro HRAI'), {
             target: {value: 'Drak hledá poklad.'}
         });
         fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
@@ -285,7 +285,7 @@ describe('HraiPanel custom game planning', () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText('Zpráva pro hrai'), {
+        fireEvent.change(screen.getByLabelText('Zpráva pro HRAI'), {
             target: {value: 'Drak hledá poklad.'}
         });
         fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
@@ -308,7 +308,7 @@ describe('HraiPanel custom game planning', () => {
             />
         );
 
-        fireEvent.change(screen.getByLabelText('Zpráva pro hrai'), {
+        fireEvent.change(screen.getByLabelText('Zpráva pro HRAI'), {
             target: {value: 'Drak hledá poklad.'}
         });
         fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));

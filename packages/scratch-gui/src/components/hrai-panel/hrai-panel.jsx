@@ -21,22 +21,22 @@ const VOICE_MIME_TYPES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'];
 const messages = defineMessages({
     panelLabel: {
         id: 'gui.aria.hraiPanel',
-        defaultMessage: 'panel hrai',
+        defaultMessage: 'panel HRAI',
         description: 'accessibility label for the hrai tutor chat panel'
     },
     title: {
         id: 'gui.hrai.title',
-        defaultMessage: 'hrai',
+        defaultMessage: 'HRAI',
         description: 'heading for the hrai tutor chat panel'
     },
     messageListLabel: {
         id: 'gui.hrai.messageListLabel',
-        defaultMessage: 'Konverzace s hrai',
+        defaultMessage: 'Konverzace s HRAI',
         description: 'accessibility label for the hrai message list'
     },
     inputLabel: {
         id: 'gui.hrai.inputLabel',
-        defaultMessage: 'Zpráva pro hrai',
+        defaultMessage: 'Zpráva pro HRAI',
         description: 'label for the hrai chat input field'
     },
     sendButton: {
@@ -56,7 +56,7 @@ const messages = defineMessages({
     },
     thinking: {
         id: 'gui.hrai.thinking',
-        defaultMessage: 'hrai přemýšlí…',
+        defaultMessage: 'HRAI přemýšlí…',
         description: 'quiet indicator shown while hrai is preparing a reply'
     },
     blockReference: {
@@ -71,7 +71,7 @@ const messages = defineMessages({
     },
     resizePanel: {
         id: 'gui.aria.resizeHraiPanel',
-        defaultMessage: 'Změnit velikost panelu hrai',
+        defaultMessage: 'Změnit velikost panelu HRAI',
         description: 'accessibility label for the hrai panel resize handle'
     },
     currentLesson: {

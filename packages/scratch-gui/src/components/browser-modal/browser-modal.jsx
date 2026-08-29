@@ -44,11 +44,11 @@ const BrowserModal = props => {
                         { /* eslint-disable @stylistic/max-len */ }
                         {
                             props.error ? <FormattedMessage
-                                defaultMessage="We are very sorry, but it looks like you are using a browser version that Scratch does not support. We recommend updating to the latest version of a supported browser such as Google Chrome, Mozilla Firefox, Microsoft Edge, or Apple Safari. "
+                                defaultMessage="We are very sorry, but it looks like you are using a browser version that HRAI Studio does not support. We recommend updating to the latest version of a supported browser such as Google Chrome, Mozilla Firefox, Microsoft Edge, or Apple Safari. "
                                 description="Error message when the browser does not meet our minimum requirements"
                                 id="gui.unsupportedBrowser.notRecommended"
                             /> : <FormattedMessage
-                                defaultMessage="We are very sorry, but Scratch does not support this browser. We recommend updating to the latest version of a supported browser such as Google Chrome, Mozilla Firefox, Microsoft Edge, or Apple Safari."
+                                defaultMessage="We are very sorry, but HRAI Studio does not support this browser. We recommend updating to the latest version of a supported browser such as Google Chrome, Mozilla Firefox, Microsoft Edge, or Apple Safari."
                                 description="Error message when the browser does not work at all (IE)"
                                 id="gui.unsupportedBrowser.description"
                             />
@@ -71,23 +71,23 @@ const BrowserModal = props => {
                     </Box>
                     <div className={styles.faqLinkText}>
                         <FormattedMessage
-                            defaultMessage="To learn more, go to the <a>{previewFaqLink}</a>."
-                            description="Invitation to try 3.0 preview"
-                            id="gui.unsupportedBrowser.previewfaq"
+                            defaultMessage="For more information about WebGL, visit the <a>{webglGuideLink}</a>."
+                            description="Link to WebGL requirements"
+                            id="gui.unsupportedBrowser.webglGuide"
                             values={{
-                                previewFaqLink: (
+                                webglGuideLink: (
                                     <FormattedMessage
-                                        defaultMessage="FAQ"
-                                        description="link to Scratch 3.0 FAQ page"
-                                        id="gui.unsupportedBrowser.previewfaqlinktext"
+                                        defaultMessage="WebGL guide"
+                                        description="Link text for WebGL requirements"
+                                        id="gui.unsupportedBrowser.webglGuidelinktext"
                                     />
                                 ),
-                                a: previewFaqLink => (
+                                a: webglGuideLink => (
                                     <a
                                         className={styles.faqLink}
-                                        href="//scratch.mit.edu/3faq"
+                                        href="https://get.webgl.org/"
                                     >
-                                        {previewFaqLink}
+                                        {webglGuideLink}
                                     </a>
                                 )
                             }}
