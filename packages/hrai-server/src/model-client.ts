@@ -26,27 +26,30 @@ export function defaultBackend(): BackendId {
 }
 
 /**
- * Default model for a backend. An agent CLI resolves to the empty string, meaning "let the CLI pick
- * its own model" — a server-side model name like `qwen3:14b` is meaningless to `cursor-agent`, and
- * passing one through `--model` would make the CLI reject the request.
- * @param backend Backend whose default model is needed.
- * @returns The model name, or the empty string for the CLI's own default.
- */
-export function defaultModelFor(backend: BackendId): string {
-    if (isAgentBackend(backend)) {
-        return process.env.HRAI_EVAL_MODEL ?? process.env.HRAI_AGENT_MODEL ?? "";
-    }
-    return process.env.HRAI_EVAL_MODEL ?? "qwen3:14b";
-}
-
-/**
  * Measured floor for the original evaluation suite. Resolved without `defaultBackend()` so that an
  * unsupported backend surfaces when a call is made, not when this module is imported.
  */
 export const EVAL_MODEL =
     process.env.HRAI_EVAL_MODEL ??
-    process.env.HRAI_AGENT_MODEL ??
-    (isAgentBackend(process.env.HRAI_MODEL_BACKEND) ? "" : "qwen3:14b");
+    (isAgentBackend(process.env.HRAI_MODEL_BACKEND)
+        // HRAI_AGENT_MODEL names a model for an agent CLI, so it must not reach a server backend.
+        ? process.env.HRAI_AGENT_MODEL ?? ""
+        : "qwen3:14b");
+
+/**
+ * Default model for a backend.
+ *
+ * The model environment variables configure the backend the environment selected, so only that one
+ * takes them. A backend chosen at runtime falls back to its own default instead of inheriting a
+ * name meant for another: `qwen3:14b` would be rejected by `cursor-agent`, and an agent model name
+ * means nothing to ollama. The empty string means "let the CLI pick", and leaves `--model` off.
+ * @param backend Backend whose default model is needed.
+ * @returns The model name, or the empty string for the CLI's own default.
+ */
+export function defaultModelFor(backend: BackendId): string {
+    if (backend === defaultBackend()) return EVAL_MODEL;
+    return isAgentBackend(backend) ? "" : "qwen3:14b";
+}
 
 /**
  * An empty model name means the agent CLI chooses, so the flag must be omitted entirely.

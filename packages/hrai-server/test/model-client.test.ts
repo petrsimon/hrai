@@ -141,6 +141,26 @@ describe("llama.cpp model client", () => {
         );
     });
 
+    it("keeps HRAI_AGENT_MODEL away from a server backend", async () => {
+        process.env.HRAI_AGENT_MODEL = "gpt-5.2";
+        const {EVAL_MODEL, defaultModelFor} = await loadModelClient();
+
+        // The environment is still ollama; an agent CLI's model name must not become its default.
+        expect(EVAL_MODEL).toBe("qwen3:14b");
+        expect(defaultModelFor("ollama")).toBe("qwen3:14b");
+        expect(defaultModelFor("cursor")).toBe("");
+    });
+
+    it("does not hand the eval model to a backend chosen at runtime", async () => {
+        process.env.HRAI_MODEL_BACKEND = "ollama";
+        process.env.HRAI_EVAL_MODEL = "qwen3:14b";
+        const {defaultModelFor} = await loadModelClient();
+
+        expect(defaultModelFor("ollama")).toBe("qwen3:14b");
+        // cursor-agent would reject --model qwen3:14b.
+        expect(defaultModelFor("cursor")).toBe("");
+    });
+
     it("omits the model for an agent backend when none is configured", async () => {
         process.env.HRAI_MODEL_BACKEND = "cursor";
         const {chat, EVAL_MODEL} = await loadModelClient();

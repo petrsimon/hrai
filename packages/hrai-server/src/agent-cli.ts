@@ -24,6 +24,12 @@ interface AgentOptions {
 
 interface AgentSpec {
     command: string;
+    /**
+     * Argv that exits 0 only when the CLI is usable. Where the CLI can report its login state
+     * cheaply, this checks that too: a logged-out CLI that answers `--version` would otherwise look
+     * available and the child would meet a spawn failure instead of a fallback.
+     */
+    probeArgs: string[];
     args(options: AgentOptions): string[];
     delta(event: unknown): string | null;
     final(event: unknown): string | null;
@@ -59,6 +65,8 @@ function combinedPrompt(system: string, user: string): string {
 const agentSpecs: Record<AgentBackendId, AgentSpec> = {
     pi: {
         command: "pi",
+        // `pi auth check` needs a provider or model, so there is no account-wide check to make here.
+        probeArgs: ["--version"],
         args: ({system, user, model, json}) => [
             "-p",
             "--mode",
@@ -95,6 +103,7 @@ const agentSpecs: Record<AgentBackendId, AgentSpec> = {
     },
     cursor: {
         command: "cursor-agent",
+        probeArgs: ["status"],
         args: ({system, user, model, json}) => [
             "-p",
             "--mode",
@@ -129,6 +138,7 @@ const agentSpecs: Record<AgentBackendId, AgentSpec> = {
     },
     codex: {
         command: "codex",
+        probeArgs: ["login", "status"],
         args: ({system, user, model, json, cwd}) => [
             "exec",
             "--json",
@@ -323,7 +333,8 @@ export async function runAgent(
  */
 export async function isAgentAvailable(backend: AgentBackendId): Promise<boolean> {
     try {
-        await execFileAsync(agentSpecs[backend].command, ["--version"], {timeout: execTimeoutMs});
+        const spec = agentSpecs[backend];
+        await execFileAsync(spec.command, spec.probeArgs, {timeout: execTimeoutMs});
         return true;
     } catch {
         return false;

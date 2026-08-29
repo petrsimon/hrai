@@ -309,6 +309,21 @@ describe("agent CLI runner", () => {
         expect(execFileMock).toHaveBeenCalledWith("pi", ["--version"], {timeout: 5000}, expect.any(Function));
     });
 
+    it("checks the login state of CLIs that can report it", async () => {
+        execFileMock.mockImplementation((...args: unknown[]) => {
+            const callback = args[args.length - 1] as (error: Error | null) => void;
+            callback(null);
+        });
+        const {isAgentAvailable} = await loadAgentCli();
+
+        expect(await isAgentAvailable("codex")).toBe(true);
+        expect(await isAgentAvailable("cursor")).toBe(true);
+
+        // A logged-out CLI answers --version happily, so availability must ask about the account.
+        expect(execFileMock).toHaveBeenCalledWith("codex", ["login", "status"], {timeout: 5000}, expect.any(Function));
+        expect(execFileMock).toHaveBeenCalledWith("cursor-agent", ["status"], {timeout: 5000}, expect.any(Function));
+    });
+
     it("adds a bare JSON object instruction in JSON mode", async () => {
         const child = createChild();
         spawnMock.mockReturnValue(child);
