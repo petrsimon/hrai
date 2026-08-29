@@ -78,7 +78,8 @@ const ScanningStep = props => {
                     // Note that it's possible the list includes devices but does not include the desired device,
                     // so don't limit this message to the (props.peripheralList.length === 0) case
                     <BalancedFormattedMessage
-                        defaultMessage="If you don't see your device, you may need to update it to work with Scratch."
+                        defaultMessage={'If you don\'t see your device, you may need to update it to ' +
+                            'work with this editor.'}
                         description="Prompt for updating a peripheral device"
                         id="gui.connection.scanning.updatePeripheralPrompt"
                     />

@@ -72,7 +72,7 @@ describe('MenuBar Component', () => {
     test('menu bar shows hrai lessons in hrai mode', () => {
         store.clearActions();
         const {container} = renderWithIntl(getComponent({hraiLogo: true}));
-        const button = container.querySelector('button[aria-label="lekce hrai"]');
+        const button = container.querySelector('button[aria-label="Lekce HRAI"]');
 
         expect(button).toBeTruthy();
         fireEvent.click(button);

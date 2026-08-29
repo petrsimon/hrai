@@ -10,7 +10,7 @@ import styles from './hrai-lessons-library.css';
 const messages = defineMessages({
     title: {
         id: 'gui.hraiLessons.title',
-        defaultMessage: 'lekce hrai',
+        defaultMessage: 'Lekce HRAI',
         description: 'title for the hrai lesson library'
     },
     intro: {
@@ -55,7 +55,7 @@ const messages = defineMessages({
     },
     bundleNote: {
         id: 'gui.hraiLessons.bundleNote',
-        defaultMessage: 'Po spuštění se ti hrai objeví v panelu a bude sledovat kroky, které právě tvoříš.',
+        defaultMessage: 'Po spuštění se ti HRAI objeví v panelu a bude sledovat kroky, které právě tvoříš.',
         description: 'note about the current hrai lesson bundle stage'
     }
 });

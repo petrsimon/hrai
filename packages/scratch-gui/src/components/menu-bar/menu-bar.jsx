@@ -85,8 +85,8 @@ const ariaMessages = defineMessages({
     },
     hraiLessons: {
         id: 'gui.menuBar.hraiLessonsLibrary',
-        defaultMessage: 'lekce hrai',
-        description: 'accessibility text for the hrai lessons button'
+        defaultMessage: 'Lekce HRAI',
+        description: 'accessibility text for the HRAI lessons button'
     },
     debug: {
         id: 'gui.menuBar.debug',
@@ -571,9 +571,9 @@ class MenuBar extends React.Component {
                                         onClick={this.props.onOpenRegistration}
                                     >
                                         <FormattedMessage
-                                            defaultMessage="Join Scratch"
-                                            description="Link for creating a Scratch account"
-                                            id="gui.menuBar.joinScratch"
+                                            defaultMessage="Create HRAI profile"
+                                            description="Link for creating an HRAI profile"
+                                            id="gui.menuBar.joinHrai"
                                         />
                                     </button>
                                 ) : null}
@@ -589,8 +589,8 @@ class MenuBar extends React.Component {
                                         onClick={this.props.onClickLogin}
                                     >
                                         <FormattedMessage
-                                            defaultMessage="Sign in"
-                                            description="Link for signing in to your Scratch account"
+                                            defaultMessage="Sign in to HRAI"
+                                            description="Link for signing in to an HRAI profile"
                                             id="gui.menuBar.signIn"
                                         />
                                         <LoginDropdown

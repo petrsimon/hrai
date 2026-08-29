@@ -373,7 +373,7 @@ const GUIComponent = props => {
                             isTotallyNormal={isTotallyNormal}
                             hraiLogo={showHraiPanel}
                             logo={showHraiPanel ? HRAI_LOGO : logo}
-                            logoAlt={showHraiPanel ? 'hrai' : 'Scratch'}
+                            logoAlt={showHraiPanel ? 'HRAI' : 'Scratch'}
                             renderLogin={renderLogin}
                             showComingSoon={showComingSoon}
                             onClickAbout={onClickAbout}
