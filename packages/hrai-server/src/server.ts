@@ -6,6 +6,8 @@
  */
 import { createServer } from "node:http";
 import { Server } from "socket.io";
+import { handleApiRequest } from "./api.ts";
+import { parseCookies, HraiStore, SESSION_COOKIE } from "./store.ts";
 import { EVAL_MODEL, chat } from "./model-client.ts";
 import { planGame } from "./game-planner.ts";
 import { MAX_GAME_IDEA_LENGTH } from "./game-plan.ts";
@@ -99,6 +101,7 @@ function parseVoiceSubmission(payload: unknown): VoiceSubmission | { code: strin
 interface ServerOptions {
     speechToText?: SpeechToText;
     gamePlanner?: typeof planGame;
+    store?: HraiStore;
 }
 
 const COMPLETION_CLAIM = /(?:^|\s)(?:ano|hotovo|m[aá]m|ud[eě]lal(?:a)?)(?:\s|[,.!?]|$)/iu;
@@ -150,7 +153,10 @@ function blocksNamedIn(text: string): Record<string, NamedBlock> {
  * @returns The listening http server, so callers can shut it down.
  */
 export function startServer(port = PORT, options: ServerOptions = {}) {
-    const http = createServer();
+    const store = options.store ?? new HraiStore();
+    const http = createServer((request, response) => {
+        if (request.url?.startsWith("/api/")) void handleApiRequest(request, response, store);
+    });
     const io = new Server(http, {
         // The editor is served from a different origin during development.
         cors: { origin: true },
@@ -159,8 +165,10 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
     const speechToText = options.speechToText ?? new WhisperSpeechToText();
     const gamePlanner = options.gamePlanner ?? planGame;
 
-    io.of("/hrai").on("connection", (socket) => {
-        const session = new Session();
+    io.of("/hrai").on("connection", async (socket) => {
+        await store.load();
+        const user = await store.userForSession(parseCookies(socket.handshake.headers.cookie)[SESSION_COOKIE]);
+        const session = new Session(user?.assistantPreferences);
         let pendingVoiceRequestId: string | null = null;
         let voiceAvailable = false;
         let announcedVoiceAvailability: boolean | undefined;
@@ -316,7 +324,7 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             // before any prose reaches the child. Streaming raw tokens would make a
             // post-generation safety check cosmetic rather than real.
             void chat(
-                systemPrompt(session.rung, context),
+                systemPrompt(session.rung, context, session.assistantPreferences),
                 userPrompt(session.render(), question, session.history.slice(0, -1)),
             )
                 .then((reply) => {

@@ -54,7 +54,15 @@ const hasMeaningfulWorkspace = vm => vm.runtime.targets.some(target => {
     return blockCount > 0 || variableCount > 0;
 }) || vm.runtime.targets.filter(target => !target.isStage).length > 1;
 
-const HraiPanel = ({activeLessonId, onCreateProject, onNextStage, projectId, projectTitle, vm}) => {
+const HraiPanel = ({
+    activeLessonId,
+    assistantPreferences,
+    onCreateProject,
+    onNextStage,
+    projectId,
+    projectTitle,
+    vm
+}) => {
     const intl = useIntl();
     const [chatMessages, setChatMessages] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
@@ -263,6 +271,7 @@ const HraiPanel = ({activeLessonId, onCreateProject, onNextStage, projectId, pro
         };
     }, [
         activeLessonId,
+        assistantPreferences,
         debouncedPushWorkspace,
         helperUnavailableText,
         emitPendingGamePlan,
@@ -427,6 +436,7 @@ const HraiPanel = ({activeLessonId, onCreateProject, onNextStage, projectId, pro
 
 HraiPanel.propTypes = {
     activeLessonId: PropTypes.string,
+    assistantPreferences: PropTypes.object,
     onCreateProject: PropTypes.func.isRequired,
     onNextStage: PropTypes.func.isRequired,
     projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

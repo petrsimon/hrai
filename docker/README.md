@@ -91,6 +91,15 @@ Compose network. The model receives the project representation sent by the
 editor, so keep this stack local unless authentication and network policy are
 added.
 
+HRAI profiles and projects are stored in the named `hrai-data` volume. The API
+uses an HttpOnly session cookie; put the editor behind HTTPS before exposing it
+outside a trusted network. Back up the volume before upgrades:
+
+```sh
+docker run --rm -v hrai_hrai-data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/hrai-data.tar.gz -C /data .
+```
+
 ## Configuration
 
 Override the model, HRAI server URL, or ports with environment variables. In the

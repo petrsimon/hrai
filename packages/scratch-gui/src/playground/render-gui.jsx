@@ -5,6 +5,8 @@ import {compose} from 'redux';
 import AppStateHOC from '../lib/app-state-hoc.jsx';
 import GUI from '../containers/gui.jsx';
 import HashParserHOC from '../lib/hash-parser-hoc.jsx';
+import HraiSessionHOC from '../lib/hrai-session-hoc.jsx';
+import {HraiStorage} from '../lib/hrai-storage';
 import log from '../lib/log.js';
 import {PLATFORM} from '../lib/platform.js';
 
@@ -35,8 +37,14 @@ export default appTarget => {
     // note that redux's 'compose' function is just being used as a general utility to make
     // the hierarchy of HOC constructor calls clearer here; it has nothing to do with redux's
     // ability to compose reducers.
+    const HraiAppStateHOC = component => AppStateHOC(
+        component,
+        false,
+        () => ({storage: new HraiStorage()})
+    );
     const WrappedGui = compose(
-        AppStateHOC,
+        HraiSessionHOC,
+        HraiAppStateHOC,
         HashParserHOC
     )(GUI);
 
@@ -86,7 +94,6 @@ export default appTarget => {
                 backpackVisible
                 showComingSoon
                 backpackHost={backpackHost}
-                canSave={false}
                 onClickLogo={onClickLogo}
                 showHraiPanel={showHraiPanel}
             />

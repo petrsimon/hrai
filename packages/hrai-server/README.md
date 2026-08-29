@@ -44,6 +44,14 @@ still opens and says so calmly — a child should never meet a stack trace.
 Override the server location with `HRAI_SERVER_URL` at build time, and the port it
 listens on with `HRAI_PORT`.
 
+Self-hosted profiles and projects use the HTTP API on the same server. Set
+`HRAI_DATA_DIR` to a persistent directory (the Compose deployment uses `/data`).
+The API provides `/api/auth/*`, `/api/profile`, and `/api/projects`; sessions use
+HttpOnly cookies and project data is private to its owner. Assistant preferences
+(persona, answer length, assistant name, and encouragement) are stored with the
+profile and applied to future tutor connections. The current tutor remains Czech;
+language selection is intentionally not exposed until prompt localization is complete.
+
 For local Docker deployment, see [`docker/README.md`](../../docker/README.md).
 
 ## Goal-driven custom games

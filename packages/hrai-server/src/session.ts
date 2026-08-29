@@ -10,6 +10,7 @@ import { renderProject, type RenderTarget } from "./render.ts";
 import { evaluateLessonStage, lessonStage, type LessonStage } from "./lesson.ts";
 import { evaluateGameAssessment } from "./game-assessor.ts";
 import type { GameMilestone, GamePlan } from "./game-plan.ts";
+import type { AssistantPreferences } from "./store.ts";
 import type { Turn, TutorPromptContext } from "./prompt.ts";
 
 /** The gentlest rung, and the most specific one the tutor will ever go to. */
@@ -17,6 +18,7 @@ export const FIRST_RUNG = 1;
 export const LAST_RUNG = 5;
 
 export class Session {
+    readonly assistantPreferences?: AssistantPreferences;
     private targets: RenderTarget[] = [];
     private focusedTargetId = "";
     private aliases = new Map<string, string>();
@@ -29,6 +31,10 @@ export class Session {
     private activeGameMilestoneIndex = 0;
     private gameMilestoneComplete = false;
     readonly history: Turn[] = [];
+
+    constructor(assistantPreferences?: AssistantPreferences) {
+        this.assistantPreferences = assistantPreferences;
+    }
 
     /**
      * How specific the next answer may be.
