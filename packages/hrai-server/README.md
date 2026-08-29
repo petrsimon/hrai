@@ -60,9 +60,12 @@ A custom game starts in the chat as a proposal, not an active tutorial. The edit
 child's first idea through the normal composer, then offers to continue in the current project or
 start a new one when the workspace already contains meaningful work. The server asks the model
 for a small, structured `GamePlan`, validates and normalizes it, and emits `gamePlanProposed`.
-Only `gamePlanAccept` activates it. The accepted plan keeps the child's original goal, core loop,
-and current learning milestone in every tutor prompt. This prevents a short chat history from
-silently replacing the game the child wanted to make.
+After `gamePlanAccept`, the editor installs a small playable prototype and enters a playtest phase.
+The child can run the game and describe what to change before selecting `gameGuide`; only then does
+the milestone tutor become active. That playtest feedback is included in the first tutor context.
+The guided plan keeps the child's original goal, core loop, and current learning milestone in every
+tutor prompt. This prevents a short chat history from silently
+replacing the game the child wanted to make.
 
 The planning model never supplies child-visible Scratch scripts or block sequences. Each milestone
 also carries a hidden, validated structural evidence contract. The contract uses only four bounded
@@ -74,13 +77,14 @@ controls cannot mark a milestone complete.
 Socket events:
 
 - `gamePlan` `{text}` → `gamePlanProposed` with a validated plan
-- `gamePlanAccept` → `gameProgress` with the first active milestone
-- `gameRestore` with a browser-saved plan/index → canonical `gameProgress` after full revalidation
+- `gamePlanAccept` → `gamePlaytest` with the installed prototype and accepted plan
+- `gameGuide` `{feedback}` → `gameProgress` with the first active milestone and playtest feedback
+- `gameRestore` with a browser-saved plan/index/phase/feedback → canonical `gamePlaytest` or `gameProgress`
 - workspace evidence → `gameMilestoneComplete` once the current contract becomes true
 - `gameMilestoneNext` → `gameProgress` for the next milestone, only after completion
 
-The editor stores only accepted plan data and the active milestone under a versioned,
-project-scoped local-storage key. Reloads and Socket.IO reconnects restore that state through
+The editor stores only accepted plan data, phase, active milestone, and bounded playtest feedback
+under a versioned, project-scoped local-storage key. Reloads and Socket.IO reconnects restore that state through
 `gameRestore`. Stored completion, chat history, and hint rung are never trusted or restored;
 completion is recomputed from the current workspace.
 

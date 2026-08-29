@@ -234,6 +234,31 @@ const messages = defineMessages({
         id: 'gui.hrai.prepareGamePlan',
         defaultMessage: 'Připravit plán hry',
         description: 'button for preparing a game plan from the chat idea'
+    },
+    gamePlaytest: {
+        id: 'gui.hrai.gamePlaytest',
+        defaultMessage: 'Teď si hru vyzkoušej',
+        description: 'heading for the custom game playtest phase'
+    },
+    gamePlaytestHint: {
+        id: 'gui.hrai.gamePlaytestHint',
+        defaultMessage: 'Spusť hru zelenou vlajkou, chvíli si s ní hraj a všimni si, co chceš změnit.',
+        description: 'instructions for testing the generated custom game'
+    },
+    startGameGuidance: {
+        id: 'gui.hrai.startGameGuidance',
+        defaultMessage: 'Začít upravovat s HRAI',
+        description: 'button to leave custom game playtest and start child-led guidance'
+    },
+    gameFeedbackLabel: {
+        id: 'gui.hrai.gameFeedbackLabel',
+        defaultMessage: 'Co chceš po vyzkoušení změnit?',
+        description: 'label for child feedback after testing a custom game'
+    },
+    gameFeedbackPlaceholder: {
+        id: 'gui.hrai.gameFeedbackPlaceholder',
+        defaultMessage: 'Například: Chci, aby drak skákal výš.',
+        description: 'placeholder for child feedback after testing a custom game'
     }
 });
 
@@ -587,6 +612,57 @@ GamePlanCard.propTypes = {
     plan: gamePlanShape.isRequired
 };
 
+const GamePlaytestCard = ({isStarting, onStart, playtest}) => {
+    const intl = useIntl();
+    const [feedback, setFeedback] = useState('');
+    const handleFeedbackChange = useCallback(event => setFeedback(event.target.value), []);
+    const handleStart = useCallback(() => onStart(feedback.trim()), [feedback, onStart]);
+
+    return (
+        <section className={styles.gameCard}>
+            <h3 className={styles.gameCardTitle}>
+                <FormattedMessage {...messages.gamePlaytest} />
+            </h3>
+            <strong><FormattedMessage {...messages.originalGoal} /></strong>
+            <p>{playtest.plan.originalGoal}</p>
+            <strong><FormattedMessage {...messages.coreLoop} /></strong>
+            <p>{playtest.plan.coreLoop}</p>
+            <p className={styles.gameHelp}>
+                <FormattedMessage {...messages.gamePlaytestHint} />
+            </p>
+            <label htmlFor="hrai-game-feedback">
+                <FormattedMessage {...messages.gameFeedbackLabel} />
+            </label>
+            <textarea
+                id="hrai-game-feedback"
+                className={styles.messageInput}
+                placeholder={intl.formatMessage(messages.gameFeedbackPlaceholder)}
+                value={feedback}
+                onChange={handleFeedbackChange}
+                maxLength={1000}
+                rows="3"
+            />
+            <Button
+                type="button"
+                className={styles.gamePrimaryButton}
+                aria-disabled={isStarting || !feedback.trim()}
+                disabled={isStarting || !feedback.trim()}
+                onClick={handleStart}
+            >
+                <FormattedMessage {...messages.startGameGuidance} />
+            </Button>
+        </section>
+    );
+};
+
+GamePlaytestCard.propTypes = {
+    isStarting: PropTypes.bool.isRequired,
+    onStart: PropTypes.func.isRequired,
+    playtest: PropTypes.shape({
+        plan: gamePlanShape.isRequired
+    }).isRequired
+};
+
 const GameProgressCard = ({onNext, progress}) => {
     const {complete, milestone, milestoneIndex, plan} = progress;
     const hasNextMilestone = milestoneIndex < plan.milestones.length - 1;
@@ -665,6 +741,7 @@ GameProgressCard.propTypes = {
 
 const HraiPanel = ({
     gamePlan,
+    gamePlaytest,
     gameProgress,
     hasProjectContent,
     isPlanning,
@@ -673,6 +750,8 @@ const HraiPanel = ({
     onGamePlanAccept,
     onGamePlanEdit,
     onGamePlanRequest,
+    onGamePlaytestComplete,
+    onGameIdea,
     onStartNewProject,
     onSend,
     onHint,
@@ -895,8 +974,12 @@ const HraiPanel = ({
             return;
         }
 
-        const isGameStart = !lesson && !gamePlan && !gameProgress && chatMessages.length === 0;
-        onSend(trimmed);
+        const isGameStart = !lesson && !gamePlan && !gamePlaytest && !gameProgress && chatMessages.length === 0;
+        if (isGameStart && onGameIdea) {
+            onGameIdea(trimmed);
+        } else {
+            onSend(trimmed);
+        }
         if (isGameStart) {
             setGameIdea(trimmed);
             setGameStartPending(true);
@@ -1000,7 +1083,7 @@ const HraiPanel = ({
     const lessonStageDetails = lessonProgress?.stage;
     const lessonStageComplete = Boolean(lessonProgress?.complete);
     const hasNextStage = Boolean(lesson && lessonStageIndex < lesson.stages.length - 1);
-    const hintDisabled = isThinking || hintMaxReached;
+    const hintDisabled = isThinking || hintMaxReached || Boolean(gamePlaytest);
     const hintExplanation = hintMaxReached ?
         intl.formatMessage(messages.hintMaxReached) :
         null;
@@ -1017,7 +1100,7 @@ const HraiPanel = ({
         stt_failed: messages.voiceFailed,
         empty_transcript: messages.voiceFailed
     }[voiceLocalError || voiceErrorCode?.code];
-    const voiceButtonDisabled = !voiceCapabilities.available || isThinking ||
+    const voiceButtonDisabled = Boolean(gamePlaytest) || !voiceCapabilities.available || isThinking ||
         voicePhase === 'transcribing';
 
     return (
@@ -1098,7 +1181,13 @@ const HraiPanel = ({
                     ) : null}
                 </section>
             ) : null}
-            {lesson ? null : gameProgress ? (
+            {lesson ? null : gamePlaytest ? (
+                <GamePlaytestCard
+                    isStarting={isPlanning}
+                    playtest={gamePlaytest}
+                    onStart={onGamePlaytestComplete}
+                />
+            ) : gameProgress ? (
                 <GameProgressCard
                     progress={gameProgress}
                     onNext={onNextGameMilestone}
@@ -1161,6 +1250,7 @@ const HraiPanel = ({
                     aria-label={intl.formatMessage(messages.inputLabel)}
                     maxLength={!lesson && chatMessages.length === 0 ? MAX_GAME_IDEA_LENGTH : null}
                     rows="3"
+                    disabled={Boolean(gamePlaytest)}
                     value={draft}
                     onChange={handleInputChange}
                     onKeyDown={handleInputKeyDown}
@@ -1201,7 +1291,7 @@ const HraiPanel = ({
                         className={styles.sendButton}
                         aria-label={intl.formatMessage(messages.sendButton)}
                         title={intl.formatMessage(messages.sendButton)}
-                        disabled={!canSend}
+                        disabled={!canSend || Boolean(gamePlaytest)}
                     >
                         <span aria-hidden="true">↑</span>
                     </Button>
@@ -1231,6 +1321,9 @@ const HraiPanel = ({
 
 HraiPanel.propTypes = {
     gamePlan: gamePlanShape,
+    gamePlaytest: PropTypes.shape({
+        plan: gamePlanShape.isRequired
+    }),
     gameProgress: PropTypes.shape({
         complete: PropTypes.bool.isRequired,
         milestone: milestoneShape.isRequired,
@@ -1268,6 +1361,8 @@ HraiPanel.propTypes = {
     onGamePlanAccept: PropTypes.func,
     onGamePlanEdit: PropTypes.func,
     onGamePlanRequest: PropTypes.func,
+    onGamePlaytestComplete: PropTypes.func,
+    onGameIdea: PropTypes.func,
     onStartNewProject: PropTypes.func,
     onHint: PropTypes.func.isRequired,
     onNextGameMilestone: PropTypes.func,
@@ -1292,6 +1387,7 @@ HraiPanel.propTypes = {
 
 HraiPanel.defaultProps = {
     gamePlan: null,
+    gamePlaytest: null,
     gameProgress: null,
     hasProjectContent: false,
     isPlanning: false,
@@ -1303,6 +1399,8 @@ HraiPanel.defaultProps = {
     onGamePlanAccept: () => {},
     onGamePlanEdit: () => {},
     onGamePlanRequest: () => {},
+    onGamePlaytestComplete: () => {},
+    onGameIdea: null,
     onStartNewProject: () => {},
     onNextGameMilestone: () => {},
     onVoiceSubmit: () => {},

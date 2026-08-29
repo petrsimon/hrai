@@ -346,6 +346,29 @@ describe('HraiPanel custom game planning', () => {
         expect(screen.queryByRole('button', {name: 'Připravit plán hry'})).toBeNull();
     });
 
+    test('shows the generated game for playtesting before guidance', () => {
+        const onGamePlaytestComplete = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                gamePlaytest={{plan: GAME_PLAN, starter: {targets: []}}}
+                messages={[]}
+                onGamePlaytestComplete={onGamePlaytestComplete}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        expect(screen.getByText('Teď si hru vyzkoušej')).toBeTruthy();
+        expect(screen.getByText(/Spusť hru zelenou vlajkou/)).toBeTruthy();
+        expect(screen.getByLabelText('Zpráva pro HRAI').disabled).toBe(true);
+        fireEvent.change(screen.getByLabelText('Co chceš po vyzkoušení změnit?'), {
+            target: {value: 'Chci, aby drak skákal výš.'}
+        });
+        fireEvent.click(screen.getByRole('button', {name: 'Začít upravovat s HRAI'}));
+        expect(onGamePlaytestComplete).toHaveBeenCalledTimes(1);
+    });
+
     test('shows a proposal and requires explicit acceptance', () => {
         const onGamePlanAccept = jest.fn();
         const onGamePlanEdit = jest.fn();

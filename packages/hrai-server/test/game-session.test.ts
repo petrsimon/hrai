@@ -73,8 +73,12 @@ describe("goal-driven game session", () => {
         expect(session.proposedGamePlan).toEqual(PLAN);
 
         expect(session.acceptGamePlan()).toEqual(PLAN);
+        expect(session.gameProgress).toBeNull();
+        expect(session.gamePlaytest?.plan).toEqual(PLAN);
         expect(session.history).toEqual([]);
+        expect(session.startGameGuidance("Ovládání je moc pomalé.")).toEqual(PLAN);
         expect(session.gameProgress?.milestone).toEqual(FIRST_MILESTONE);
+        expect(session.tutorContext?.playtestFeedback).toBe("Ovládání je moc pomalé.");
         expect(session.tutorContext).toMatchObject({
             originalGoal: PLAN.originalGoal,
             coreLoop: PLAN.coreLoop,
@@ -83,12 +87,14 @@ describe("goal-driven game session", () => {
         });
         expect(systemPrompt(1, session.tutorContext)).toContain(`PŮVODNÍ CÍL HRY: ${PLAN.originalGoal}`);
         expect(systemPrompt(1, session.tutorContext)).toContain(`PROČ TENTO KROK PATŘÍ DO HRY: ${FIRST_MILESTONE.why}`);
+        expect(systemPrompt(1, session.tutorContext)).toContain("ZPĚTNÁ VAZBA Z VYZKOUŠENÍ: Ovládání je moc pomalé.");
     });
 
     it("does not advance until workspace evidence completes the milestone", () => {
         const session = new Session();
         session.proposeGamePlan(PLAN);
         session.acceptGamePlan();
+        expect(session.startGameGuidance()).toEqual(PLAN);
 
         expect(session.nextGameMilestone()).toBeNull();
         expect(session.evaluateGameMilestone()).toBe(false);

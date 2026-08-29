@@ -23,6 +23,7 @@ export interface TutorPromptContext {
     coreLoop?: string;
     why?: string;
     concept?: string;
+    playtestFeedback?: string;
 }
 
 /** Backward-compatible name for authored lesson stages. */
@@ -88,6 +89,10 @@ export function systemPrompt(
             `CO DÍTĚ STAVÍ: ${context.goal}`,
             ...(context.why ? [`PROČ TENTO KROK PATŘÍ DO HRY: ${context.why}`] : []),
             ...(context.concept ? [`CO SE DÍTĚ UČÍ: ${context.concept}`] : []),
+            ...(context.playtestFeedback ? [
+                `ZPĚTNÁ VAZBA Z VYZKOUŠENÍ: ${context.playtestFeedback}`,
+                "Tuto zpětnou vazbu ber jako první prioritu při vysvětlování další úpravy.",
+            ] : []),
             `TEĎ MÁ UDĚLAT: ${context.instruction}`,
             `KROK JE HOTOVÝ, KDYŽ: ${context.success}`,
             "Veď dítě aktivně k tomuto kroku. Když tápe, vysvětli význam a připomeň jeden nejbližší úkol. Neplánuj jinou funkci hry.",

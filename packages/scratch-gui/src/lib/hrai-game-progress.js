@@ -28,7 +28,30 @@ export const loadGameProgress = (projectId, projectTitle) => {
         !Number.isInteger(saved.milestoneIndex) || saved.milestoneIndex < 0) {
         return null;
     }
-    return {plan: saved.plan, milestoneIndex: saved.milestoneIndex};
+    return {
+        plan: saved.plan,
+        milestoneIndex: saved.milestoneIndex,
+        ...(saved.phase === 'playtest' ? {phase: 'playtest'} : {}),
+        ...(typeof saved.feedback === 'string' ? {feedback: saved.feedback} : {})
+    };
+};
+
+const save = (projectId, plan, milestoneIndex, projectTitle, phase, feedback) => {
+    const progress = readProgress();
+    writeProgress({
+        ...progress,
+        [projectProgressKey(projectId, projectTitle)]: {
+            plan,
+            milestoneIndex,
+            ...(phase ? {phase} : {}),
+            ...(feedback ? {feedback} : {})
+        }
+    });
+};
+
+export const saveGamePlaytest = (projectId, gamePlaytest, projectTitle) => {
+    if (!gamePlaytest?.plan || typeof gamePlaytest.plan !== 'object') return;
+    save(projectId, gamePlaytest.plan, 0, projectTitle, 'playtest');
 };
 
 export const saveGameProgress = (projectId, gameProgress, projectTitle) => {
@@ -36,14 +59,7 @@ export const saveGameProgress = (projectId, gameProgress, projectTitle) => {
         !Number.isInteger(gameProgress.milestoneIndex) || gameProgress.milestoneIndex < 0) {
         return;
     }
-    const progress = readProgress();
-    writeProgress({
-        ...progress,
-        [projectProgressKey(projectId, projectTitle)]: {
-            plan: gameProgress.plan,
-            milestoneIndex: gameProgress.milestoneIndex
-        }
-    });
+    save(projectId, gameProgress.plan, gameProgress.milestoneIndex, projectTitle, null, gameProgress.feedback);
 };
 
 export const clearGameProgress = (projectId, projectTitle) => {

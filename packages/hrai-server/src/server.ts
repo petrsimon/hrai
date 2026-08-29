@@ -189,6 +189,11 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             if (progress) socket.emit("lessonProgress", progress);
         };
 
+        const emitGamePlaytest = (): void => {
+            const playtest = session.gamePlaytest;
+            if (playtest) socket.emit("gamePlaytest", playtest);
+        };
+
         const emitGameProgress = (): void => {
             const progress = session.gameProgress;
             if (progress) socket.emit("gameProgress", progress);
@@ -222,14 +227,25 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
 
         socket.on("gameRestore", (payload: unknown) => {
             const restored = parseGameRestore(payload);
-            if (restored && session.restoreGamePlan(restored.plan, restored.milestoneIndex)) {
+            if (!restored || !session.restoreGamePlan(restored.plan, restored.milestoneIndex, restored.phase, restored.feedback)) return;
+            if (restored.phase === "playtest") {
+                emitGamePlaytest();
+            } else {
                 emitGameProgress();
                 evaluateGameProgress();
             }
         });
 
         socket.on("gamePlanAccept", () => {
-            if (session.acceptGamePlan()) {
+            if (session.acceptGamePlan()) emitGamePlaytest();
+        });
+
+        socket.on("gameGuide", (payload: unknown) => {
+            const storedFeedback = typeof payload === "object" && payload !== null && !Array.isArray(payload) ?
+                (payload as Record<string, unknown>).feedback : undefined;
+            const feedback = typeof storedFeedback === "string" ? storedFeedback.trim().slice(0, 1000) : "";
+            if (session.startGameGuidance(feedback)) {
+                if (feedback) session.remember("learner", feedback);
                 emitGameProgress();
                 evaluateGameProgress();
             }
@@ -311,6 +327,15 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             if (gameProgress && COMPLETION_CLAIM.test(question)) {
                 const text = `Editor zatím nevidí důkazy pro milník: ${gameProgress.milestone.doneWhen} ` +
                     "Nemusíš mi psát „hotovo“ — dokončení se objeví automaticky, jakmile je projekt splní.";
+                session.remember("tutor", text);
+                socket.emit("token", { id, delta: text });
+                socket.emit("blocks", { id, blocks: {} });
+                socket.emit("done", { id, rung: session.rung });
+                return;
+            }
+
+            if (session.gamePlaytest) {
+                const text = "Nejdřív si hru vyzkoušej. Až budeš vědět, co chceš změnit, klikni na Začít upravovat.";
                 session.remember("tutor", text);
                 socket.emit("token", { id, delta: text });
                 socket.emit("blocks", { id, blocks: {} });

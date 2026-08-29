@@ -27,6 +27,20 @@ describe('custom game progress persistence', () => {
         });
     });
 
+    test('persists playtest feedback with guided progress', () => {
+        saveGameProgress(42, {
+            plan: PLAN,
+            milestoneIndex: 0,
+            feedback: 'Chci, aby drak skákal výš.'
+        }, 'Moje hra');
+
+        expect(loadGameProgress(42, 'Moje hra')).toEqual({
+            plan: PLAN,
+            milestoneIndex: 0,
+            feedback: 'Chci, aby drak skákal výš.'
+        });
+    });
+
     test('isolates projects and supports local title keys', () => {
         saveGameProgress(null, {plan: PLAN, milestoneIndex: 0}, 'První hra');
 

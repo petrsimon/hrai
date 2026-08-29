@@ -10,8 +10,11 @@ import { renderProject, type RenderTarget } from "./render.ts";
 import { evaluateLessonStage, lessonStage, type LessonStage } from "./lesson.ts";
 import { evaluateGameAssessment } from "./game-assessor.ts";
 import type { GameMilestone, GamePlan } from "./game-plan.ts";
+import { createGameStarter, type GameStarter } from "./game-starter.ts";
 import type { AssistantPreferences } from "./store.ts";
 import type { Turn, TutorPromptContext } from "./prompt.ts";
+
+export type GamePhase = "playtest" | "guided";
 
 /** The gentlest rung, and the most specific one the tutor will ever go to. */
 export const FIRST_RUNG = 1;
@@ -27,7 +30,11 @@ export class Session {
     private activeStageIndex = 0;
     private stageComplete = false;
     private pendingGamePlan: GamePlan | null = null;
+    private pendingGameStarter: GameStarter | null = null;
     private activeGamePlan: GamePlan | null = null;
+    private activeGameStarter: GameStarter | null = null;
+    private gamePhase: GamePhase | null = null;
+    private gameFeedback = "";
     private activeGameMilestoneIndex = 0;
     private gameMilestoneComplete = false;
     readonly history: Turn[] = [];
@@ -78,14 +85,26 @@ export class Session {
      * Stores a model-generated proposal without changing what the tutor is teaching.
      * The child owns the project direction, so only acceptance activates the plan.
      * @param plan Validated plan proposal.
+     * @param starter Playable prototype to install after acceptance.
      */
-    proposeGamePlan(plan: GamePlan): void {
+    proposeGamePlan(plan: GamePlan, starter: GameStarter = createGameStarter(plan)): void {
         this.pendingGamePlan = plan;
+        this.pendingGameStarter = starter;
     }
 
-    private activateGamePlan(plan: GamePlan, milestoneIndex: number): GamePlan {
+    private activateGamePlan(
+        plan: GamePlan,
+        milestoneIndex: number,
+        phase: GamePhase,
+        starter: GameStarter,
+        feedback = "",
+    ): GamePlan {
         this.activeGamePlan = plan;
+        this.activeGameStarter = starter;
         this.pendingGamePlan = null;
+        this.pendingGameStarter = null;
+        this.gamePhase = phase;
+        this.gameFeedback = feedback;
         this.activeGameMilestoneIndex = milestoneIndex;
         this.gameMilestoneComplete = false;
         this.activeLessonId = null;
@@ -100,22 +119,53 @@ export class Session {
      * @returns Accepted plan, or null when no proposal exists.
      */
     acceptGamePlan(): GamePlan | null {
-        if (!this.pendingGamePlan) return null;
+        if (!this.pendingGamePlan || !this.pendingGameStarter) return null;
         // Earlier brainstorming must not compete with the child-approved north star.
-        return this.activateGamePlan(this.pendingGamePlan, 0);
+        // The first phase deliberately has no tutor context: the child gets to play
+        // the generated prototype before deciding what to change.
+        return this.activateGamePlan(this.pendingGamePlan, 0, "playtest", this.pendingGameStarter);
+    }
+
+    /**
+     * Starts child-led implementation after the child has tested the prototype.
+     * @param feedback Child's observations from playtesting.
+     * @returns Active plan, or null when no playtest is waiting.
+     */
+    startGameGuidance(feedback = ""): GamePlan | null {
+        if (!this.activeGamePlan || this.gamePhase !== "playtest" || !this.activeGameStarter) return null;
+        this.gamePhase = "guided";
+        this.gameFeedback = feedback.slice(0, 1000);
+        this.activeGameMilestoneIndex = 0;
+        this.gameMilestoneComplete = false;
+        this.resetRung();
+        return this.activeGamePlan;
     }
 
     /**
      * Restores a plan previously accepted in this browser and project.
      * @param plan Revalidated canonical plan.
      * @param milestoneIndex Previously active milestone.
+     * @param phase Whether the child is still playtesting or is being guided.
+     * @param feedback Child's observations from playtesting.
+     * @param starter Prototype installed before playtesting.
      * @returns Restored plan, or null when the index is outside it.
      */
-    restoreGamePlan(plan: GamePlan, milestoneIndex: number): GamePlan | null {
+    restoreGamePlan(
+        plan: GamePlan,
+        milestoneIndex: number,
+        phase: GamePhase = "guided",
+        feedback = "",
+        starter: GameStarter = createGameStarter(plan),
+    ): GamePlan | null {
         if (!Number.isInteger(milestoneIndex) || milestoneIndex < 0 || milestoneIndex >= plan.milestones.length) {
             return null;
         }
-        return this.activateGamePlan(plan, milestoneIndex);
+        return this.activateGamePlan(plan, milestoneIndex, phase, starter, feedback);
+    }
+
+    get gamePlaytest(): {plan: GamePlan; starter: GameStarter} | null {
+        if (this.gamePhase !== "playtest" || !this.activeGamePlan || !this.activeGameStarter) return null;
+        return {plan: this.activeGamePlan, starter: this.activeGameStarter};
     }
 
     get gameProgress(): {
@@ -123,8 +173,9 @@ export class Session {
         milestoneIndex: number;
         milestone: GameMilestone;
         complete: boolean;
+        feedback: string;
     } | null {
-        if (!this.activeGamePlan) return null;
+        if (this.gamePhase !== "guided" || !this.activeGamePlan) return null;
         const milestone = this.activeGamePlan.milestones[this.activeGameMilestoneIndex];
         if (!milestone) return null;
         return {
@@ -132,6 +183,7 @@ export class Session {
             milestoneIndex: this.activeGameMilestoneIndex,
             milestone,
             complete: this.gameMilestoneComplete,
+            feedback: this.gameFeedback,
         };
     }
 
@@ -140,7 +192,9 @@ export class Session {
      * @returns Whether the current milestone is complete.
      */
     evaluateGameMilestone(): boolean {
-        if (!this.activeGamePlan || this.gameMilestoneComplete) return this.gameMilestoneComplete;
+        if (this.gamePhase !== "guided" || !this.activeGamePlan || this.gameMilestoneComplete) {
+            return this.gameMilestoneComplete;
+        }
         const milestone = this.activeGamePlan.milestones[this.activeGameMilestoneIndex];
         if (!milestone) return false;
         this.gameMilestoneComplete = evaluateGameAssessment(milestone.assessment, this.targets);
@@ -174,6 +228,7 @@ export class Session {
             goal: game.milestone.outcome,
             why: game.milestone.why,
             concept: game.milestone.concept,
+            playtestFeedback: game.feedback,
             instruction: game.milestone.outcome,
             success: game.milestone.doneWhen,
         };
@@ -186,7 +241,11 @@ export class Session {
         this.activeStageIndex = stageIndex;
         this.stageComplete = false;
         this.activeGamePlan = null;
+        this.activeGameStarter = null;
         this.pendingGamePlan = null;
+        this.pendingGameStarter = null;
+        this.gamePhase = null;
+        this.gameFeedback = "";
         this.gameMilestoneComplete = false;
         this.resetRung();
         return stage;

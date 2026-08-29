@@ -7,7 +7,9 @@ import {io} from 'socket.io-client';
 import VM from '@scratch/scratch-vm';
 
 import HraiPanelComponent from '../components/hrai-panel/hrai-panel.jsx';
-import {clearGameProgress, loadGameProgress, saveGameProgress} from '../lib/hrai-game-progress';
+import log from '../lib/log.js';
+import {clearGameProgress, loadGameProgress, saveGamePlaytest, saveGameProgress} from '../lib/hrai-game-progress';
+import {loadGameStarter} from '../lib/hrai-game-starter';
 import lessons from '../lib/hrai-lessons';
 import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
@@ -70,6 +72,7 @@ const HraiPanel = ({
     const [rung, setRung] = useState(0);
     const [lessonProgress, setLessonProgress] = useState(null);
     const [gamePlan, setGamePlan] = useState(null);
+    const [gamePlaytest, setGamePlaytest] = useState(null);
     const [gameProgress, setGameProgress] = useState(null);
     const [isPlanning, setIsPlanning] = useState(false);
     const [isStartingNewProject, setIsStartingNewProject] = useState(false);
@@ -206,14 +209,35 @@ const HraiPanel = ({
 
         socket.on('gamePlanProposed', plan => {
             setGamePlan(plan);
+            setGamePlaytest(null);
             setGameProgress(null);
             setIsPlanning(false);
             setIsStartingNewProject(false);
         });
 
+        socket.on('gamePlaytest', playtest => {
+            void loadGameStarter(vmRef.current, playtest.starter)
+                .then(() => {
+                    saveGamePlaytest(projectId, playtest, projectTitle);
+                    setGamePlan(null);
+                    setGamePlaytest(playtest);
+                    setGameProgress(null);
+                    setIsPlanning(false);
+                    setIsStartingNewProject(false);
+                })
+                .catch(error => {
+                    // A malformed starter must not leave the child believing it is playable.
+                    // The server owns the plan; the editor owns loading its block graph.
+                    log.error('hrai: failed to load game starter', {error});
+                    setIsPlanning(false);
+                    setIsStartingNewProject(false);
+                });
+        });
+
         socket.on('gameProgress', progress => {
             saveGameProgress(projectId, progress, projectTitle);
             setGamePlan(null);
+            setGamePlaytest(null);
             setGameProgress(progress);
             setIsPlanning(false);
             setIsStartingNewProject(false);
@@ -261,6 +285,7 @@ const HraiPanel = ({
             socket.off('blocks');
             socket.off('done');
             socket.off('gamePlanProposed');
+            socket.off('gamePlaytest');
             socket.off('gameProgress');
             socket.off('gameMilestoneComplete');
             socket.off('lessonProgress');
@@ -285,6 +310,7 @@ const HraiPanel = ({
         setRung(0);
         setIsThinking(false);
         setGamePlan(null);
+        setGamePlaytest(null);
         setGameProgress(null);
         setIsPlanning(false);
         const saved = activeLessonId ? loadLessonProgress(projectId, activeLessonId, projectTitle) : null;
@@ -322,19 +348,29 @@ const HraiPanel = ({
         };
     }, [emitPendingGamePlan, vm, debouncedPushWorkspace, pushWorkspace]);
 
-    const handleSend = useCallback(text => {
+    const appendLearnerMessage = useCallback(text => {
         const learnerId = `learner-${messageIdCounter.current += 1}`;
-        setRung(0);
         setChatMessages(prev => [...prev, {
             id: learnerId,
             role: 'learner',
             text
         }]);
+    }, []);
+
+    const handleGameIdea = useCallback(text => {
+        // The idea is shown in the conversation, but does not reach the tutor before
+        // the prototype has been installed and playtested.
+        appendLearnerMessage(text);
+    }, [appendLearnerMessage]);
+
+    const handleSend = useCallback(text => {
+        appendLearnerMessage(text);
+        setRung(0);
         if (socketRef.current?.connected) {
             pushWorkspace();
             socketRef.current.emit('ask', {text});
         }
-    }, [pushWorkspace]);
+    }, [appendLearnerMessage, pushWorkspace]);
 
     const handleVoiceSubmit = useCallback(payload => {
         const socket = socketRef.current;
@@ -386,6 +422,15 @@ const HraiPanel = ({
         setIsPlanning(false);
     }, []);
 
+    const handleGamePlaytestComplete = useCallback(feedback => {
+        if (socketRef.current?.connected && gamePlaytest && !isPlanning && feedback) {
+            appendLearnerMessage(feedback);
+            setIsPlanning(true);
+            pushWorkspace();
+            socketRef.current.emit('gameGuide', {feedback});
+        }
+    }, [appendLearnerMessage, gamePlaytest, isPlanning, pushWorkspace]);
+
     const handleHint = useCallback(() => {
         if (socketRef.current?.connected) {
             pushWorkspace();
@@ -409,6 +454,7 @@ const HraiPanel = ({
     return (
         <HraiPanelComponent
             gamePlan={gamePlan}
+            gamePlaytest={gamePlaytest}
             gameProgress={gameProgress}
             hasProjectContent={hasMeaningfulWorkspace(vm)}
             isPlanning={isPlanning}
@@ -417,6 +463,8 @@ const HraiPanel = ({
             onGamePlanAccept={handleGamePlanAccept}
             onGamePlanEdit={handleGamePlanEdit}
             onGamePlanRequest={handleGamePlanRequest}
+            onGamePlaytestComplete={handleGamePlaytestComplete}
+            onGameIdea={handleGameIdea}
             onStartNewProject={handleStartNewProject}
             onSend={handleSend}
             onHint={handleHint}

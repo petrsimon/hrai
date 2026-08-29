@@ -118,8 +118,12 @@ describe("goal-driven game protocol", () => {
         expect(await proposed).toEqual(PLAN);
         expect(gamePlanner).toHaveBeenCalledWith("Drak hledá poklad v bludišti.");
 
-        const activated = new Promise<Record<string, unknown>>((resolve) => socket?.once("gameProgress", resolve));
+        const playtest = new Promise<Record<string, unknown>>((resolve) => socket?.once("gamePlaytest", resolve));
         socket.emit("gamePlanAccept");
+        expect(await playtest).toMatchObject({plan: PLAN});
+
+        const activated = new Promise<Record<string, unknown>>((resolve) => socket?.once("gameProgress", resolve));
+        socket.emit("gameGuide");
         expect(await activated).toMatchObject({
             milestoneIndex: 0,
             milestone: PLAN.milestones[0],
@@ -143,6 +147,30 @@ describe("goal-driven game protocol", () => {
             milestone: PLAN.milestones[1],
             complete: false,
         });
+    });
+
+    it("restores an unfinished playtest without activating tutor guidance", async () => {
+        const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+        await new Promise<void>((resolve, reject) => {
+            connected.on("connect", resolve);
+            connected.on("connect_error", reject);
+        });
+
+        try {
+            const playtest = new Promise<Record<string, unknown>>((resolve) => {
+                connected.once("gamePlaytest", resolve);
+            });
+            connected.emit("gameRestore", {plan: PLAN, milestoneIndex: 0, phase: "playtest"});
+            expect(await playtest).toMatchObject({plan: PLAN});
+
+            const progress = new Promise<Record<string, unknown>>((resolve) => {
+                connected.once("gameProgress", resolve);
+            });
+            connected.emit("gameGuide", {feedback: "Chci, aby drak skákal výš."});
+            expect(await progress).toMatchObject({milestoneIndex: 0, complete: false, feedback: "Chci, aby drak skákal výš."});
+        } finally {
+            connected.close();
+        }
     });
 
     it("restores accepted progress without trusting persisted completion", async () => {
@@ -185,10 +213,16 @@ describe("goal-driven game protocol", () => {
             connected.emit("gamePlan", {text: "Drak hledá poklad v bludišti."});
             await proposed;
 
+            const playtest = new Promise<Record<string, unknown>>((resolve) => {
+                connected.once("gamePlaytest", resolve);
+            });
+            connected.emit("gamePlanAccept");
+            await playtest;
+
             const completed = new Promise<Record<string, unknown>>((resolve) => {
                 connected.once("gameMilestoneComplete", resolve);
             });
-            connected.emit("gamePlanAccept");
+            connected.emit("gameGuide");
             expect(await completed).toMatchObject({milestoneIndex: 0, complete: true});
         } finally {
             connected.close();
