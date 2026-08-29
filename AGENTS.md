@@ -126,6 +126,9 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
   They skip loudly, printing the reason, when the model is unavailable — never silently green.
 - `npm test --workspace=packages/hrai-server` needs `ollama serve` and `ollama pull qwen3:14b`.
   Override with `HRAI_EVAL_MODEL` / `HRAI_EVAL_HOST`.
+- `HRAI_MODEL_BACKEND` also accepts `cursor`, `pi`, and `codex`. Those spawn a locally installed
+  agent CLI instead of calling a model server, and they reach hosted APIs — the child's project
+  text leaves the machine. The Compose deployment still uses `llama.cpp`. See the package README.
 
 ### scratch-vm specifics
 

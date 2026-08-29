@@ -21,6 +21,44 @@ Point elsewhere with `HRAI_EVAL_MODEL` and `HRAI_EVAL_HOST`. If the model is una
 suite **skips loudly** with the reason printed — it never passes silently, because a green
 run that tested nothing is worse than a red one.
 
+## Model backends
+
+`HRAI_MODEL_BACKEND` selects how the tutor reaches a model:
+
+| Value | How it runs |
+| - | - |
+| `ollama` (default) | HTTP to `/api/chat` |
+| `llama.cpp` | HTTP to the OpenAI-compatible `/v1/chat/completions` |
+| `cursor` | spawns `cursor-agent -p --mode ask` |
+| `pi` | spawns `pi -p --mode json --no-tools` |
+| `codex` | spawns `codex exec --json -s read-only` |
+
+The three agent backends run a locally installed coding-agent CLI in its non-interactive mode and
+parse its JSONL output. They need no model server:
+
+```sh
+HRAI_MODEL_BACKEND=cursor npm start --workspace=packages/hrai-server
+HRAI_MODEL_BACKEND=codex  npm run eval:game-design --workspace=packages/hrai-server
+```
+
+**These CLIs call hosted APIs.** With an agent backend the child's rendered project and chat leave
+the machine and reach Cursor, OpenAI or the provider `pi` is configured with. The two HTTP backends
+stay local, and the Compose deployment still uses llama.cpp. `pi` can also drive local models — its
+listing shows them under the `local` provider.
+
+Each CLI runs with its tools restricted and with an empty temporary directory as its working
+directory, so it cannot reach the source tree and no `AGENTS.md` is pulled into the prompt.
+
+| Variable | Meaning |
+| - | - |
+| `HRAI_AGENT_MODEL` | model passed as `--model`/`-m`; unset lets the CLI choose |
+| `HRAI_AGENT_TIMEOUT_MS` | per-call timeout, default `120000` |
+| `HRAI_AGENT_CWD` | sandbox working directory, default a fresh empty temp dir |
+
+`HRAI_MODEL_HOST` and `HRAI_EVAL_HOST` configure whichever backend `HRAI_MODEL_BACKEND` selects.
+A backend picked at runtime uses `HRAI_OLLAMA_HOST` or `HRAI_LLAMA_HOST` instead, because a host
+belonging to one backend is wrong for another.
+
 ## Running it against the editor
 
 Three terminals:
@@ -48,9 +86,16 @@ Self-hosted profiles and projects use the HTTP API on the same server. Set
 `HRAI_DATA_DIR` to a persistent directory (the Compose deployment uses `/data`).
 The API provides `/api/auth/*`, `/api/profile`, and `/api/projects`; sessions use
 HttpOnly cookies and project data is private to its owner. Assistant preferences
-(persona, answer length, assistant name, and encouragement) are stored with the
-profile and applied to future tutor connections. The current tutor remains Czech;
-language selection is intentionally not exposed until prompt localization is complete.
+(persona, answer length, assistant name, encouragement, and the model provider and
+model) are stored with the profile and applied to future tutor connections. The
+current tutor remains Czech; language selection is intentionally not exposed until
+prompt localization is complete.
+
+`GET /api/models` lists the backends this server can reach and the models each offers, which is
+what fills the provider and model controls in assistant settings. Choosing a provider there
+overrides `HRAI_MODEL_BACKEND` for that profile; leaving it on *Server default* keeps the
+environment's choice. A profile naming a backend that has since become unavailable falls back to
+the default with a warning rather than failing the child's question.
 
 For local Docker deployment, see [`docker/README.md`](../../docker/README.md).
 
