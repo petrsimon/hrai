@@ -20,12 +20,16 @@ const messages = defineMessages({
     persona: {id: 'gui.hrai.persona', defaultMessage: 'Persona', description: 'assistant preference label'},
     projects: {id: 'gui.hrai.projects', defaultMessage: 'My projects', description: 'saved project list heading'},
     noProjects: {id: 'gui.hrai.noProjects', defaultMessage: 'No saved projects yet.', description: 'empty saved project list'},
+    provider: {id: 'gui.hrai.provider', defaultMessage: 'Provider', description: 'assistant model provider label'},
+    serverDefault: {id: 'gui.hrai.serverDefault', defaultMessage: 'Server default', description: 'server default model provider option'},
     saveSettings: {id: 'gui.hrai.saveSettings', defaultMessage: 'Save settings', description: 'assistant settings submit button'},
     saved: {id: 'gui.hrai.saved', defaultMessage: 'Saved.', description: 'assistant settings success message'},
     signIn: {id: 'gui.hrai.signIn', defaultMessage: 'Sign in to HRAI', description: 'account form heading'},
     signInButton: {id: 'gui.hrai.signInButton', defaultMessage: 'Sign in', description: 'account form submit button'},
     switchToLogin: {id: 'gui.hrai.switchToLogin', defaultMessage: 'I already have a profile', description: 'account form mode switch'},
     assistantName: {id: 'gui.hrai.assistantName', defaultMessage: 'Assistant name', description: 'assistant preference label'},
+    model: {id: 'gui.hrai.model', defaultMessage: 'Model', description: 'assistant model label'},
+    backendDefault: {id: 'gui.hrai.backendDefault', defaultMessage: 'Backend default', description: 'backend default model option'},
     socratic: {id: 'gui.hrai.socratic', defaultMessage: 'Socratic guide', description: 'assistant persona option'},
     coach: {id: 'gui.hrai.coach', defaultMessage: 'Encouraging coach', description: 'assistant persona option'},
     working: {id: 'gui.hrai.working', defaultMessage: 'Working…', description: 'account form busy state'},
@@ -155,10 +159,19 @@ HraiAuthForm.propTypes = {
 
 const AssistantSettings = ({user, onClose, onUpdated}) => {
     const [preferences, setPreferences] = React.useState(user.assistantPreferences);
+    const [modelCatalog, setModelCatalog] = React.useState(null);
+    const [modelsFailed, setModelsFailed] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [saved, setSaved] = React.useState(false);
 
+    React.useEffect(() => {
+        request('/api/models')
+            .then((catalog) => setModelCatalog(catalog))
+            .catch(() => setModelsFailed(true));
+    }, []);
+
     const update = (field, value) => setPreferences((current) => ({...current, [field]: value}));
+    const updateBackend = (value) => setPreferences((current) => ({...current, modelBackend: value, modelName: ''}));
     const save = async (event) => {
         event.preventDefault();
         setError(null);
@@ -174,6 +187,9 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
             setError(messages.requestFailed.defaultMessage);
         }
     };
+
+    const modelControlsDisabled = !modelCatalog || modelsFailed;
+    const selectedBackend = modelCatalog?.backends.find((backend) => backend.id === preferences.modelBackend);
 
     return (
         <div style={panelStyle} role="dialog" aria-label={messages.assistantSettings.defaultMessage}>
@@ -199,6 +215,42 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
                         <option value="detailed"><FormattedMessage {...messages.detailed} /></option>
                     </select>
                 </label>
+                <label>
+                    <FormattedMessage {...messages.provider} />
+                    <select value={preferences.modelBackend} disabled={modelControlsDisabled} onChange={(event) => updateBackend(event.target.value)}>
+                        {modelCatalog && !modelsFailed ? (
+                            <>
+                                <option value="default"><FormattedMessage {...messages.serverDefault} /></option>
+                                {modelCatalog.backends.map((backend) => (
+                                    <option key={backend.id} value={backend.id} disabled={!backend.available}>{backend.label}</option>
+                                ))}
+                            </>
+                        ) : (
+                            <option value={preferences.modelBackend}><FormattedMessage {...messages.loading} /></option>
+                        )}
+                    </select>
+                </label>
+                {modelControlsDisabled ? (
+                    <label>
+                        <FormattedMessage {...messages.model} />
+                        <select value={preferences.modelName} disabled>
+                            <option value={preferences.modelName}><FormattedMessage {...messages.loading} /></option>
+                        </select>
+                    </label>
+                ) : preferences.modelBackend === 'default' ? null : selectedBackend?.freeform ? (
+                    <label>
+                        <FormattedMessage {...messages.model} />
+                        <input value={preferences.modelName} maxLength={100} onChange={(event) => update('modelName', event.target.value)} />
+                    </label>
+                ) : (
+                    <label>
+                        <FormattedMessage {...messages.model} />
+                        <select value={preferences.modelName} onChange={(event) => update('modelName', event.target.value)}>
+                            <option value=""><FormattedMessage {...messages.backendDefault} /></option>
+                            {selectedBackend?.models.map((model) => <option key={model} value={model}>{model}</option>)}
+                        </select>
+                    </label>
+                )}
                 <label>
                     <input
                         type="checkbox"
