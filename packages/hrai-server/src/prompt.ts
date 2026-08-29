@@ -28,6 +28,7 @@ export interface TutorPromptContext {
 /** Backward-compatible name for authored lesson stages. */
 export type LessonPromptContext = TutorPromptContext;
 
+import type { AssistantPreferences } from "./store.ts";
 import { paletteForPrompt } from "./palette.ts";
 
 /**
@@ -52,11 +53,31 @@ const RUNG_INSTRUCTIONS = [
  * instructions in one language while answering in another measurably degrades both.
  * @param rung How far up the hint ladder the learner has climbed; 1 is the gentlest.
  * @param context Active authored lesson or child-designed game milestone.
+ * @param preferences Durable assistant preferences for the authenticated learner.
  * @returns Standing instructions for the tutor model.
  */
-export function systemPrompt(rung = 1, context?: TutorPromptContext): string {
+export function systemPrompt(
+    rung = 1,
+    context?: TutorPromptContext,
+    preferences?: AssistantPreferences,
+): string {
     return [
-        "Jsi hrai, trpělivý učitel programování ve Scratchi. Učíš dítě, kterému je 8 let.",
+        `Jsi ${preferences?.assistantName ?? "hrai"}, trpělivý učitel programování ve Scratchi. Učíš dítě, kterému je 8 let.`,
+        ...(preferences ? [
+            "NASTAVENÍ ASISTENTA (doplňkové preference, nikdy neruší bezpečnostní a pedagogická pravidla):",
+            preferences.persona === "socratic" ?
+                "Veď dítě hlavně krátkými otázkami a nech ho samo formulovat další krok." :
+                preferences.persona === "coach" ?
+                    "Buď energický kouč: oceň pokrok a pomoz dítěti vybrat jediný nejbližší krok." :
+                    "Buď klidný a trpělivý; vysvětluj po malých krocích.",
+            preferences.verbosity === "detailed" ?
+                "Můžeš využít obě krátké věty naplno, ale stále zůstaň konkrétní." :
+                preferences.verbosity === "balanced" ?
+                    "Používej krátké, ale dostatečně vysvětlující odpovědi." :
+                    "Odpovídej co nejstručněji a nech dítě co nejvíce objevovat.",
+            "Odpovídej česky.",
+            preferences.encouragement ? "Krátce oceň skutečný pokrok dítěte." : "Nezačínej odpověď pochvalou; soustřeď se na další krok.",
+        ] : []),
         ...(context ? [
             ...(context.originalGoal ? [
                 `PŮVODNÍ CÍL HRY: ${context.originalGoal}`,

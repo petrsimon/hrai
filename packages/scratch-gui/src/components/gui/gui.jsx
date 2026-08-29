@@ -206,6 +206,7 @@ const GUIComponent = props => {
         tipsLibraryVisible,
         useExternalPeripheralList,
         username,
+        assistantPreferences,
         avatarBadge,
         userOwnsProject,
         hideTutorialProjects,
@@ -593,7 +594,7 @@ const GUIComponent = props => {
                         {/* Hidden in fullscreen: .stage-wrapper.full-screen is position:fixed
                             over the viewport, so the panel would render underneath it. */}
                         {hraiAssistantVisible && !isFullScreen ? (
-                            <HraiPanel />
+                            <HraiPanel assistantPreferences={assistantPreferences} />
                         ) : null}
                     </Box>
                     <DragLayer />
@@ -690,6 +691,7 @@ GUIComponent.propTypes = {
     tipsLibraryVisible: PropTypes.bool,
     useExternalPeripheralList: PropTypes.bool, // true for CDM, false for normal Scratch Link
     username: PropTypes.string,
+    assistantPreferences: PropTypes.object,
     avatarBadge: PropTypes.number,
     userOwnsProject: PropTypes.bool,
     hideTutorialProjects: PropTypes.bool,

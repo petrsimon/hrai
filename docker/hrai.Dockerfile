@@ -13,6 +13,7 @@ RUN apt-get update \
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HRAI_PORT=8791
+ENV HRAI_DATA_DIR=/data
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/packages/hrai-server/package.json ./packages/hrai-server/package.json

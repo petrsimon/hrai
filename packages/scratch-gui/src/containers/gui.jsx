@@ -183,6 +183,7 @@ GUI.propTypes = {
     shouldStopProject: PropTypes.bool,
     telemetryModalVisible: PropTypes.bool,
     username: PropTypes.string,
+    assistantPreferences: PropTypes.object,
     avatarBadge: PropTypes.number,
     userOwnsProject: PropTypes.bool,
     // TODO: Is this unused?
