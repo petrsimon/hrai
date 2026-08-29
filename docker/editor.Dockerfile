@@ -1,5 +1,9 @@
 FROM node:24-bookworm-slim AS build
 
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes g++ make python3 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ARG HRAI_SERVER_URL=
