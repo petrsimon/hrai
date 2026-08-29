@@ -1,9 +1,36 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
 
-const ENV_KEYS = ["HRAI_MODEL_BACKEND", "HRAI_MODEL_HOST", "HRAI_EVAL_MODEL"] as const;
+const {agentLoginHintMock, isAgentAvailableMock, runAgentMock} = vi.hoisted(() => ({
+    agentLoginHintMock: vi.fn(),
+    isAgentAvailableMock: vi.fn(),
+    runAgentMock: vi.fn(),
+}));
+
+vi.mock("../src/agent-cli.ts", () => ({
+    agentLoginHint: agentLoginHintMock,
+    isAgentAvailable: isAgentAvailableMock,
+    runAgent: runAgentMock,
+}));
+
+const ENV_KEYS = [
+    "HRAI_MODEL_BACKEND",
+    "HRAI_MODEL_HOST",
+    "HRAI_EVAL_HOST",
+    "HRAI_EVAL_MODEL",
+    "HRAI_AGENT_MODEL",
+    "HRAI_OLLAMA_HOST",
+    "HRAI_LLAMA_HOST",
+] as const;
+
+async function loadModelClient() {
+    vi.resetModules();
+    return import("../src/model-client.ts");
+}
 
 afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.resetAllMocks();
     for (const key of ENV_KEYS) delete process.env[key];
 });
 
@@ -58,5 +85,143 @@ describe("llama.cpp model client", () => {
             return body.response_format?.type === "json_object";
         });
         expect(jsonRequest).toBeDefined();
+    });
+
+    it("delegates agent chat calls without fetching", async () => {
+        process.env.HRAI_MODEL_BACKEND = "cursor";
+        const fetchMock = vi.fn();
+        vi.stubGlobal("fetch", fetchMock);
+        runAgentMock.mockResolvedValue({text: "agent reply", seconds: 0});
+
+        const {chat, chatJson} = await loadModelClient();
+        await chat("system", "user", "model");
+        await chatJson("system", "user", "model");
+
+        expect(runAgentMock).toHaveBeenNthCalledWith(1, "cursor", {
+            system: "system",
+            user: "user",
+            model: "model",
+        });
+        expect(runAgentMock).toHaveBeenNthCalledWith(2, "cursor", {
+            system: "system",
+            user: "user",
+            model: "model",
+            json: true,
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("delegates agent availability without using the model name", async () => {
+        process.env.HRAI_MODEL_BACKEND = "pi";
+        isAgentAvailableMock.mockResolvedValue(true);
+
+        const {isModelAvailable} = await loadModelClient();
+
+        await expect(isModelAvailable("model-that-is-ignored")).resolves.toBe(true);
+        expect(isAgentAvailableMock).toHaveBeenCalledWith("pi");
+    });
+
+    it("prints the agent login hint when an agent is unavailable", async () => {
+        process.env.HRAI_MODEL_BACKEND = "codex";
+        agentLoginHintMock.mockReturnValue("codex login");
+        const writeMock = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+        const {warnSkipped} = await loadModelClient();
+        warnSkipped("codex");
+
+        expect(writeMock.mock.calls.flat().join("")).toContain("codex login");
+    });
+
+    it("throws for an unsupported backend", async () => {
+        process.env.HRAI_MODEL_BACKEND = "not-a-backend";
+        const {chat} = await loadModelClient();
+
+        await expect(chat("system", "user")).rejects.toThrow(
+            "Unsupported HRAI_MODEL_BACKEND: not-a-backend",
+        );
+    });
+
+    it("omits the model for an agent backend when none is configured", async () => {
+        process.env.HRAI_MODEL_BACKEND = "cursor";
+        const {chat, EVAL_MODEL} = await loadModelClient();
+
+        expect(EVAL_MODEL).toBe("");
+        await chat("system", "user");
+
+        // A server-side model name means nothing to cursor-agent; the flag must be left off.
+        expect(runAgentMock).toHaveBeenCalledWith(
+            "cursor",
+            {system: "system", user: "user", model: undefined},
+        );
+    });
+
+    it("passes an explicitly configured agent model through", async () => {
+        process.env.HRAI_MODEL_BACKEND = "cursor";
+        process.env.HRAI_AGENT_MODEL = "gpt-5.2";
+        const {chat} = await loadModelClient();
+        await chat("system", "user");
+
+        expect(runAgentMock).toHaveBeenCalledWith(
+            "cursor",
+            {system: "system", user: "user", model: "gpt-5.2"},
+        );
+    });
+
+    it("uses the per-call backend instead of the environment backend", async () => {
+        process.env.HRAI_MODEL_BACKEND = "ollama";
+        process.env.HRAI_LLAMA_HOST = "http://llama.test";
+        const fetchMock = vi.fn(() => new Response(JSON.stringify({choices: [{message: {content: "Hotovo"}}]})));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const {chat} = await loadModelClient();
+        await chat("system", "user", "model", "llama.cpp");
+
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("http://llama.test/v1/chat/completions");
+    });
+
+    it("honors the model host for the default backend and specific hosts for overrides", async () => {
+        process.env.HRAI_MODEL_BACKEND = "ollama";
+        process.env.HRAI_MODEL_HOST = "http://model.test";
+        process.env.HRAI_OLLAMA_HOST = "http://ollama.test";
+        process.env.HRAI_LLAMA_HOST = "http://llama.test";
+        // The two backends read the reply from different fields, so the body must match the URL.
+        const fetchMock = vi.fn((input: string) => new Response(JSON.stringify(
+            input.endsWith("/api/chat")
+                ? {message: {content: "Hotovo"}}
+                : {choices: [{message: {content: "Hotovo"}}]},
+        )));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const {chat} = await loadModelClient();
+        await chat("system", "user", "model");
+        await chat("system", "user", "model", "llama.cpp");
+
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("http://model.test/api/chat");
+        expect(fetchMock.mock.calls[1]?.[0]).toBe("http://llama.test/v1/chat/completions");
+    });
+
+    it("does not leak HRAI_EVAL_HOST to a per-call backend override", async () => {
+        process.env.HRAI_MODEL_BACKEND = "llama.cpp";
+        process.env.HRAI_EVAL_HOST = "http://llama.test";
+        const fetchMock = vi.fn(() => new Response(JSON.stringify({message: {content: "Hotovo"}})));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const {chat} = await loadModelClient();
+        await chat("system", "user", "model", "ollama");
+
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:11434/api/chat");
+    });
+
+    it("honors the Ollama-specific host when Ollama is not the default", async () => {
+        process.env.HRAI_MODEL_BACKEND = "llama.cpp";
+        process.env.HRAI_MODEL_HOST = "http://model.test";
+        process.env.HRAI_OLLAMA_HOST = "http://ollama.test";
+        const fetchMock = vi.fn(() => new Response(JSON.stringify({message: {content: "Hotovo"}})));
+        vi.stubGlobal("fetch", fetchMock);
+
+        const {chat} = await loadModelClient();
+        await chat("system", "user", "model", "ollama");
+
+        expect(fetchMock.mock.calls[0]?.[0]).toBe("http://ollama.test/api/chat");
     });
 });
