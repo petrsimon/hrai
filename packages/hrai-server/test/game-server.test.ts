@@ -116,7 +116,7 @@ describe("goal-driven game protocol", () => {
         const proposed = new Promise<GamePlan>((resolve) => socket?.once("gamePlanProposed", resolve));
         socket.emit("gamePlan", {text: "Drak hledá poklad v bludišti."});
         expect(await proposed).toEqual(PLAN);
-        expect(gamePlanner).toHaveBeenCalledWith("Drak hledá poklad v bludišti.");
+        expect(gamePlanner).toHaveBeenCalledWith("Drak hledá poklad v bludišti.", expect.any(Function));
 
         const playtest = new Promise<Record<string, unknown>>((resolve) => socket?.once("gamePlaytest", resolve));
         socket.emit("gamePlanAccept");

@@ -7,8 +7,9 @@
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { handleApiRequest } from "./api.ts";
-import { parseCookies, HraiStore, SESSION_COOKIE } from "./store.ts";
-import { EVAL_MODEL, chat } from "./model-client.ts";
+import { parseCookies, HraiStore, SESSION_COOKIE, type AssistantPreferences } from "./store.ts";
+import { EVAL_MODEL, chat, chatJson, defaultBackend, defaultModelFor, type BackendId } from "./model-client.ts";
+import { listBackends } from "./model-catalog.ts";
 import { planGame } from "./game-planner.ts";
 import { MAX_GAME_IDEA_LENGTH } from "./game-plan.ts";
 import { parseGameRestore } from "./game-restore.ts";
@@ -165,6 +166,32 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
     const speechToText = options.speechToText ?? new WhisperSpeechToText();
     const gamePlanner = options.gamePlanner ?? planGame;
 
+/**
+ * Resolves which backend and model a profile's tutor calls should use.
+ *
+ * An unavailable choice falls back to the configured default rather than failing: a child should
+ * not lose the tutor because a CLI was logged out since they picked it.
+ * @param preferences The profile's assistant preferences, if the socket is signed in.
+ * @returns The backend to call and the model name to pass it.
+ */
+async function resolveModelChoice(
+    preferences?: AssistantPreferences,
+): Promise<{ backend: BackendId; model: string }> {
+    const fallback = { backend: defaultBackend(), model: EVAL_MODEL };
+    if (preferences === undefined || preferences.modelBackend === "default") return fallback;
+
+    const backend = preferences.modelBackend;
+    const info = (await listBackends()).find((entry) => entry.id === backend);
+    if (info?.available !== true) {
+        console.warn(`hrai: model backend "${backend}" is unavailable; falling back to "${fallback.backend}"`);
+        return fallback;
+    }
+    return {
+        backend,
+        model: preferences.modelName === "" ? defaultModelFor(backend) : preferences.modelName,
+    };
+}
+
     io.of("/hrai").on("connection", async (socket) => {
         await store.load();
         const user = await store.userForSession(parseCookies(socket.handshake.headers.cookie)[SESSION_COOKIE]);
@@ -210,7 +237,11 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             const idea = parseGameIdea(payload);
             if (!idea) return;
             socket.emit("thinking", { thinking: true });
-            void gamePlanner(idea)
+            void resolveModelChoice(session.assistantPreferences)
+                .then(({ backend, model }) => gamePlanner(
+                    idea,
+                    (system, user) => chatJson(system, user, model, backend),
+                ))
                 .then((plan) => {
                     session.proposeGamePlan(plan);
                     // Proposal does not steer tutoring until the child accepts it.
@@ -348,10 +379,13 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
             // Buffer the model response so pedagogical constraints can be enforced
             // before any prose reaches the child. Streaming raw tokens would make a
             // post-generation safety check cosmetic rather than real.
-            void chat(
-                systemPrompt(session.rung, context, session.assistantPreferences),
-                userPrompt(session.render(), question, session.history.slice(0, -1)),
-            )
+            void resolveModelChoice(session.assistantPreferences)
+                .then(({ backend, model }) => chat(
+                    systemPrompt(session.rung, context, session.assistantPreferences),
+                    userPrompt(session.render(), question, session.history.slice(0, -1)),
+                    model,
+                    backend,
+                ))
                 .then((reply) => {
                     const text = enforceTutorPolicy(reply.text, {
                         rung: session.rung,
