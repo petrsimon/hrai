@@ -151,6 +151,29 @@ order. The same applies to the root `package.json`.
 **Do not publish packages manually.** Every package has a `prepublishOnly` script that will error if you try.
 Publishing is handled exclusively by the CI release pipeline.
 
+## Deployment
+
+Deployment is a manual SSH-based rollout to the Ubuntu GPU host. There is no deployment pipeline:
+
+1. Push the validated `main` branch to `origin`.
+2. SSH to the Ubuntu deployment machine.
+3. In the deployment checkout, pull `main` fast-forward-only:
+   ```sh
+   git pull --ff-only origin main
+   ```
+4. Pull updated base/service images and rebuild/recreate the Compose stack:
+   ```sh
+   docker compose pull
+   docker compose up -d --build --remove-orphans
+   ```
+5. Verify service state and recent logs:
+   ```sh
+   docker compose ps
+   docker compose logs --tail=100 hrai editor
+   ```
+
+The Ubuntu host must provide `/dev/dri/renderD128`, Vulkan access, and `render`/`video` group permissions. Persistent HRAI profiles and projects live in the `hrai-data` Docker volume. Back up that volume before rollout when data preservation matters. The local Apple Silicon development machine is not the deployment target because the stack uses Linux GPU/Whisper container images.
+
 ## Before submitting changes
 
 Review all changes and confirm:
