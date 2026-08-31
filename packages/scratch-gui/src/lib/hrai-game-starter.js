@@ -15,25 +15,46 @@ export const loadGameStarter = async (vm, starter) => {
     const project = typeof serializedProject === 'string' ? JSON.parse(serializedProject) : serializedProject;
     const stage = project.targets.find(target => target.isStage);
     const sprites = project.targets.filter(target => !target.isStage);
+    const lastLayerOrder = Math.max(0, ...sprites.map(target => target.layerOrder || 0));
     let spriteIndex = 0;
     const replacements = new Map();
+    const additions = [];
 
     starter.targets.forEach(starterTarget => {
-        const source = starterTarget.isStage ? stage : sprites[spriteIndex++];
+        const existingSprite = starterTarget.isStage ? null : sprites[spriteIndex++];
+        const source = starterTarget.isStage ? stage : existingSprite || sprites[0];
         if (!source) {
-            throw new Error('HRAI game starter needs more editor targets');
+            throw new Error('HRAI game starter needs a stage and at least one sprite');
         }
-        replacements.set(source, {
+        const replacement = {
             ...source,
             name: starterTarget.name,
-            variables: {},
+            variables: starterTarget.variables || {},
             lists: {},
             broadcasts: {},
             blocks: starterTarget.blocks,
             comments: {},
-            ...(starterTarget.isStage ? {} : {x: -120, y: 0})
-        });
+            ...(starterTarget.isStage ? {} : {
+                x: starterTarget.x ?? -120,
+                y: starterTarget.y ?? 0
+            })
+        };
+        if (starterTarget.isStage || existingSprite) {
+            replacements.set(source, replacement);
+        } else {
+            additions.push({
+                ...replacement,
+                layerOrder: lastLayerOrder + additions.length + 1
+            });
+        }
     });
 
-    await vm.loadProject({...project, targets: project.targets.map(target => replacements.get(target) || target)});
+    await vm.loadProject({
+        ...project,
+        targets: [
+            ...project.targets.map(target => replacements.get(target) || target),
+            ...additions
+        ],
+        monitors: Array.isArray(starter.monitors) ? starter.monitors : project.monitors
+    });
 };
