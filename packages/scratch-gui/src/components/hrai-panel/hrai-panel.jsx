@@ -29,6 +29,21 @@ const messages = defineMessages({
         defaultMessage: 'HRAI',
         description: 'heading for the hrai tutor chat panel'
     },
+    hraiTab: {
+        id: 'gui.hrai.hraiTab',
+        defaultMessage: 'Hrai',
+        description: 'label for the hrai conversation tab'
+    },
+    planTab: {
+        id: 'gui.hrai.planTab',
+        defaultMessage: 'Plan',
+        description: 'label for the game plan tab'
+    },
+    planEmpty: {
+        id: 'gui.hrai.planEmpty',
+        defaultMessage: 'Your game plan will appear here.',
+        description: 'empty state shown before a game plan has been prepared'
+    },
     messageListLabel: {
         id: 'gui.hrai.messageListLabel',
         defaultMessage: 'Konverzace s HRAI',
@@ -56,8 +71,8 @@ const messages = defineMessages({
     },
     thinking: {
         id: 'gui.hrai.thinking',
-        defaultMessage: 'HRAI přemýšlí…',
-        description: 'quiet indicator shown while hrai is preparing a reply'
+        defaultMessage: 'The little dragon is forging ideas and code…',
+        description: 'playful status shown while hrai is preparing a reply'
     },
     blockReference: {
         id: 'gui.hrai.blockReference',
@@ -314,6 +329,68 @@ const ProgressIcon = () => (
         />
         <path d="M12 4a8 8 0 0 1 8 8" />
     </svg>
+);
+
+const BrainIcon = () => (
+    <svg
+        aria-hidden="true"
+        className={styles.tabIcon}
+        viewBox="0 0 24 24"
+    >
+        <path
+            d="M9.5 4.5A3.5 3.5 0 0 0 6 8v.3A3.5 3.5 0 0 0 4.5 15a3.5 3.5 0 0 0 5 3.2V5.5a1 1 0 0 0-1-1Z"
+        />
+        <path
+            d="M14.5 4.5A3.5 3.5 0 0 1 18 8v.3a3.5 3.5 0 0 1 1.5 6.7 3.5 3.5 0 0 1-5 3.2V5.5a1 1 0 0 1 1-1Z"
+        />
+        <path
+            d="M6 8.3c1 .1 1.8.6 2.3 1.4M18 8.3c-1 .1-1.8.6-2.3 1.4"
+        />
+        <path
+            d="M4.5 15c1.3-.3 2.5 0 3.4.8M19.5 15c-1.3-.3-2.5 0-3.4.8"
+        />
+    </svg>
+);
+
+const PlanIcon = () => (
+    <svg
+        aria-hidden="true"
+        className={styles.tabIcon}
+        viewBox="0 0 24 24"
+    >
+        <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+        <rect
+            x="8"
+            y="3"
+            width="8"
+            height="4"
+            rx="1"
+        />
+        <path d="m8 13 2 2 5-5M8 18h7" />
+    </svg>
+);
+
+const ThinkingForge = () => (
+    <div
+        className={styles.thinking}
+        aria-live="polite"
+        role="status"
+    >
+        <span
+            className={styles.forgeArt}
+            aria-hidden="true"
+        >
+            <img
+                className={styles.forgeDragon}
+                src={hraiLogo}
+                alt=""
+                draggable={false}
+            />
+            <span className={styles.forgeFlame}>🔥</span>
+            <span className={styles.forgeSpark}>✦</span>
+        </span>
+        <FormattedMessage {...messages.thinking} />
+    </div>
 );
 
 const BlockRef = ({alias, onAliasClick, formatBlockReference}) => {
@@ -768,6 +845,8 @@ const HraiPanel = ({
     voiceTranscript
 }) => {
     const intl = useIntl();
+    const hasGameGuide = Boolean(gamePlan || gamePlaytest || gameProgress);
+    const [activeTab, setActiveTab] = useState(hasGameGuide ? 'plan' : 'hrai');
     const [draft, setDraft] = useState('');
     const [gameIdea, setGameIdea] = useState(null);
     const [gameStartPending, setGameStartPending] = useState(false);
@@ -784,6 +863,16 @@ const HraiPanel = ({
     const recordingStartedAtRef = useRef(0);
     const recordingDurationRef = useRef(0);
     const recordingTimerRef = useRef(null);
+    const hadGameGuideRef = useRef(hasGameGuide);
+
+    useEffect(() => {
+        if (hasGameGuide && !hadGameGuideRef.current) {
+            setActiveTab('plan');
+        } else if (!hasGameGuide && hadGameGuideRef.current) {
+            setActiveTab('hrai');
+        }
+        hadGameGuideRef.current = hasGameGuide;
+    }, [hasGameGuide]);
 
     useEffect(() => {
         if (gamePlan || gameProgress) {
@@ -1007,8 +1096,22 @@ const HraiPanel = ({
     const handleGamePlanEdit = useCallback(() => {
         setGameIdea(gamePlan?.originalGoal || '');
         setGameStartPending(true);
+        setActiveTab('hrai');
         onGamePlanEdit();
     }, [gamePlan, onGamePlanEdit]);
+
+    const handleHraiTabClick = useCallback(() => setActiveTab('hrai'), []);
+    const handlePlanTabClick = useCallback(() => setActiveTab('plan'), []);
+
+    const handleTabKeyDown = useCallback(event => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+            return;
+        }
+        event.preventDefault();
+        const nextTab = activeTab === 'hrai' ? 'plan' : 'hrai';
+        setActiveTab(nextTab);
+        event.currentTarget.parentElement.querySelector(`#hrai-${nextTab}-tab`)?.focus();
+    }, [activeTab]);
 
     const handleHintClick = useCallback(() => {
         onHint();
@@ -1123,198 +1226,236 @@ const HraiPanel = ({
                 onPointerDown={handleResizeStart}
                 onKeyDown={handleResizeKeyDown}
             />
-            <h2 className={styles.title}>
-                <img
-                    className={styles.logo}
-                    src={hraiLogo}
-                    alt=""
-                    draggable={false}
-                />
-                <FormattedMessage {...messages.title} />
-            </h2>
-            {lesson && lessonStage ? (
-                <section className={styles.lessonCard}>
-                    <strong>
-                        <FormattedMessage
-                            {...messages.currentLesson}
-                            values={{title: lesson.title}}
+            <div
+                className={styles.tabList}
+                role="tablist"
+            >
+                <button
+                    id="hrai-hrai-tab"
+                    type="button"
+                    className={styles.tab}
+                    role="tab"
+                    aria-controls="hrai-hrai-panel"
+                    aria-selected={activeTab === 'hrai'}
+                    tabIndex={activeTab === 'hrai' ? 0 : -1}
+                    onClick={handleHraiTabClick}
+                    onKeyDown={handleTabKeyDown}
+                >
+                    <BrainIcon />
+                    <FormattedMessage {...messages.hraiTab} />
+                </button>
+                <button
+                    id="hrai-plan-tab"
+                    type="button"
+                    className={styles.tab}
+                    role="tab"
+                    aria-controls="hrai-plan-panel"
+                    aria-selected={activeTab === 'plan'}
+                    tabIndex={activeTab === 'plan' ? 0 : -1}
+                    onClick={handlePlanTabClick}
+                    onKeyDown={handleTabKeyDown}
+                >
+                    <PlanIcon />
+                    <FormattedMessage {...messages.planTab} />
+                </button>
+            </div>
+            {activeTab === 'hrai' ? (
+                <div
+                    id="hrai-hrai-panel"
+                    className={styles.tabPanel}
+                    role="tabpanel"
+                    aria-labelledby="hrai-hrai-tab"
+                >
+                    {lesson && lessonStage ? (
+                        <section className={styles.lessonCard}>
+                            <strong>
+                                <FormattedMessage
+                                    {...messages.currentLesson}
+                                    values={{title: lesson.title}}
+                                />
+                            </strong>
+                            <span>
+                                <FormattedMessage
+                                    {...messages.currentStage}
+                                    values={{
+                                        current: lessonStageIndex + 1,
+                                        total: lesson.stages.length
+                                    }}
+                                />
+                            </span>
+                            {lessonStageDetails?.title ? (
+                                <h3 className={styles.lessonStageTitle}>{lessonStageDetails.title}</h3>
+                            ) : null}
+                            <p>{lessonStageDetails?.goal || lessonStage}</p>
+                            {lessonStageDetails?.instruction ? (
+                                <div className={styles.lessonInstruction}>
+                                    <strong><FormattedMessage {...messages.stageAction} /></strong>
+                                    <p>{lessonStageDetails.instruction}</p>
+                                </div>
+                            ) : null}
+                            {lessonStageDetails?.success ? (
+                                <div className={styles.lessonSuccess}>
+                                    <strong><FormattedMessage {...messages.stageSuccess} /></strong>
+                                    <p>{lessonStageDetails.success}</p>
+                                </div>
+                            ) : null}
+                            {lessonStageComplete ? (
+                                <>
+                                    <strong><FormattedMessage {...messages.lessonComplete} /></strong>
+                                    {hasNextStage ? (
+                                        <Button
+                                            type="button"
+                                            className={styles.nextStageButton}
+                                            onClick={onNextStage}
+                                        >
+                                            <FormattedMessage {...messages.nextStage} />
+                                        </Button>
+                                    ) : null}
+                                </>
+                            ) : null}
+                        </section>
+                    ) : null}
+                    <div
+                        className={styles.messageList}
+                        aria-label={intl.formatMessage(messages.messageListLabel)}
+                        aria-live="polite"
+                        role="log"
+                    >
+                        {chatMessages.map(message => (
+                            <HraiMessage
+                                key={message.id}
+                                message={message}
+                                onAliasClick={handleAliasClick}
+                                formatBlockReference={formatBlockReference}
+                                formatBlockOpcode={formatBlockOpcode}
+                            />
+                        ))}
+                        {chatMessages.length === 0 && !lesson && !gamePlan && !gameProgress ? (
+                            <div className={styles.messageTutor}>
+                                <div className={styles.messageBubble}>
+                                    <FormattedMessage {...messages.gameStartPrompt} />
+                                </div>
+                            </div>
+                        ) : null}
+                        {gameStartPending && gameIdea ? (
+                            <GameStartCard
+                                hasProjectContent={hasProjectContent}
+                                isBusy={isPlanning || isStartingNewProject}
+                                idea={gameIdea}
+                                onNewProject={onStartNewProject}
+                                onPlan={onGamePlanRequest}
+                            />
+                        ) : null}
+                        {isThinking ? <ThinkingForge /> : null}
+                        <div ref={messagesEndRef} />
+                    </div>
+                    <form
+                        className={styles.inputArea}
+                        onSubmit={handleSubmit}
+                    >
+                        <textarea
+                            className={styles.messageInput}
+                            aria-label={intl.formatMessage(messages.inputLabel)}
+                            maxLength={!lesson && chatMessages.length === 0 ? MAX_GAME_IDEA_LENGTH : null}
+                            rows="3"
+                            disabled={Boolean(gamePlaytest)}
+                            value={draft}
+                            onChange={handleInputChange}
+                            onKeyDown={handleInputKeyDown}
                         />
-                    </strong>
-                    <span>
-                        <FormattedMessage
-                            {...messages.currentStage}
-                            values={{
-                                current: lessonStageIndex + 1,
-                                total: lesson.stages.length
-                            }}
-                        />
-                    </span>
-                    {lessonStageDetails?.title ? (
-                        <h3 className={styles.lessonStageTitle}>{lessonStageDetails.title}</h3>
-                    ) : null}
-                    <p>{lessonStageDetails?.goal || lessonStage}</p>
-                    {lessonStageDetails?.instruction ? (
-                        <div className={styles.lessonInstruction}>
-                            <strong><FormattedMessage {...messages.stageAction} /></strong>
-                            <p>{lessonStageDetails.instruction}</p>
-                        </div>
-                    ) : null}
-                    {lessonStageDetails?.success ? (
-                        <div className={styles.lessonSuccess}>
-                            <strong><FormattedMessage {...messages.stageSuccess} /></strong>
-                            <p>{lessonStageDetails.success}</p>
-                        </div>
-                    ) : null}
-                    {lessonStageComplete ? (
-                        <>
-                            <strong><FormattedMessage {...messages.lessonComplete} /></strong>
-                            {hasNextStage ? (
+                        <div className={styles.composerControls}>
+                            <div className={styles.composerActions}>
                                 <Button
                                     type="button"
-                                    className={styles.nextStageButton}
-                                    onClick={onNextStage}
+                                    className={styles.voiceButton}
+                                    aria-label={intl.formatMessage(
+                                        voicePhase === 'recording' ? messages.voiceStop :
+                                            voicePhase === 'transcribing' ? messages.voiceTranscribing :
+                                                messages.voiceStart
+                                    )}
+                                    title={intl.formatMessage(
+                                        voicePhase === 'transcribing' ? messages.voiceTranscribing :
+                                            voicePhase === 'recording' ? messages.voiceStop : messages.voiceStart
+                                    )}
+                                    disabled={voiceButtonDisabled}
+                                    onClick={handleVoiceButton}
                                 >
-                                    <FormattedMessage {...messages.nextStage} />
+                                    {voicePhase === 'recording' ? <StopIcon /> :
+                                        voicePhase === 'transcribing' ? <ProgressIcon /> : <MicrophoneIcon />}
                                 </Button>
-                            ) : null}
-                        </>
-                    ) : null}
-                </section>
-            ) : null}
-            {lesson ? null : gamePlaytest ? (
-                <GamePlaytestCard
-                    isStarting={isPlanning}
-                    playtest={gamePlaytest}
-                    onStart={onGamePlaytestComplete}
-                />
-            ) : gameProgress ? (
-                <GameProgressCard
-                    progress={gameProgress}
-                    onNext={onNextGameMilestone}
-                />
-            ) : gamePlan ? (
-                <GamePlanCard
-                    isAccepting={isPlanning}
-                    plan={gamePlan}
-                    onAccept={onGamePlanAccept}
-                    onEdit={handleGamePlanEdit}
-                />
-            ) : null}
-            <div
-                className={styles.messageList}
-                aria-label={intl.formatMessage(messages.messageListLabel)}
-                aria-live="polite"
-                role="log"
-            >
-                {chatMessages.map(message => (
-                    <HraiMessage
-                        key={message.id}
-                        message={message}
-                        onAliasClick={handleAliasClick}
-                        formatBlockReference={formatBlockReference}
-                        formatBlockOpcode={formatBlockOpcode}
-                    />
-                ))}
-                {chatMessages.length === 0 && !lesson && !gamePlan && !gameProgress ? (
-                    <div className={styles.messageTutor}>
-                        <div className={styles.messageBubble}>
-                            <FormattedMessage {...messages.gameStartPrompt} />
+                                <Button
+                                    type="button"
+                                    className={styles.hintButton}
+                                    disabled={hintDisabled}
+                                    aria-label={intl.formatMessage(messages.hintButton)}
+                                    title={hintExplanation || intl.formatMessage(messages.hintButton)}
+                                    onClick={handleHintClick}
+                                >
+                                    <span aria-hidden="true">🙏</span>
+                                </Button>
+                            </div>
+                            <Button
+                                type="submit"
+                                className={styles.sendButton}
+                                aria-label={intl.formatMessage(messages.sendButton)}
+                                title={intl.formatMessage(messages.sendButton)}
+                                disabled={!canSend || Boolean(gamePlaytest)}
+                            >
+                                <span aria-hidden="true">↑</span>
+                            </Button>
                         </div>
-                    </div>
-                ) : null}
-                {gameStartPending && gameIdea ? (
-                    <GameStartCard
-                        hasProjectContent={hasProjectContent}
-                        isBusy={isPlanning || isStartingNewProject}
-                        idea={gameIdea}
-                        onNewProject={onStartNewProject}
-                        onPlan={onGamePlanRequest}
-                    />
-                ) : null}
-                {isThinking ? (
-                    <p
-                        className={styles.thinking}
-                        aria-live="polite"
-                    >
-                        <FormattedMessage {...messages.thinking} />
-                    </p>
-                ) : null}
-                <div ref={messagesEndRef} />
-            </div>
-            <form
-                className={styles.inputArea}
-                onSubmit={handleSubmit}
-            >
-                <textarea
-                    className={styles.messageInput}
-                    aria-label={intl.formatMessage(messages.inputLabel)}
-                    maxLength={!lesson && chatMessages.length === 0 ? MAX_GAME_IDEA_LENGTH : null}
-                    rows="3"
-                    disabled={Boolean(gamePlaytest)}
-                    value={draft}
-                    onChange={handleInputChange}
-                    onKeyDown={handleInputKeyDown}
-                />
-                <div className={styles.composerControls}>
-                    <div className={styles.composerActions}>
-                        <Button
-                            type="button"
-                            className={styles.voiceButton}
-                            aria-label={intl.formatMessage(
-                                voicePhase === 'recording' ? messages.voiceStop :
-                                    voicePhase === 'transcribing' ? messages.voiceTranscribing :
-                                        messages.voiceStart
-                            )}
-                            title={intl.formatMessage(
-                                voicePhase === 'transcribing' ? messages.voiceTranscribing :
-                                    voicePhase === 'recording' ? messages.voiceStop : messages.voiceStart
-                            )}
-                            disabled={voiceButtonDisabled}
-                            onClick={handleVoiceButton}
-                        >
-                            {voicePhase === 'recording' ? <StopIcon /> :
-                                voicePhase === 'transcribing' ? <ProgressIcon /> : <MicrophoneIcon />}
-                        </Button>
-                        <Button
-                            type="button"
-                            className={styles.hintButton}
-                            disabled={hintDisabled}
-                            aria-label={intl.formatMessage(messages.hintButton)}
-                            title={hintExplanation || intl.formatMessage(messages.hintButton)}
-                            onClick={handleHintClick}
-                        >
-                            <span aria-hidden="true">🙏</span>
-                        </Button>
-                    </div>
-                    <Button
-                        type="submit"
-                        className={styles.sendButton}
-                        aria-label={intl.formatMessage(messages.sendButton)}
-                        title={intl.formatMessage(messages.sendButton)}
-                        disabled={!canSend || Boolean(gamePlaytest)}
-                    >
-                        <span aria-hidden="true">↑</span>
-                    </Button>
+                        {voiceErrorMessage ? (
+                            <p
+                                className={styles.voiceError}
+                                role="alert"
+                            >
+                                <FormattedMessage {...voiceErrorMessage} />
+                            </p>
+                        ) : null}
+                        {!voiceCapabilities.available && !voiceErrorMessage ? (
+                            <p className={styles.voiceStatus}>
+                                <FormattedMessage {...messages.voiceUnavailable} />
+                            </p>
+                        ) : null}
+                        {hintMaxReached ? (
+                            <p className={styles.hintExplanation}>
+                                {hintExplanation}
+                            </p>
+                        ) : null}
+                    </form>
                 </div>
-                {voiceErrorMessage ? (
-                    <p
-                        className={styles.voiceError}
-                        role="alert"
-                    >
-                        <FormattedMessage {...voiceErrorMessage} />
-                    </p>
-                ) : null}
-                {!voiceCapabilities.available && !voiceErrorMessage ? (
-                    <p className={styles.voiceStatus}>
-                        <FormattedMessage {...messages.voiceUnavailable} />
-                    </p>
-                ) : null}
-                {hintMaxReached ? (
-                    <p className={styles.hintExplanation}>
-                        {hintExplanation}
-                    </p>
-                ) : null}
-            </form>
+            ) : (
+                <div
+                    id="hrai-plan-panel"
+                    className={`${styles.tabPanel} ${styles.planPanel}`}
+                    role="tabpanel"
+                    aria-labelledby="hrai-plan-tab"
+                >
+                    {gamePlaytest ? (
+                        <GamePlaytestCard
+                            isStarting={isPlanning}
+                            playtest={gamePlaytest}
+                            onStart={onGamePlaytestComplete}
+                        />
+                    ) : gameProgress ? (
+                        <GameProgressCard
+                            progress={gameProgress}
+                            onNext={onNextGameMilestone}
+                        />
+                    ) : gamePlan ? (
+                        <GamePlanCard
+                            isAccepting={isPlanning}
+                            plan={gamePlan}
+                            onAccept={onGamePlanAccept}
+                            onEdit={handleGamePlanEdit}
+                        />
+                    ) : (
+                        <p className={styles.planEmpty}>
+                            <FormattedMessage {...messages.planEmpty} />
+                        </p>
+                    )}
+                </div>
+            )}
         </Box>
     );
 };

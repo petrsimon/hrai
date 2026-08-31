@@ -202,6 +202,22 @@ describe('HraiPanel lesson guidance', () => {
         expect(screen.getByText('Modrý voják má událost po kliknutí.')).toBeTruthy();
         expect(screen.queryByText('Navrhni vlastní hru')).toBeNull();
     });
+
+    test('shows the animated idea forge beneath the conversation while thinking', () => {
+        renderWithIntl(
+            <HraiPanel
+                isThinking
+                messages={[{id: 'idea', role: 'learner', text: 'Hra s drakem.'}]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        const status = screen.getByRole('status');
+        expect(status.textContent).toContain('The little dragon is forging ideas and code…');
+        expect(status.querySelector('img')).toBeTruthy();
+    });
 });
 
 describe('HraiPanel custom game planning', () => {
@@ -361,7 +377,9 @@ describe('HraiPanel custom game planning', () => {
 
         expect(screen.getByText('Teď si hru vyzkoušej')).toBeTruthy();
         expect(screen.getByText(/Spusť hru zelenou vlajkou/)).toBeTruthy();
+        fireEvent.click(screen.getByRole('tab', {name: 'Hrai'}));
         expect(screen.getByLabelText('Zpráva pro HRAI').disabled).toBe(true);
+        fireEvent.click(screen.getByRole('tab', {name: 'Plan'}));
         fireEvent.change(screen.getByLabelText('Co chceš po vyzkoušení změnit?'), {
             target: {value: 'Chci, aby drak skákal výš.'}
         });
@@ -392,6 +410,31 @@ describe('HraiPanel custom game planning', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Upravit nápad'}));
         expect(onGamePlanAccept).toHaveBeenCalledTimes(1);
         expect(onGamePlanEdit).toHaveBeenCalledTimes(1);
+    });
+
+    test('keeps the game plan in a separate tab from the Hrai conversation', () => {
+        renderWithIntl(
+            <HraiPanel
+                gamePlan={GAME_PLAN}
+                messages={[{id: 'reply', role: 'tutor', text: 'Plán je připravený.'}]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        const hraiTab = screen.getByRole('tab', {name: 'Hrai'});
+        const planTab = screen.getByRole('tab', {name: 'Plan'});
+        expect(planTab.getAttribute('aria-selected')).toBe('true');
+        expect(screen.getByText('Dračí bludiště')).toBeTruthy();
+        expect(screen.queryByLabelText('Zpráva pro HRAI')).toBeNull();
+
+        fireEvent.click(hraiTab);
+
+        expect(hraiTab.getAttribute('aria-selected')).toBe('true');
+        expect(screen.getByText('Plán je připravený.')).toBeTruthy();
+        expect(screen.getByLabelText('Zpráva pro HRAI')).toBeTruthy();
+        expect(screen.queryByText('Dračí bludiště')).toBeNull();
     });
 
     test('keeps the north star and current milestone visible after acceptance', () => {
