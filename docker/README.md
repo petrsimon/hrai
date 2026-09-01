@@ -118,6 +118,53 @@ is text-only, so the multimodal projector is disabled; reasoning is also disable
 replies stay concise. HRAI selects it with `HRAI_MODEL_BACKEND=llama.cpp`; Ollama
 remains the default for non-Compose development and evaluation commands.
 
+## Run without a model server, using a host agent CLI
+
+`docker-compose.agent.yml` is a second, self-contained stack: editor, tutor, and
+whisper, with no llama.cpp. The tutor spawns the host's `codex` CLI instead of
+calling a model server, so the answers come from the host's own login and no GPU
+or GGUF download is involved.
+
+**The child's rendered project and chat leave the machine** and reach the agent
+CLI's provider. Use this stack only where that is acceptable.
+
+Prepare the environment file once:
+
+```sh
+cp docker/agent.env.example docker/agent.env
+```
+
+Set `CODEX_BIN` to `command -v codex`, `CODEX_HOME_HOST_DIR` to the host `~/.codex`,
+and `HOST_UID`/`HOST_GID` to `id -u` / `id -g`. The container runs as that user, so
+files it writes into the mounted agent home and data directory stay host-owned.
+`codex` is a static binary, so the host executable runs unchanged inside the image.
+
+Create the data directory and start:
+
+```sh
+mkdir -p .hrai-data
+docker compose --env-file docker/agent.env -f docker-compose.agent.yml up -d --build
+```
+
+The editor is published on `0.0.0.0:${EDITOR_PORT}` (8080 by default), so another
+machine on the network reaches it at `http://<host>:8080/`. `HRAI_SERVER_URL` stays
+unset, so the editor calls the API on whatever origin it was opened from and nginx
+proxies `/api/` and `/socket.io/` to the tutor.
+
+Log in on the host before starting, and check the container sees the same login:
+
+```sh
+codex login status
+docker compose --env-file docker/agent.env -f docker-compose.agent.yml exec hrai codex login status
+```
+
+To use `pi` instead, set `HRAI_AGENT_BACKEND=pi` and mount the host `pi`
+installation directory and `~/.pi` in place of the codex mounts; `pi` is
+dynamically linked, so mount its whole install directory, not just the binary.
+
+Stop it with `docker compose --env-file docker/agent.env -f docker-compose.agent.yml down`.
+Profiles and projects live in the `.hrai-data` host directory, not in a volume.
+
 ## Run the game-design eval on Ubuntu
 
 The model capability eval runs as a one-shot, opt-in Compose service. It joins the

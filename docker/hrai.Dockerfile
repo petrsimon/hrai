@@ -7,7 +7,7 @@ RUN npm ci --omit=dev --workspace=@hrai/server --include-workspace-root=false --
 FROM node:24-bookworm-slim
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends --yes ffmpeg \
+    && apt-get install --no-install-recommends --yes ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
