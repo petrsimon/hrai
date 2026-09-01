@@ -1,0 +1,87 @@
+# Editor + tutor with no local model server: the tutor spawns a coding-agent CLI
+# taken from the host, so the host's own login is what answers.
+#
+#   docker compose -f docker-compose.agent.yml up -d --build
+#
+# `codex` is a static binary and is bind-mounted straight in. Its home directory
+# is mounted too, so the container reuses the host login; the container runs as
+# the host user to keep that directory's files owned by the host user.
+services:
+  whisper-model:
+    image: alpine:3.22
+    command:
+      - sh
+      - -c
+      - >-
+        if [ ! -s /models/${HRAI_STT_MODEL_FILE:-ggml-small.bin} ]; then
+        wget -O /models/${HRAI_STT_MODEL_FILE:-ggml-small.bin}
+        "${HRAI_STT_MODEL_URL:-https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin?download=true}";
+        fi
+    volumes:
+      - whisper-model-cache:/models
+    restart: "no"
+
+  whisper:
+    image: ${WHISPER_IMAGE:-ghcr.io/ggml-org/whisper.cpp:main}
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        server=whisper-server;
+        if command -v whisper-whisper-server >/dev/null 2>&1; then server=whisper-whisper-server; fi;
+        exec "$$server" -m /models/${HRAI_STT_MODEL_FILE:-ggml-small.bin}
+        --host 0.0.0.0 --port 8080
+    volumes:
+      - whisper-model-cache:/models:ro
+    expose:
+      - "8080"
+    depends_on:
+      whisper-model:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  hrai:
+    build:
+      context: .
+      dockerfile: docker/hrai.Dockerfile
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      HRAI_MODEL_BACKEND: ${HRAI_AGENT_BACKEND:-codex}
+      HRAI_AGENT_MODEL: ${HRAI_AGENT_MODEL:-}
+      # An agent CLI answers far slower than a local server, so the default
+      # 120 s per-call timeout cuts long tutor replies off.
+      HRAI_AGENT_TIMEOUT_MS: ${HRAI_AGENT_TIMEOUT_MS:-300000}
+      HRAI_AGENT_CWD: /sandbox
+      HRAI_STT_HOST: http://whisper:8080
+      HRAI_PORT: "8791"
+      HRAI_DATA_DIR: /data
+      # Only CODEX_HOME is mounted; a writable HOME keeps any stray cache write
+      # from failing against the read-only image.
+      HOME: /tmp
+      CODEX_HOME: /agent-home/.codex
+      NO_COLOR: "1"
+    volumes:
+      - ${HRAI_DATA_HOST_DIR:-./.hrai-data}:/data
+      - ${CODEX_BIN:-/usr/bin/codex}:/usr/local/bin/codex:ro
+      - ${CODEX_HOME_HOST_DIR:-/home/petr/.codex}:/agent-home/.codex
+    # The agent CLI runs with this as its working directory; it must be writable
+    # and must not contain a source tree or an AGENTS.md.
+    tmpfs:
+      - /sandbox
+    expose:
+      - "8791"
+    restart: unless-stopped
+
+  editor:
+    build:
+      context: .
+      dockerfile: docker/editor.Dockerfile
+      args:
+        HRAI_SERVER_URL: ${HRAI_SERVER_URL:-}
+    ports:
+      - "${EDITOR_PORT:-8080}:8080"
+    depends_on:
+      - hrai
+    restart: unless-stopped
+
+volumes:
+  whisper-model-cache:
