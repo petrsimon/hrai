@@ -3,7 +3,6 @@ import {parseGamePlan} from "../src/game-plan.ts";
 
 const VALID_PLAN = {
     title: "Dračí bludiště",
-    originalGoal: "Proveď draka bludištěm a najdi poklad.",
     coreLoop: "Hráč pohybuje drakem, vyhýbá se stěnám a hledá poklad.",
     milestones: [
         {
@@ -71,9 +70,25 @@ describe("game plan parser", () => {
         }))).toThrow(/milestones/);
     });
 
-    it("rejects missing or oversized goal fields", () => {
-        expect(() => parseGamePlan(JSON.stringify({...VALID_PLAN, originalGoal: ""}))).toThrow(/originalGoal/);
-        expect(() => parseGamePlan(JSON.stringify({...VALID_PLAN, coreLoop: "x".repeat(501)}))).toThrow(/coreLoop/);
+    it("rejects oversized fields at their individual limits", () => {
+        expect(() => parseGamePlan(JSON.stringify({...VALID_PLAN, title: "x".repeat(61)}))).toThrow(/title/);
+        expect(() => parseGamePlan(JSON.stringify({
+            ...VALID_PLAN,
+            milestones: [{...VALID_PLAN.milestones[0], outcome: "x".repeat(161)}, ...VALID_PLAN.milestones.slice(1)],
+        }))).toThrow(/outcome/);
+        expect(() => parseGamePlan(JSON.stringify({
+            ...VALID_PLAN,
+            milestones: [{...VALID_PLAN.milestones[0], why: "x".repeat(161)}, ...VALID_PLAN.milestones.slice(1)],
+        }))).toThrow(/why/);
+        expect(() => parseGamePlan(JSON.stringify({
+            ...VALID_PLAN,
+            milestones: [{...VALID_PLAN.milestones[0], concept: "x".repeat(161)}, ...VALID_PLAN.milestones.slice(1)],
+        }))).toThrow(/concept/);
+        expect(() => parseGamePlan(JSON.stringify({
+            ...VALID_PLAN,
+            milestones: [{...VALID_PLAN.milestones[0], doneWhen: "x".repeat(161)}, ...VALID_PLAN.milestones.slice(1)],
+        }))).toThrow(/doneWhen/);
+        expect(() => parseGamePlan(JSON.stringify({...VALID_PLAN, coreLoop: "x".repeat(201)}))).toThrow(/coreLoop/);
     });
 
     it("rejects missing, unsupported, or oversized assessment contracts", () => {

@@ -72,15 +72,11 @@ export function opcodesNamedByLabel(text: string): string[] {
 }
 
 /**
- * Renders the palette as prompt text, grouped by category.
- *
- * Grouping matters: the failure was a category claim, and a flat list makes the
- * category look like a per-block attribute the model can guess rather than a heading
- * it must read.
- * @param opcodes Restrict to these opcodes, e.g. a lesson's in-scope list. Omit for all.
- * @returns Lines of `opcode = label` grouped under Czech category headings.
+ * Groups palette entries by their Czech category.
+ * @param opcodes Restrict to these opcodes. Omit for all.
+ * @returns Palette entries grouped in catalogue order.
  */
-export function paletteForPrompt(opcodes?: readonly string[]): string {
+function entriesByCategory(opcodes?: readonly string[]): Map<string, PaletteEntry[]> {
     const allowed = opcodes ? new Set(opcodes) : null;
     const byCategory = new Map<string, PaletteEntry[]>();
     for (const entry of PALETTE) {
@@ -89,18 +85,42 @@ export function paletteForPrompt(opcodes?: readonly string[]): string {
         list.push(entry);
         byCategory.set(entry.category, list);
     }
+    return byCategory;
+}
 
-    const lines: string[] = ["BARVY KATEGORIÍ:"];
-    for (const [category, entries] of byCategory) {
-        const categoryKey = entries[0]?.categoryKey;
-        lines.push(`  ${category} = ${categoryKey ? CATEGORY_COLORS[categoryKey] ?? "neuvedená" : "neuvedená"}`);
-    }
-    lines.push("");
+function catalogueLines(byCategory: Map<string, PaletteEntry[]>): string[] {
+    const lines: string[] = [];
     for (const [category, entries] of byCategory) {
         lines.push(`${category}:`);
         for (const entry of entries) {
             lines.push(`  ${entry.opcode} = ${entry.cs}`);
         }
     }
+    return lines;
+}
+
+/**
+ * Renders the palette catalogue without category colours.
+ * @param opcodes Restrict to these opcodes. Omit for all.
+ * @returns Lines of `opcode = label` grouped under Czech category headings.
+ */
+export function paletteCatalogue(opcodes?: readonly string[]): string {
+    return catalogueLines(entriesByCategory(opcodes)).join("\n");
+}
+
+/**
+ * Renders the palette as prompt text, grouped by category and prefixed with colours.
+ * @param opcodes Restrict to these opcodes, e.g. a lesson's in-scope list. Omit for all.
+ * @returns Category colours followed by grouped `opcode = label` catalogue lines.
+ */
+export function paletteForPrompt(opcodes?: readonly string[]): string {
+    const byCategory = entriesByCategory(opcodes);
+    const lines: string[] = ["BARVY KATEGORIÍ:"];
+    for (const [category, entries] of byCategory) {
+        const categoryKey = entries[0]?.categoryKey;
+        lines.push(`  ${category} = ${categoryKey ? CATEGORY_COLORS[categoryKey] ?? "neuvedená" : "neuvedená"}`);
+    }
+    lines.push("");
+    lines.push(...catalogueLines(byCategory));
     return lines.join("\n");
 }

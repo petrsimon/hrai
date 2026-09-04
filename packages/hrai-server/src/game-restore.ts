@@ -1,4 +1,4 @@
-import {parseGamePlan, type GamePlan} from "./game-plan.ts";
+import {MAX_GAME_IDEA_LENGTH, parseGamePlan, type GamePlan} from "./game-plan.ts";
 import type {GamePhase} from "./session.ts";
 
 export interface RestoredGame {
@@ -22,7 +22,16 @@ export function parseGameRestore(payload: unknown): RestoredGame | null {
     const feedback = typeof storedFeedback === "string" ? storedFeedback.slice(0, 1000) : "";
 
     try {
-        const plan = parseGamePlan(JSON.stringify(storedPlan));
+        if (typeof storedPlan !== "object" || storedPlan === null || Array.isArray(storedPlan)) return null;
+        const storedPlanObject = storedPlan as Record<string, unknown>;
+        const originalGoal = storedPlanObject.originalGoal;
+        if (typeof originalGoal !== "string") return null;
+        const trimmedGoal = originalGoal.trim();
+        if (trimmedGoal.length === 0 || trimmedGoal.length > MAX_GAME_IDEA_LENGTH) return null;
+        const plan = {
+            ...parseGamePlan(JSON.stringify(storedPlan)),
+            originalGoal: trimmedGoal,
+        };
         if ((milestoneIndex as number) >= plan.milestones.length) return null;
         return {plan, milestoneIndex: milestoneIndex as number, phase, feedback};
     } catch {

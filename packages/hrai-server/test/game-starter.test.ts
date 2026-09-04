@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {createGameStarter} from "../src/game-starter.ts";
+import {createGameStarter, gameStarterToRenderTargets} from "../src/game-starter.ts";
 import type {GamePlan} from "../src/game-plan.ts";
 
 const PLAN: GamePlan = {
@@ -59,5 +59,33 @@ describe("custom game starter", () => {
         expect(starter.monitors).toEqual([
             expect.objectContaining({opcode: "data_variable", visible: true}),
         ]);
+    });
+
+    it("converts starter blocks to render targets for structural assessment", () => {
+        const starter = createGameStarter(PLAN);
+        const targets = gameStarterToRenderTargets(starter);
+        const player = targets.find(target => target.name === "Hráč");
+        const stage = targets.find(target => target.isStage);
+        if (!player) throw new Error("render fixture must contain a player");
+        if (!stage) throw new Error("render fixture must contain a stage");
+
+        expect(player.blocks["player-loop"]?.inputs.SUBSTACK).toEqual({
+            name: "SUBSTACK",
+            block: "right-if",
+            shadow: null,
+        });
+        expect(player.blocks["right-key"]?.inputs.KEY_OPTION).toEqual({
+            name: "KEY_OPTION",
+            block: null,
+            shadow: "right-key-menu",
+        });
+        expect(player.blocks["right-move"]?.inputs.DX).toEqual({
+            name: "DX",
+            block: null,
+            shadow: null,
+        });
+        expect(player.blocks["player-event"]?.topLevel).toBe(true);
+        expect(player.blocks["right-key-menu"]?.shadow).toBe(true);
+        expect(stage.variables).toEqual({"hrai-score": ["Skóre", 0]});
     });
 });

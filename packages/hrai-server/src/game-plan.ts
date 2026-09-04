@@ -1,4 +1,4 @@
-import {PALETTE} from "./palette.ts";
+import {PALETTE, paletteCatalogue} from "./palette.ts";
 
 /** A child-approved plan for turning their game idea into learning milestones. */
 export interface GamePlan {
@@ -9,6 +9,8 @@ export interface GamePlan {
     coreLoop: string;
     milestones: GameMilestone[];
 }
+
+export type GamePlanProposal = Omit<GamePlan, "originalGoal">;
 
 export interface GameMilestone {
     /** Server-assigned stable identifier; never trusted from model output. */
@@ -40,7 +42,9 @@ export const MAX_GAME_IDEA_LENGTH = 500;
 
 const MIN_MILESTONES = 3;
 const MAX_MILESTONES = 4;
-const MAX_FIELD_LENGTH = MAX_GAME_IDEA_LENGTH;
+const MAX_TITLE_LENGTH = 60;
+const MAX_CORE_LOOP_LENGTH = 200;
+const MAX_MILESTONE_FIELD_LENGTH = 160;
 const MIN_CRITERIA = 1;
 const MAX_CRITERIA = 4;
 const MAX_CRITERION_OPCODES = 5;
@@ -61,18 +65,27 @@ export function gamePlanningSystemPrompt(): string {
         "Piš stručně: title nejvýše 5 slov; outcome, why, concept a doneWhen každý nejvýše 12 slov.",
         "Každý milník musí mít jeden viditelný výsledek, jeden programovací pojem a pozorovatelnou podmínku hotovo.",
         "Ke každému milníku přidej skrytý assessment: server ověří jeho allOf proti struktuře projektu.",
+        "PROTOTYP UŽ OBSAHUJE: dvě postavy Hráč a Cíl; jejich skripty začínají event_whenflagclicked.",
+        "Hráč už má pohyb šipkami: control_forever, control_if, sensing_keypressed, motion_changexby a motion_changeyby.",
+        "Cíl už má sensing_touchingobject, data_changevariableby, looks_sayforsecs, operator_random a motion_gotoxy; scéna má proměnnou Skóre s data_setvariableto a looks_say.",
+        "Každý assessment musí vyžadovat strukturální důkaz, který prototyp ještě nesplňuje; jinak je milník hotový hned.",
         "projectContains znamená, že všechny opcodes existují někde v projektu.",
         "scriptContains znamená, že všechny opcodes jsou v jednom propojeném skriptu; minimum je počet takových skriptů.",
+        "projectContains používej pouze pro inventární cíl „projekt obsahuje X“.",
+        "Chování „když X, stane se Y“ vždy ověřuj pomocí scriptContains.",
         "spriteCountAtLeast a variableCountAtLeast používají pouze minimum.",
         "Assessment smí mít 1 až 4 podmínky, seznam opcodes 1 až 5 položek a minimum 1 až 10.",
-        `Používej pouze tyto přesné opcodes: ${[...PALETTE_OPCODES].join(", ")}`,
+        "DOBRÝ assessment: scriptContains s sensing_touchingcolor a control_if vyžaduje novou propojenou logiku.",
+        "ŠPATNÝ assessment: projectContains s event_whenflagclicked, protože ho prototyp už obsahuje.",
+        "Používej pouze přesné opcodes z tohoto katalogu, seskupeného podle kategorií:",
+        paletteCatalogue(),
         "Nevypisuj hotové scénáře ani postup spojování bloků. Dítě bude programovat samo s nápovědou tutora.",
         "Opcodes patří pouze do skrytého assessment; nikdy je nevkládej do title, outcome, why, concept ani doneWhen.",
         "Odpověz pouze jedním JSON objektem bez Markdownu a bez dalšího textu.",
         "Použij přesně tento tvar:",
-        '{"title":"...","originalGoal":"...","coreLoop":"...","milestones":[' +
+        '{"title":"...","coreLoop":"...","milestones":[' +
             '{"title":"...","outcome":"...","why":"...","concept":"...","doneWhen":"...",' +
-            '"assessment":{"allOf":[{"kind":"scriptContains","opcodes":["event_whenflagclicked"],' +
+            '"assessment":{"allOf":[{"kind":"scriptContains","opcodes":["sensing_touchingcolor"],' +
             '"minimum":1}]}}]}'
     ].join("\n");
 }
@@ -99,11 +112,11 @@ function objectValue(value: unknown, field: string): Record<string, unknown> {
     return value as Record<string, unknown>;
 }
 
-function stringValue(value: unknown, field: string): string {
+function stringValue(value: unknown, field: string, maxLength: number): string {
     if (typeof value !== "string") throw new Error(`Game plan ${field} must be a string`);
     const trimmed = value.trim();
-    if (trimmed.length === 0 || trimmed.length > MAX_FIELD_LENGTH) {
-        throw new Error(`Game plan ${field} must contain 1-${MAX_FIELD_LENGTH} characters`);
+    if (trimmed.length === 0 || trimmed.length > maxLength) {
+        throw new Error(`Game plan ${field} must contain 1-${maxLength} characters`);
     }
     return trimmed;
 }
@@ -171,9 +184,9 @@ function assessmentValue(value: unknown, field: string): GameAssessment {
  * object is accepted, but only whitelisted fields survive and milestone IDs are
  * assigned by the server.
  * @param text Raw model reply.
- * @returns Validated game plan.
+ * @returns Validated model proposal without the child-owned original goal.
  */
-export function parseGamePlan(text: string): GamePlan {
+export function parseGamePlan(text: string): GamePlanProposal {
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
     if (start < 0 || end <= start) throw new Error("Game plan response contained no JSON object");
@@ -193,18 +206,33 @@ export function parseGamePlan(text: string): GamePlan {
     }
 
     return {
-        title: stringValue(root.title, "title"),
-        originalGoal: stringValue(root.originalGoal, "originalGoal"),
-        coreLoop: stringValue(root.coreLoop, "coreLoop"),
+        title: stringValue(root.title, "title", MAX_TITLE_LENGTH),
+        coreLoop: stringValue(root.coreLoop, "coreLoop", MAX_CORE_LOOP_LENGTH),
         milestones: root.milestones.map((value, index) => {
             const milestone = objectValue(value, `milestones[${index}]`);
             return {
                 id: `milestone-${index + 1}`,
-                title: stringValue(milestone.title, `milestones[${index}].title`),
-                outcome: stringValue(milestone.outcome, `milestones[${index}].outcome`),
-                why: stringValue(milestone.why, `milestones[${index}].why`),
-                concept: stringValue(milestone.concept, `milestones[${index}].concept`),
-                doneWhen: stringValue(milestone.doneWhen, `milestones[${index}].doneWhen`),
+                title: stringValue(milestone.title, `milestones[${index}].title`, MAX_TITLE_LENGTH),
+                outcome: stringValue(
+                    milestone.outcome,
+                    `milestones[${index}].outcome`,
+                    MAX_MILESTONE_FIELD_LENGTH,
+                ),
+                why: stringValue(
+                    milestone.why,
+                    `milestones[${index}].why`,
+                    MAX_MILESTONE_FIELD_LENGTH,
+                ),
+                concept: stringValue(
+                    milestone.concept,
+                    `milestones[${index}].concept`,
+                    MAX_MILESTONE_FIELD_LENGTH,
+                ),
+                doneWhen: stringValue(
+                    milestone.doneWhen,
+                    `milestones[${index}].doneWhen`,
+                    MAX_MILESTONE_FIELD_LENGTH,
+                ),
                 assessment: assessmentValue(milestone.assessment, `milestones[${index}].assessment`),
             };
         }),

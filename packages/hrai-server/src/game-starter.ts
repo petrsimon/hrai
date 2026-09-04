@@ -1,4 +1,5 @@
 import type {GamePlan} from "./game-plan.ts";
+import type {Block, BlockField, BlockInput, RenderTarget} from "./render.ts";
 
 /** A small Scratch program installed before the child begins tutoring. */
 export interface GameStarter {
@@ -51,6 +52,44 @@ const numberInput = (value: number): unknown[] => [1, [4, String(value)]];
 const textInput = (value: string): unknown[] => [1, [10, value]];
 const blockInput = (id: string): unknown[] => [2, id];
 const shadowInput = (id: string): unknown[] => [1, id];
+
+function renderInput(name: string, value: unknown): BlockInput {
+    if (!Array.isArray(value)) return {name, block: null, shadow: null};
+    if (value[0] === 1 && typeof value[1] === "string") {
+        return {name, block: null, shadow: value[1]};
+    }
+    if (value[0] === 2 && typeof value[1] === "string") {
+        return {name, block: value[1], shadow: null};
+    }
+    if (value[0] === 3 && typeof value[1] === "string" && typeof value[2] === "string") {
+        return {name, block: value[1], shadow: value[2]};
+    }
+    return {name, block: null, shadow: null};
+}
+
+function renderField(name: string, value: unknown): BlockField {
+    return {
+        name,
+        value: Array.isArray(value) ? value[0] : value,
+    };
+}
+
+function renderBlock(starterBlock: GameStarterBlock): Block {
+    return {
+        id: starterBlock.id,
+        opcode: starterBlock.opcode,
+        next: starterBlock.next,
+        parent: starterBlock.parent,
+        inputs: Object.fromEntries(Object.entries(starterBlock.inputs).map(([name, value]) => (
+            [name, renderInput(name, value)]
+        ))),
+        fields: Object.fromEntries(Object.entries(starterBlock.fields).map(([name, value]) => (
+            [name, renderField(name, value)]
+        ))),
+        topLevel: starterBlock.topLevel,
+        shadow: starterBlock.shadow,
+    };
+}
 
 const block = (
     id: string,
@@ -270,4 +309,21 @@ export function createGameStarter(plan: GamePlan): GameStarter {
             isDiscrete: true,
         }],
     };
+}
+
+/**
+ * Converts the starter's SB3-shaped block data to the normalized render shape.
+ * @param starter Trusted starter project.
+ * @returns Targets suitable for structural game assessment.
+ */
+export function gameStarterToRenderTargets(starter: GameStarter): RenderTarget[] {
+    return starter.targets.map((target, index) => ({
+        id: `starter-target-${index + 1}`,
+        name: target.name,
+        isStage: target.isStage,
+        blocks: Object.fromEntries(Object.entries(target.blocks).map(([id, block]) => (
+            [id, renderBlock(block)]
+        ))),
+        variables: target.variables,
+    }));
 }
