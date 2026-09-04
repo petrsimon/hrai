@@ -237,7 +237,7 @@ describe('HraiPanel lesson guidance', () => {
         fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
 
         expect(onSend).not.toHaveBeenCalled();
-        expect(screen.getByRole('button', {name: 'Odeslat'}).disabled).toBe(true);
+        expect(screen.getByRole('button', {name: 'Odeslat'}).getAttribute('aria-disabled')).toBe('true');
     });
 });
 

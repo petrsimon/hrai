@@ -1190,6 +1190,7 @@ const HraiPanel = ({
     const lessonStageComplete = Boolean(lessonProgress?.complete);
     const hasNextStage = Boolean(lesson && lessonStageIndex < lesson.stages.length - 1);
     const hintDisabled = isThinking || hintMaxReached || Boolean(gamePlaytest);
+    const sendDisabled = !canSend || Boolean(gamePlaytest) || isThinking;
     const hintExplanation = hintMaxReached ?
         intl.formatMessage(messages.hintMaxReached) :
         null;
@@ -1402,7 +1403,8 @@ const HraiPanel = ({
                                 className={styles.sendButton}
                                 aria-label={intl.formatMessage(messages.sendButton)}
                                 title={intl.formatMessage(messages.sendButton)}
-                                disabled={!canSend || Boolean(gamePlaytest) || isThinking}
+                                aria-disabled={sendDisabled}
+                                disabled={sendDisabled}
                             >
                                 <span aria-hidden="true">↑</span>
                             </Button>
