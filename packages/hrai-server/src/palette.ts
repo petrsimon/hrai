@@ -115,12 +115,23 @@ export function paletteCatalogue(opcodes?: readonly string[]): string {
  */
 export function paletteForPrompt(opcodes?: readonly string[]): string {
     const byCategory = entriesByCategory(opcodes);
+    return [...colourLines(byCategory), "", ...catalogueLines(byCategory)].join("\n");
+}
+
+function colourLines(byCategory: Map<string, PaletteEntry[]>): string[] {
     const lines: string[] = ["BARVY KATEGORIÍ:"];
     for (const [category, entries] of byCategory) {
         const categoryKey = entries[0]?.categoryKey;
         lines.push(`  ${category} = ${categoryKey ? CATEGORY_COLORS[categoryKey] ?? "neuvedená" : "neuvedená"}`);
     }
-    lines.push("");
-    lines.push(...catalogueLines(byCategory));
-    return lines.join("\n");
+    return lines;
+}
+
+/**
+ * Renders only the category names and colours, for a rung that may name a category
+ * but not yet a block.
+ * @returns Lines of `category = colour`.
+ */
+export function categoryColoursForPrompt(): string {
+    return colourLines(entriesByCategory()).join("\n");
 }
