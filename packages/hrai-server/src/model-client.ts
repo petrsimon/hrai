@@ -86,7 +86,12 @@ interface OpenAIModelsResponse {
 }
 
 interface OpenAIChatResponse {
-    choices?: { message?: { content?: string } }[];
+    choices?: { message?: { content?: string }; finish_reason?: string }[];
+}
+
+interface OllamaChatResponse {
+    message?: { content?: string };
+    done_reason?: string;
 }
 
 interface OpenAIStreamChunk {
@@ -156,7 +161,7 @@ function ollamaRequestBody(system: string, user: string, stream: boolean, model:
             { role: "system", content: system },
             { role: "user", content: user },
         ],
-        options: { temperature: 0, num_ctx: stream ? 8192 : 4096 },
+        options: { temperature: 0, num_ctx: 8192 },
     };
 }
 
@@ -170,7 +175,7 @@ function llamaRequestBody(system: string, user: string, stream: boolean, model: 
             { role: "user", content: user },
         ],
         temperature: 0,
-        max_tokens: json ? 768 : 512,
+        max_tokens: json ? 1536 : 512,
         // Qwen3.5 otherwise emits a long reasoning trace before the tutor reply.
         chat_template_kwargs: { enable_thinking: false },
     };
@@ -282,10 +287,16 @@ async function complete(
         body: JSON.stringify(requestBody(system, user, false, model, backend, json)),
     });
     if (!res.ok) throw new Error(`${host} returned ${res.status} ${res.statusText}`);
-    const body = (await res.json()) as OpenAIChatResponse | { message?: { content?: string } };
+    const body = (await res.json()) as OpenAIChatResponse | OllamaChatResponse;
+    const finishReason = backend === "llama.cpp"
+        ? (body as OpenAIChatResponse).choices?.[0]?.finish_reason
+        : (body as OllamaChatResponse).done_reason;
+    if (finishReason === "length") {
+        throw new Error(`${host} response was truncated at the model token limit`);
+    }
     const text = backend === "llama.cpp"
         ? (body as OpenAIChatResponse).choices?.[0]?.message?.content
-        : (body as { message?: { content?: string } }).message?.content;
+        : (body as OllamaChatResponse).message?.content;
     if (typeof text !== "string") throw new Error(`${host} returned no message content`);
     return { text: text.trim(), seconds: (performance.now() - started) / 1000 };
 }

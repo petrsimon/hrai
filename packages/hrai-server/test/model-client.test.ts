@@ -55,6 +55,7 @@ describe("llama.cpp model client", () => {
             const request = JSON.parse(init?.body as string) as {
                 stream: boolean;
                 temperature: number;
+                max_tokens: number;
                 chat_template_kwargs: object;
                 response_format?: {type: string};
             };
@@ -90,6 +91,33 @@ describe("llama.cpp model client", () => {
             return body.response_format?.type === "json_object";
         });
         expect(jsonRequest).toBeDefined();
+        const jsonBody = JSON.parse(jsonRequest?.[1]?.body as string) as {max_tokens: number};
+        expect(jsonBody.max_tokens).toBe(1536);
+    });
+
+    it.each([
+        ["llama.cpp", {choices: [{message: {content: "{"}, finish_reason: "length"}]}],
+        ["ollama", {message: {content: "{"}, done_reason: "length"}],
+    ] as const)("reports %s length-limited JSON replies as truncated", async (backend, body) => {
+        if (backend === "llama.cpp") {
+            process.env.HRAI_MODEL_BACKEND = backend;
+            process.env.HRAI_MODEL_HOST = "http://llama.test";
+        }
+        const requests: {max_tokens?: number}[] = [];
+        const fetchMock = vi.fn((_: RequestInfo | URL, init?: RequestInit) => {
+            requests.push(JSON.parse(init?.body as string) as {max_tokens?: number});
+            return new Response(JSON.stringify(body));
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        const {chatJson} = await loadModelClient();
+
+        await expect(chatJson("system", "user")).rejects.toThrow(/truncated/);
+        if (backend === "llama.cpp") {
+            expect(requests[0]?.max_tokens).toBe(1536);
+        } else {
+            expect(requests[0]?.max_tokens).toBeUndefined();
+        }
     });
 
     it("delegates agent chat calls without fetching", async () => {
@@ -256,5 +284,31 @@ describe("llama.cpp model client", () => {
         await chat("system", "user", "model", "ollama");
 
         expect(fetchMock.mock.calls[0]?.[0]).toBe("http://ollama.test/api/chat");
+    });
+
+    it("uses the full context window for streamed and complete Ollama requests", async () => {
+        process.env.HRAI_MODEL_BACKEND = "ollama";
+        const fetchMock = vi.fn((_: RequestInfo | URL, init?: RequestInit) => {
+            const request = JSON.parse(init?.body as string) as {options: {num_ctx: number}; stream: boolean};
+            if (!request.stream) return new Response(JSON.stringify({message: {content: "Hotovo"}}));
+
+            const encoder = new TextEncoder();
+            const body = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(encoder.encode('{"message":{"content":"Hotovo"}}\n'));
+                    controller.close();
+                },
+            });
+            return new Response(body);
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        const {chat, chatStream} = await loadModelClient();
+        await chatStream("system", "user", () => undefined);
+        await chat("system", "user");
+
+        expect(fetchMock.mock.calls.map(([, init]) => (
+            JSON.parse(init?.body as string) as {options: {num_ctx: number}}
+        ).options.num_ctx)).toEqual([8192, 8192]);
     });
 });
