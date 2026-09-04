@@ -312,6 +312,11 @@ export async function runAgent(
             // Parsing the flushed tail can surface an error event that settles the promise.
             if (isSettled()) return;
 
+            if (code !== 0) {
+                settleReject(new Error(`${spec.command} exited ${code}: ${stderrTail.toString()}`));
+                return;
+            }
+
             if (finalText === undefined && accumulated === "") {
                 // Exiting 0 having emitted no reply means the CLI failed in a way it did not report
                 // as an event — an auth banner, say. Resolving here would hand the child an empty

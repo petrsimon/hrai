@@ -241,7 +241,25 @@ describe("agent CLI runner", () => {
         child.stderr.push("useful stderr tail");
         await completeChild(child, [], 2);
 
-        await expect(replyPromise).rejects.toThrow("pi exited 2 without a reply: useful stderr tail");
+        await expect(replyPromise).rejects.toThrow("pi exited 2: useful stderr tail");
+    });
+
+    it("rejects a non-zero exit even after receiving partial output", async () => {
+        const child = createChild();
+        spawnMock.mockReturnValue(child);
+        const {runAgent} = await loadAgentCli();
+        const replyPromise = runAgent("pi", {system: "system", user: "user"});
+
+        child.stderr.push("fatal stderr");
+        await completeChild(child, [
+            JSON.stringify({
+                type: "message_update",
+                assistantMessageEvent: {type: "text_delta", delta: "partial"},
+            }),
+        ], 7);
+
+        await expect(replyPromise).rejects.toThrow("pi exited 7");
+        await expect(replyPromise).rejects.toThrow("fatal stderr");
     });
 
     it("rejects a clean exit that produced no reply", async () => {
