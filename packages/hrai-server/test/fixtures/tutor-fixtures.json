@@ -595,12 +595,13 @@
       "question": "nefunguje mi to",
       "truth": {
         "blocks": [
+                {"opcode": "control_forever"},
           {"opcode": "control_if"},
           {"opcode": "motion_turnright"},
           {"opcode": "event_whenkeypressed"},
           {"opcode": "motion_movesteps"}
         ],
-        "cause": "nothing moves until space is pressed, so the edge is never reached; naming the condition or the missing movement are both defensible"
+        "cause": "nothing moves until space is pressed, so the edge is never reached; naming the loop without movement, the condition or the missing movement are all defensible"
       }
     },
     {
