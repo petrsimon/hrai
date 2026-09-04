@@ -105,7 +105,17 @@ interface ServerOptions {
     store?: HraiStore;
 }
 
-const COMPLETION_CLAIM = /(?:^|\s)(?:ano|hotovo|m[aá]m|ud[eě]lal(?:a)?)(?:\s|[,.!?]|$)/iu;
+/**
+ * A whole message that only asserts completion. Anything with more content — a bare
+ * "ano" answering the tutor's own question, "mám otázku", a real question — goes to
+ * the model.
+ */
+const COMPLETION_CLAIM =
+    /^(?:(?:ano|jo|jasně),?\s+)?(?:už\s+)?(?:hotovo|(?:to\s+)?(?:mám|je)\s+(?:to\s+)?hotov[oéý]|to\s+mám|udělal[a]?\s+jsem\s+to)$/iu;
+
+export function isCompletionClaim(text: string): boolean {
+    return COMPLETION_CLAIM.test(text.trim().replace(/\s+/gu, " ").replace(/[.!?]+$/u, ""));
+}
 
 const BY_OPCODE = new Map(PALETTE.map((entry) => [entry.opcode, entry]));
 
@@ -345,7 +355,7 @@ async function resolveModelChoice(
                 return;
             }
 
-            if (progress && COMPLETION_CLAIM.test(question)) {
+            if (progress && isCompletionClaim(question)) {
                 const text = `Editor zatím nevidí splněnou podmínku: ${progress.stage.success} ` +
                     "Nemusíš mi psát „hotovo“ — Další krok se objeví automaticky, jakmile ji projekt splní.";
                 session.remember("tutor", text);
@@ -355,7 +365,7 @@ async function resolveModelChoice(
                 return;
             }
 
-            if (gameProgress && COMPLETION_CLAIM.test(question)) {
+            if (gameProgress && isCompletionClaim(question)) {
                 const text = `Editor zatím nevidí důkazy pro milník: ${gameProgress.milestone.doneWhen} ` +
                     "Nemusíš mi psát „hotovo“ — dokončení se objeví automaticky, jakmile je projekt splní.";
                 session.remember("tutor", text);
