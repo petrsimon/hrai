@@ -161,7 +161,7 @@ describe("renderProject", () => {
         expect(text).not.toContain("<1 + 2>");
     });
 
-    it("summarises unfocused targets in one line each", () => {
+    it("summarises unfocused targets by script root", () => {
         const focused = target("Rover", [block("h", "event_whenflagclicked", { topLevel: true })]);
         const stage = { ...target("Stage", []), isStage: true };
         const other = target("Pearl", [
@@ -169,13 +169,73 @@ describe("renderProject", () => {
             block("m2", "motion_movesteps"),
         ]);
 
-        const { text } = renderProject([focused, stage, other], "Rover");
+        const { text } = renderProject([focused, stage, other], "Rover", "cs");
 
         expect(text).toContain("postava: Rover");
         expect(text).toContain("scéna: Stage");
-        expect(text).toMatch(/postava: Pearl\s+\(1 skriptu, 2 bloku\)/);
+        expect(text).toContain("postava: Pearl — skripty: po kliknutí na zelenou vlajku (2 bloky)");
         // The unfocused target contributes no aliased block lines.
         expect(text).not.toContain("move");
+    });
+
+    it("renders global stage variables and lists when a sprite is focused", () => {
+        const stage = {
+            ...target("Stage", []),
+            isStage: true,
+            variables: { score: ["Skóre", 4] },
+            lists: { messages: { name: "Zprávy", value: ["start", "konec"] } },
+        };
+        const sprite = {
+            ...target("Rover", []),
+            variables: { lives: ["Životy", 3] },
+            lists: { inventory: { name: "Batoh", value: ["meč"] } },
+        };
+
+        const { text } = renderProject([stage, sprite], "Rover", "cs");
+
+        expect(text).toContain("proměnné: Životy=3");
+        expect(text).toContain("seznamy: Batoh (1 položek)");
+        expect(text).toContain("globální proměnné: Skóre=4");
+        expect(text).toContain("globální seznamy: Zprávy (2 položek)");
+    });
+
+    it("caps unfocused script summaries at twelve scripts", () => {
+        const focused = target("Rover", []);
+        const roots = Array.from({length: 13}, (_, index) => (
+            block(`hat-${index}`, "event_whenflagclicked", {topLevel: true})
+        ));
+        const other = target("Enemy", roots);
+
+        const { text } = renderProject([focused, other], "Rover", "cs");
+        const summary = text.split("\n").find(line => line.startsWith("postava: Enemy"));
+
+        expect(summary).toContain("skripty:");
+        expect(summary).toContain("… a dalších 1 skriptů");
+        expect((summary?.match(/\(1 blok\)/g) ?? [])).toHaveLength(12);
+    });
+
+    it("lists broadcast message names used by senders and receivers", () => {
+        const menu = block("menu", "event_broadcast_menu", {
+            shadow: true,
+            fields: { BROADCAST_OPTION: { name: "BROADCAST_OPTION", value: "konec hry" } },
+        });
+        const sender = target("Rover", [
+            block("send", "event_broadcast", {
+                topLevel: true,
+                inputs: { BROADCAST_INPUT: { name: "BROADCAST_INPUT", block: "menu", shadow: "menu" } },
+            }),
+            menu,
+        ]);
+        const receiver = target("Enemy", [
+            block("receive", "event_whenbroadcastreceived", {
+                topLevel: true,
+                fields: { BROADCAST_OPTION: { name: "BROADCAST_OPTION", value: "start" } },
+            }),
+        ]);
+
+        const { text } = renderProject([sender, receiver], "Rover", "cs");
+
+        expect(text).toContain("zprávy: konec hry, start");
     });
 
     it("names a focused stage as a scene and unfocused stages with Czech diacritics", () => {

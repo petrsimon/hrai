@@ -95,6 +95,69 @@ function namedValue(value: unknown): {name: string; value: unknown} | null {
     }
     return null;
 }
+
+function namedEntries(values: Record<string, unknown> | undefined): {name: string; value: unknown}[] {
+    return Object.values(values ?? {})
+        .map(namedValue)
+        .filter((value): value is {name: string; value: unknown} => value !== null);
+}
+
+function variablesText(values: Record<string, unknown> | undefined): string[] {
+    return namedEntries(values).map((variable) => `${variable.name}=${variableValueText(variable.value)}`);
+}
+
+function listsText(values: Record<string, unknown> | undefined): string[] {
+    return namedEntries(values).map((list) => (
+        `${list.name} (${Array.isArray(list.value) ? list.value.length : 0} položek)`
+    ));
+}
+
+function fieldNamed(block: Block): string | null {
+    const field = Object.values(block.fields).find((item) => item.name.toUpperCase().includes("BROADCAST"));
+    if (!field) return null;
+    const value = fieldText(field.value).trim();
+    return value.length > 0 ? value : null;
+}
+
+function broadcastName(blocks: Record<string, Block>, block: Block): string | null {
+    if (block.opcode === "event_whenbroadcastreceived") return fieldNamed(block);
+    if (block.opcode !== "event_broadcast" && block.opcode !== "event_broadcastandwait") return null;
+    const input = Object.values(block.inputs).find((item) => item.name.toUpperCase().includes("BROADCAST"));
+    const menuId = input?.block ?? input?.shadow;
+    const menu = menuId ? blocks[menuId] : undefined;
+    return (menu && fieldNamed(menu)) ?? fieldNamed(block);
+}
+
+function scriptBlockCount(blocks: Record<string, Block>, startId: string): number {
+    const visited = new Set<string>();
+    const pending = [startId];
+    let count = 0;
+    while (pending.length > 0) {
+        const id = pending.pop();
+        if (!id || visited.has(id)) continue;
+        visited.add(id);
+        const block = blocks[id];
+        if (!block) continue;
+        if (!block.shadow) count += 1;
+        if (block.next) pending.push(block.next);
+        for (const input of Object.values(block.inputs)) {
+            const child = input.block ?? input.shadow;
+            if (child) pending.push(child);
+        }
+    }
+    return count;
+}
+
+function blocksText(count: number): string {
+    const suffix = count === 1 ? "blok" : count >= 2 && count <= 4 ? "bloky" : "bloků";
+    return `${count} ${suffix}`;
+}
+/** Czech text for the icon slots that opcode-labels.ts supplies in English. */
+const ICON_SLOTS_CS: Record<string, string> = {
+    "green flag": "zelenou vlajku",
+    right: "doprava",
+    left: "doleva",
+};
 const INDENT = "  ";
 const BOOLEAN_OPCODES = new Set([
     "operator_and",
@@ -204,7 +267,10 @@ function renderBlockLabel(blocks: Record<string, Block>, block: Block, locale: s
                 .map((i) => renderInputValue(blocks, i, locale)),
             ...Object.values(block.fields).map((f) => `[${fieldText(f.value)}]`),
         ];
-    const slots: string[] = [...iconSlots(block.opcode), ...argumentsInDefinitionOrder];
+    const iconArguments = iconSlots(block.opcode).map((slot) => (
+        locale === "cs" ? ICON_SLOTS_CS[slot] ?? slot : slot
+    ));
+    const slots: string[] = [...iconArguments, ...argumentsInDefinitionOrder];
 
     let slot = 0;
     return template.replace(/%\d/g, () => slots[slot++] ?? "()").trim();
@@ -307,9 +373,9 @@ function isScriptRoot(block: Block): boolean {
 /**
  * Renders a project as pseudo-Scratch text.
  *
- * The focused target is rendered in full; every other target gets a single summary
- * line. A child works on one sprite at a time, and rendering all of them in full is
- * the fastest way to exhaust a small model's context on blocks nobody asked about.
+ * The focused target is rendered in full; every other target contributes compact script
+ * root summaries. A child works on one sprite at a time, and rendering all of them in
+ * full is the fastest way to exhaust a small model's context on blocks nobody asked about.
  * @param targets All targets in the project, stage included.
  * @param focusedTargetId The target the child currently has selected.
  * @param locale Label locale; `cs` renders Czech block labels.
@@ -321,19 +387,24 @@ export function renderProject(targets: RenderTarget[], focusedTargetId: string, 
     for (const target of targets) {
         if (target.id !== focusedTargetId) continue;
         state.lines.push(`${target.isStage ? "scéna" : "postava"}: ${target.name}`);
-        const variables = Object.values(target.variables ?? {})
-            .map(namedValue)
-            .filter((variable): variable is {name: string; value: unknown} => variable !== null)
-            .map((variable) => `${variable.name}=${variableValueText(variable.value)}`);
+        const variables = variablesText(target.variables);
         if (variables.length > 0) {
             state.lines.push(`proměnné: ${variables.join(", ")}`);
         }
-        const lists = Object.values(target.lists ?? {})
-            .map(namedValue)
-            .filter((list): list is {name: string; value: unknown} => list !== null)
-            .map((list) => `${list.name} (${Array.isArray(list.value) ? list.value.length : 0} položek)`);
+        const lists = listsText(target.lists);
         if (lists.length > 0) {
             state.lines.push(`seznamy: ${lists.join(", ")}`);
+        }
+        if (!target.isStage) {
+            const stage = targets.find((item) => item.isStage);
+            const globalVariables = variablesText(stage?.variables);
+            const globalLists = listsText(stage?.lists);
+            if (globalVariables.length > 0) {
+                state.lines.push(`globální proměnné: ${globalVariables.join(", ")}`);
+            }
+            if (globalLists.length > 0) {
+                state.lines.push(`globální seznamy: ${globalLists.join(", ")}`);
+            }
         }
         const roots = Object.values(target.blocks).filter(isScriptRoot);
         if (roots.length === 0) {
@@ -349,12 +420,32 @@ export function renderProject(targets: RenderTarget[], focusedTargetId: string, 
     const others = targets.filter((t) => t.id !== focusedTargetId);
     if (others.length > 0) {
         state.lines.push("");
+        let summarizedScripts = 0;
+        const maxSummarizedScripts = 12;
         for (const other of others) {
-            const scripts = Object.values(other.blocks).filter(isScriptRoot).length;
-            const count = Object.values(other.blocks).filter((b) => !b.shadow).length;
+            const roots = Object.values(other.blocks).filter(isScriptRoot);
             const kind = other.isStage ? "scéna" : "postava";
-            state.lines.push(`${kind}: ${other.name}  (${scripts} skriptu, ${count} bloku)`);
+            if (roots.length === 0) {
+                state.lines.push(`${kind}: ${other.name} — skripty: žádné`);
+                continue;
+            }
+            const available = Math.max(maxSummarizedScripts - summarizedScripts, 0);
+            const visible = roots.slice(0, available);
+            summarizedScripts += visible.length;
+            const entries = visible.map((root) => (
+                `${renderBlockLabel(other.blocks, root, locale)} (${blocksText(scriptBlockCount(other.blocks, root.id))})`
+            ));
+            const remaining = roots.length - visible.length;
+            const suffix = remaining > 0 ? `; … a dalších ${remaining} skriptů` : "";
+            state.lines.push(`${kind}: ${other.name} — skripty: ${entries.join("; ")}${suffix}`);
         }
+    }
+
+    const messages = [...new Set(targets.flatMap((target) => Object.values(target.blocks)
+        .map((block) => broadcastName(target.blocks, block))
+        .filter((name): name is string => name !== null)))];
+    if (messages.length > 0) {
+        state.lines.push(`zprávy: ${messages.join(", ")}`);
     }
 
     return { text: state.lines.join("\n"), aliases: state.aliases };
