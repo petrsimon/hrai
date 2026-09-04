@@ -45,6 +45,7 @@ function evaluateCriterion(
         return scripts.filter((script) => criterion.opcodes.every((opcode) => script.has(opcode))).length >=
             criterion.minimum;
     case "spriteCountAtLeast":
+        // The GUI filters runtime clones before sending the workspace payload.
         return targets.filter((target) => !target.isStage).length >= criterion.minimum;
     case "variableCountAtLeast": {
         const variableIds = new Set(targets.flatMap((target) => Object.keys(target.variables ?? {})));

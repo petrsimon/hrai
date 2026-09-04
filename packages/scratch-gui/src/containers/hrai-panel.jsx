@@ -36,16 +36,18 @@ const messages = defineMessages({
 // Duplicated from hrai-server rather than imported: that package is private
 // TypeScript and would force scratch-gui into a build-order dependency.
 const buildWorkspacePayload = vm => {
+    const targets = vm.runtime.targets.filter(target => target.isOriginal !== false);
     const focusedTarget = vm.editingTarget ||
-        vm.runtime.targets.find(target => target.isStage);
+        targets.find(target => target.isStage);
     return {
         focusedTargetId: focusedTarget ? focusedTarget.id : '',
-        targets: vm.runtime.targets.map(target => ({
+        targets: targets.map(target => ({
             id: target.id,
             name: target.getName(),
             isStage: target.isStage,
             blocks: target.blocks._blocks,
-            variables: target.variables
+            variables: target.variables,
+            lists: target.lists
         }))
     };
 };
