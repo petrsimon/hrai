@@ -136,7 +136,7 @@ describe("hrai server", () => {
                 clearTimeout(timer);
                 resolve(deltas.join(""));
             });
-            client().emit("ask", { text: "hotovo, co teď?" });
+            client().emit("ask", { text: "co teď?" });
         });
 
         expect(answer).toContain("Tento krok je hotový");

@@ -366,13 +366,16 @@ const HraiPanel = ({
     }, [appendLearnerMessage]);
 
     const handleSend = useCallback(text => {
+        if (isThinking) {
+            return;
+        }
         appendLearnerMessage(text);
         setRung(0);
         if (socketRef.current?.connected) {
             pushWorkspace();
             socketRef.current.emit('ask', {text});
         }
-    }, [appendLearnerMessage, pushWorkspace]);
+    }, [appendLearnerMessage, isThinking, pushWorkspace]);
 
     const handleVoiceSubmit = useCallback(payload => {
         const socket = socketRef.current;

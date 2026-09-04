@@ -218,6 +218,27 @@ describe('HraiPanel lesson guidance', () => {
         expect(status.textContent).toContain('The little dragon is forging ideas and code…');
         expect(status.querySelector('img')).toBeTruthy();
     });
+
+    test('does not send the composer while thinking', () => {
+        const onSend = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                isThinking
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={onSend}
+            />
+        );
+
+        const input = screen.getByLabelText('Zpráva pro HRAI');
+        fireEvent.change(input, {target: {value: 'Pomoz mi'}});
+        fireEvent.keyDown(input, {key: 'Enter', shiftKey: false});
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+
+        expect(onSend).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', {name: 'Odeslat'}).disabled).toBe(true);
+    });
 });
 
 describe('HraiPanel custom game planning', () => {

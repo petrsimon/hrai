@@ -1058,6 +1058,9 @@ const HraiPanel = ({
     }, [startRecording, stopRecording, voicePhase]);
 
     const submitDraft = useCallback(() => {
+        if (isThinking) {
+            return;
+        }
         const trimmed = draft.trim();
         if (!trimmed) {
             return;
@@ -1075,7 +1078,7 @@ const HraiPanel = ({
         }
         setDraft('');
         resetVoice();
-    }, [chatMessages.length, draft, gamePlan, gameProgress, lesson, onSend, resetVoice]);
+    }, [chatMessages.length, draft, gamePlan, gameProgress, isThinking, lesson, onSend, resetVoice]);
 
     const handleInputChange = useCallback(event => {
         setDraft(event.target.value);
@@ -1399,7 +1402,7 @@ const HraiPanel = ({
                                 className={styles.sendButton}
                                 aria-label={intl.formatMessage(messages.sendButton)}
                                 title={intl.formatMessage(messages.sendButton)}
-                                disabled={!canSend || Boolean(gamePlaytest)}
+                                disabled={!canSend || Boolean(gamePlaytest) || isThinking}
                             >
                                 <span aria-hidden="true">↑</span>
                             </Button>

@@ -117,6 +117,10 @@ export function isCompletionClaim(text: string): boolean {
     return COMPLETION_CLAIM.test(text.trim().replace(/\s+/gu, " ").replace(/[.!?]+$/u, ""));
 }
 
+const COMPLETION_FOLLOW_UP = /^(?:co|a)\s+(?:dál|teď)/iu;
+const COMPLETED_STEP_CONTEXT =
+    "KROK JE HOTOVÝ (editor to ověřil). Odpověz na otázku dítěte, nezadávej nový úkol.";
+
 const BY_OPCODE = new Map(PALETTE.map((entry) => [entry.opcode, entry]));
 
 /**
@@ -207,6 +211,7 @@ async function resolveModelChoice(
         const user = await store.userForSession(parseCookies(socket.handshake.headers.cookie)[SESSION_COOKIE]);
         const session = new Session(user?.assistantPreferences);
         let pendingVoiceRequestId: string | null = null;
+        let modelCallPending = false;
         let voiceAvailable = false;
         let announcedVoiceAvailability: boolean | undefined;
 
@@ -238,7 +243,8 @@ async function resolveModelChoice(
 
         const evaluateGameProgress = (): void => {
             const progress = session.gameProgress;
-            if (progress && !progress.complete && session.evaluateGameMilestone()) {
+            const wasComplete = progress?.complete ?? false;
+            if (progress && session.evaluateGameMilestone() && !wasComplete) {
                 socket.emit("gameMilestoneComplete", session.gameProgress);
             }
         };
@@ -246,6 +252,11 @@ async function resolveModelChoice(
         socket.on("gamePlan", (payload: unknown) => {
             const idea = parseGameIdea(payload);
             if (!idea) return;
+            if (modelCallPending) {
+                console.warn("hrai: ignored game-plan request while a model call is pending");
+                return;
+            }
+            modelCallPending = true;
             socket.emit("thinking", { thinking: true });
             void resolveModelChoice(session.assistantPreferences)
                 .then(({ backend, model }) => gamePlanner(
@@ -263,7 +274,10 @@ async function resolveModelChoice(
                         message: "Plán hry se mi nepodařilo připravit. Zkus nápad popsat ještě jednou.",
                     });
                 })
-                .finally(() => socket.emit("thinking", { thinking: false }));
+                .finally(() => {
+                    modelCallPending = false;
+                    socket.emit("thinking", {thinking: false});
+                });
         });
 
         socket.on("gameRestore", (payload: unknown) => {
@@ -316,7 +330,8 @@ async function resolveModelChoice(
             if (!workspace) return;
             session.setWorkspace(workspace.targets, workspace.focusedTargetId);
             const progress = session.lessonProgress;
-            if (progress && !progress.complete && session.evaluateLessonStage()) {
+            const wasComplete = progress?.complete ?? false;
+            if (progress && session.evaluateLessonStage() && !wasComplete) {
                 socket.emit("stageComplete", session.lessonProgress);
             }
             evaluateGameProgress();
@@ -325,102 +340,111 @@ async function resolveModelChoice(
         /**
          * Answers, at the session's current rung.
          * @param question What to answer.
+         * @param rememberLearner Whether to add the learner turn to history.
          */
-        const answer = (question: string): void => {
-            const id = `m${Date.now()}`;
-            session.remember("learner", question);
-            const progress = session.lessonProgress;
-            const gameProgress = session.gameProgress;
-            const context = session.tutorContext;
-
-            if (progress?.complete) {
-                const text = `Tento krok je hotový: ${progress.stage.success} Klikni na Další krok a budeme pokračovat.`;
-                session.remember("tutor", text);
-                socket.emit("token", { id, delta: text });
-                socket.emit("blocks", { id, blocks: {} });
-                socket.emit("done", { id, rung: session.rung });
+        const answer = (question: string, rememberLearner = true): void => {
+            if (modelCallPending) {
+                console.warn("hrai: ignored tutor request while a model call is pending");
                 return;
             }
 
-            if (gameProgress?.complete) {
+            const id = `m${Date.now()}`;
+            if (rememberLearner) session.remember("learner", question);
+            const render = session.render();
+            const rung = session.rung;
+            const history = rememberLearner ? session.history.slice(0, -1) : session.history.slice();
+            const context = session.tutorContextFor(rung);
+            const progress = session.lessonProgress;
+            const gameProgress = session.gameProgress;
+            const stepComplete = Boolean(progress?.complete ?? gameProgress?.complete);
+            const completionRequest = isCompletionClaim(question) || COMPLETION_FOLLOW_UP.test(question.trim());
+
+            const emitCanned = (text: string): void => {
+                socket.emit("token", {id, delta: text});
+                socket.emit("blocks", {id, blocks: {}});
+                socket.emit("done", {id, rung});
+            };
+
+            if (progress?.complete && completionRequest) {
+                emitCanned(`Tento krok je hotový: ${progress.stage.success} Klikni na Další krok a budeme pokračovat.`);
+                return;
+            }
+
+            if (gameProgress?.complete && completionRequest) {
                 const hasNextMilestone = gameProgress.milestoneIndex < gameProgress.plan.milestones.length - 1;
                 const text = `Tento milník je hotový: ${gameProgress.milestone.doneWhen} ` +
                     (hasNextMilestone ?
                         "Až budeš připravený, klikni na Další milník." :
                         "Dokončil jsi plán své hry.");
-                session.remember("tutor", text);
-                socket.emit("token", { id, delta: text });
-                socket.emit("blocks", { id, blocks: {} });
-                socket.emit("done", { id, rung: session.rung });
+                emitCanned(text);
                 return;
             }
 
-            if (progress && isCompletionClaim(question)) {
-                const text = `Editor zatím nevidí splněnou podmínku: ${progress.stage.success} ` +
-                    "Nemusíš mi psát „hotovo“ — Další krok se objeví automaticky, jakmile ji projekt splní.";
-                session.remember("tutor", text);
-                socket.emit("token", { id, delta: text });
-                socket.emit("blocks", { id, blocks: {} });
-                socket.emit("done", { id, rung: session.rung });
+            if (progress && !progress.complete && isCompletionClaim(question)) {
+                emitCanned(`Editor zatím nevidí splněnou podmínku: ${progress.stage.success} ` +
+                    "Nemusíš mi psát „hotovo“ — Další krok se objeví automaticky, jakmile ji projekt splní.");
                 return;
             }
 
-            if (gameProgress && isCompletionClaim(question)) {
-                const text = `Editor zatím nevidí důkazy pro milník: ${gameProgress.milestone.doneWhen} ` +
-                    "Nemusíš mi psát „hotovo“ — dokončení se objeví automaticky, jakmile je projekt splní.";
-                session.remember("tutor", text);
-                socket.emit("token", { id, delta: text });
-                socket.emit("blocks", { id, blocks: {} });
-                socket.emit("done", { id, rung: session.rung });
+            if (gameProgress && !gameProgress.complete && isCompletionClaim(question)) {
+                emitCanned(`Editor zatím nevidí důkazy pro milník: ${gameProgress.milestone.doneWhen} ` +
+                    "Nemusíš mi psát „hotovo“ — dokončení se objeví automaticky, jakmile je projekt splní.");
                 return;
             }
 
             if (session.gamePlaytest) {
-                const text = "Nejdřív si hru vyzkoušej. Až budeš vědět, co chceš změnit, klikni na Začít upravovat.";
-                session.remember("tutor", text);
-                socket.emit("token", { id, delta: text });
-                socket.emit("blocks", { id, blocks: {} });
-                socket.emit("done", { id, rung: session.rung });
+                emitCanned("Nejdřív si hru vyzkoušej. Až budeš vědět, co chceš změnit, klikni na Začít upravovat.");
                 return;
             }
 
-            socket.emit("thinking", { thinking: true });
+            modelCallPending = true;
+            socket.emit("thinking", {thinking: true});
 
             // Buffer the model response so pedagogical constraints can be enforced
             // before any prose reaches the child. Streaming raw tokens would make a
             // post-generation safety check cosmetic rather than real.
             void resolveModelChoice(session.assistantPreferences)
-                .then(({ backend, model }) => chat(
-                    systemPrompt(session.rung, context, session.assistantPreferences),
-                    userPrompt(session.render(), question, session.history.slice(0, -1)),
+                .then(({backend, model}) => chat(
+                    [
+                        systemPrompt(rung, context, session.assistantPreferences),
+                        ...(stepComplete ? [COMPLETED_STEP_CONTEXT] : []),
+                    ].join("\n"),
+                    userPrompt(render, question, history),
                     model,
                     backend,
                 ))
                 .then((reply) => {
                     const policed = enforceTutorPolicy(reply.text, {
-                        rung: session.rung,
+                        rung,
                         hasGoalContext: Boolean(context),
                     });
-                    const { text, removed } = stripUnknownAliases(
+                    const {text, removed} = stripUnknownAliases(
                         policed,
                         (alias) => session.resolveAlias(alias) !== undefined,
                     );
                     if (removed.length > 0) {
-                        console.warn(`hrai: answer at rung ${session.rung} cited unknown block aliases ${removed.join(", ")}`);
+                        console.warn(`hrai: answer at rung ${rung} cited unknown block aliases ${removed.join(", ")}`);
                     }
                     session.remember("tutor", text);
-                    socket.emit("token", { id, delta: text });
-                    socket.emit("blocks", { id, blocks: blocksNamedIn(text) });
-                    socket.emit("done", { id, rung: session.rung });
+                    socket.emit("token", {id, delta: text});
+                    socket.emit("blocks", {id, blocks: blocksNamedIn(text)});
+                    socket.emit("done", {id, rung});
                 })
                 .catch((error: unknown) => {
                     // The child sees a calm sentence; the operator sees the cause.
                     console.error("hrai: model call failed", error);
+                    const last = session.history.at(-1);
+                    if (rememberLearner && last?.role === "learner" && last.text === question) {
+                        session.history.pop();
+                    }
                     socket.emit("error", {
                         message: "Teď se mi nedaří přemýšlet. Zkus to prosím za chvilku znovu.",
                     });
                 })
-                .finally(() => socket.emit("thinking", { thinking: false }));
+                .finally(() => {
+                    modelCallPending = false;
+                    socket.emit("thinking", {thinking: false});
+                });
         };
 
         socket.on("ask", (payload: unknown) => {
@@ -433,8 +457,12 @@ async function resolveModelChoice(
         });
 
         socket.on("hint", () => {
+            if (modelCallPending) {
+                console.warn("hrai: ignored hint request while a model call is pending");
+                return;
+            }
             session.escalate();
-            answer("Nerozumím tomu, poraď mi víc.");
+            answer("Nerozumím tomu, poraď mi víc.", false);
         });
 
         socket.on("voice:submit", (payload: unknown, acknowledge?: (result: { accepted: boolean; code?: string }) => void) => {

@@ -149,6 +149,36 @@ describe("goal-driven game protocol", () => {
         });
     });
 
+    it("emits completion again when a completed milestone is broken and repaired", async () => {
+        const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+        await new Promise<void>((resolve, reject) => {
+            connected.on("connect", resolve);
+            connected.on("connect_error", reject);
+        });
+
+        try {
+            const restored = new Promise<void>((resolve) => connected.once("gameProgress", () => resolve()));
+            connected.emit("gameRestore", {plan: PLAN, milestoneIndex: 0, phase: "guided"});
+            await restored;
+
+            let completions = 0;
+            connected.on("gameMilestoneComplete", () => {
+                completions += 1;
+            });
+            connected.emit("workspace", COMPLETING_WORKSPACE);
+            await new Promise<void>((resolve) => connected.once("gameMilestoneComplete", () => resolve()));
+            connected.emit("workspace", {focusedTargetId: "dragon", targets: []});
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            expect(completions).toBe(1);
+
+            connected.emit("workspace", COMPLETING_WORKSPACE);
+            await new Promise<void>((resolve) => connected.once("gameMilestoneComplete", () => resolve()));
+            expect(completions).toBe(2);
+        } finally {
+            connected.close();
+        }
+    });
+
     it("restores an unfinished playtest without activating tutor guidance", async () => {
         const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
         await new Promise<void>((resolve, reject) => {
