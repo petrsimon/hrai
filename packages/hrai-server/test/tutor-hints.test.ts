@@ -10,6 +10,12 @@
 import { describe, expect, it, beforeAll } from "vitest";
 import fixtures from "./fixtures/tutor-fixtures.json" with { type: "json" };
 import { EVAL_MODEL, chat, warnSkipped, isModelAvailable } from "../src/model-client.ts";
+import { renderProject, type RenderTarget } from "../src/render.ts";
+import { systemPrompt, userPrompt } from "../src/prompt.ts";
+
+function renderFixture(fixture: (typeof fixtures.cases)[number]) {
+    return renderProject(fixture.targets as RenderTarget[], fixture.focusedTargetId, "cs");
+}
 
 let available = false;
 beforeAll(async () => {
@@ -22,12 +28,10 @@ describe(`rung-1 hints (${EVAL_MODEL})`, () => {
         it(c.id, async ({ skip }) => {
             if (!available) skip();
 
-            const { text } = await chat(
-                fixtures.system,
-                `Projekt dítěte:\n<projekt>\n${c.render}\n</projekt>\n\nOtázka dítěte: ${c.question}`,
-            );
+            const { text: render, aliases } = renderFixture(c);
+            const { text } = await chat(systemPrompt(1), userPrompt(render, c.question));
 
-            const realAliases = new Set(c.render.match(/\bb\d+\b/g) ?? []);
+            const realAliases = new Set(aliases.keys());
             const citedAliases = new Set(text.match(/\bb\d+\b/g) ?? []);
             const invented = [...citedAliases].filter((a) => !realAliases.has(a));
 

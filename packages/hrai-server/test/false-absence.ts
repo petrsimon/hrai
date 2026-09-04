@@ -8,7 +8,10 @@
  * are tested against the script holding the block the model named rather than the whole project.
  */
 export const ABSENCE_CLAIMS = [
-    {claimed: /missing.{0,40}(move|10 steps)|no move/i, present: /move \d+ steps/},
+    {
+        claimed: /missing.{0,40}(move|10 steps|movement|krok)|no move/i,
+        present: /move \d+ steps|dopředu o \d+ kroků/i,
+    },
     {claimed: /missing.{0,40}(end\b|"end")/i, present: /\bend b\d+/},
 ];
 
@@ -16,7 +19,7 @@ export const ABSENCE_CLAIMS = [
  * The scripts that define the given aliases, joined, or the whole render when none of them do.
  *
  * Absence is a property of one script, not of the project. In the Space Rover fixture the
- * right- and left-arrow scripts both contain `move 10 steps` while the up-arrow script is
+ * right- and left-arrow scripts both contain `dopředu o 10 kroků` while the up-arrow script is
  * missing one — so "a move block is missing" is the correct diagnosis there and a project-wide
  * search for the text would contradict the fixture's own ground truth. Falling back to the whole
  * render matters for the fixture whose answer is `none`, where there is no script to narrow to

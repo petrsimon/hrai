@@ -7,13 +7,18 @@
  * reveal, never about phrasing.
  */
 import { describe, expect, it, beforeAll } from "vitest";
+import fixtures from "./fixtures/tutor-fixtures.json" with { type: "json" };
 import { EVAL_MODEL, chat, isModelAvailable, warnSkipped } from "../src/model-client.ts";
 import { PALETTE, opcodesNamedByLabel } from "../src/palette.ts";
 import { systemPrompt, userPrompt } from "../src/prompt.ts";
+import { renderProject, type RenderTarget } from "../src/render.ts";
 
-const RENDER = `postava: Rover
-b1  when green flag clicked
-b2    go to x: 0 y: 0`;
+const movementFixture = fixtures.cases[0];
+const RENDER = renderProject(
+    movementFixture.targets as RenderTarget[],
+    movementFixture.focusedTargetId,
+    "cs",
+).text;
 const QUESTION = "jak udelam aby se rover hybal sipkama?";
 const OPCODES = new Set(PALETTE.map((e) => e.opcode));
 

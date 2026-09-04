@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import fixtures from "./fixtures/tutor-fixtures.json" with { type: "json" };
 import { ABSENCE_CLAIMS, scriptsFor } from "./false-absence.ts";
+import { renderProject, type RenderTarget } from "../src/render.ts";
 
 function isFalseAbsence(render: string, aliases: string[], cause: string): boolean {
     const scripts = scriptsFor(render, aliases);
@@ -17,7 +18,7 @@ function isFalseAbsence(render: string, aliases: string[], cause: string): boole
 function render(id: string): string {
     const found = fixtures.cases.find((c) => c.id === id);
     if (!found) throw new Error(`no fixture ${id}`);
-    return found.render;
+    return renderProject(found.targets as RenderTarget[], found.focusedTargetId, "cs").text;
 }
 
 describe("false-absence rule", () => {

@@ -20,6 +20,7 @@ import { describe, expect, it, beforeAll } from "vitest";
 import fixtures from "./fixtures/tutor-fixtures.json" with { type: "json" };
 import { ABSENCE_CLAIMS, scriptsFor } from "./false-absence.ts";
 import { EVAL_MODEL, chat, warnSkipped, isModelAvailable } from "../src/model-client.ts";
+import { renderProject, type RenderTarget } from "../src/render.ts";
 
 const DIAGNOSTIC_SYSTEM = [
     "You are the diagnostic component of a Scratch tutor. You are NOT talking to a child.",
@@ -33,6 +34,28 @@ const DIAGNOSTIC_SYSTEM = [
     "For a vague failure such as 'nothing works', identify the most likely structural blockage.",
 ].join("\n");
 
+function renderFixture(fixture: (typeof fixtures.cases)[number]) {
+    return renderProject(fixture.targets as RenderTarget[], fixture.focusedTargetId, "cs");
+}
+
+function truthAliases(
+    fixture: (typeof fixtures.cases)[number],
+    render: ReturnType<typeof renderFixture>,
+): string[] {
+    const blocks = new Map(
+        (fixture.targets as RenderTarget[]).flatMap((target) => Object.entries(target.blocks)),
+    );
+    return fixture.truth.blocks.map(({opcode, nth = 1}) => {
+        if (opcode === "none") return "none";
+        const matches = [...render.aliases].filter(([, id]) => blocks.get(id)?.opcode === opcode);
+        const alias = matches[nth - 1]?.[0];
+        if (!alias) {
+            throw new Error(`Fixture ${fixture.id} has no ${opcode} block at ordinal ${nth}`);
+        }
+        return alias;
+    });
+}
+
 let available = false;
 beforeAll(async () => {
     available = await isModelAvailable(EVAL_MODEL);
@@ -44,23 +67,25 @@ describe(`diagnosis (${EVAL_MODEL})`, () => {
         it(c.id, async ({ skip }) => {
             if (!available) skip();
 
+            const rendered = renderFixture(c);
             const { text } = await chat(
                 DIAGNOSTIC_SYSTEM,
-                `<project>\n${c.render}\n</project>\n\nSymptom the child reports: ${c.question}`,
+                `<project>\n${rendered.text}\n</project>\n\nSymptom the child reports: ${c.question}`,
             );
 
             const [head = "", tail = ""] = text.split(/CAUSE/i);
             const named = head.toLowerCase().match(/\bb\d+\b|none/g) ?? [];
+            const expectedAliases = truthAliases(c, rendered);
 
             expect(
-                named.some((n) => c.truth.blocks.includes(n)),
-                `named ${named.join(", ") || "nothing"}; expected one of ${c.truth.blocks.join(", ")}. ` +
+                named.some((n) => expectedAliases.includes(n)),
+                `named ${named.join(", ") || "nothing"}; expected one of ${expectedAliases.join(", ")}. ` +
                     `Truth: ${c.truth.cause}\nModel said: ${text}`,
             ).toBe(true);
 
             // Both models name b3 on the vague fixture; only the reason separates them.
             // qwen3:8b claims the `end` marker is missing from a script that contains it.
-            const scripts = scriptsFor(c.render, named.filter((n) => n !== "none"));
+            const scripts = scriptsFor(rendered.text, named.filter((n) => n !== "none"));
             for (const {claimed, present} of ABSENCE_CLAIMS) {
                 expect(
                     claimed.test(tail) && present.test(scripts),
@@ -69,7 +94,7 @@ describe(`diagnosis (${EVAL_MODEL})`, () => {
             }
 
             // Only real aliases may be named — same contract as the hint path.
-            const realAliases = new Set(c.render.match(/\bb\d+\b/g) ?? []);
+            const realAliases = new Set(rendered.aliases.keys());
             const invented = named.filter((n) => n !== "none" && !realAliases.has(n));
             expect(invented, `invented aliases: ${invented.join(", ")}`).toEqual([]);
         });

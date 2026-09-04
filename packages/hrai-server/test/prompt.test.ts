@@ -23,6 +23,10 @@ const context: TutorPromptContext = {
 
 const PALETTE_LINE = /^\s+[a-z]+_[a-z0-9_]+ = /m;
 
+function paletteOpcodes(prompt: string): string[] {
+    return [...prompt.matchAll(/^\s+([a-z]+_[a-z0-9_]+) = /gmu)].map((match) => match[1]);
+}
+
 describe("assistant preferences", () => {
     it("adds bounded profile preferences without replacing tutor rules", () => {
         const prompt = systemPrompt(1, undefined, preferences);
@@ -44,6 +48,7 @@ describe("palette scoping by rung", () => {
         for (const rung of [1, 2]) {
             const prompt = systemPrompt(rung);
             expect(prompt).not.toMatch(PALETTE_LINE);
+            expect(paletteOpcodes(prompt)).toEqual([]);
             expect(prompt).not.toContain("BARVY KATEGORIÍ");
         }
     });
@@ -53,13 +58,12 @@ describe("palette scoping by rung", () => {
         expect(prompt).toContain("BARVY KATEGORIÍ");
         expect(prompt).toContain("Události = žlutá");
         expect(prompt).not.toMatch(PALETTE_LINE);
+        expect(paletteOpcodes(prompt)).toEqual([]);
     });
 
-    it("narrows the rung-4 palette to the step's opcodes", () => {
+    it("shows only the step's opcodes in the rung-4 palette", () => {
         const prompt = systemPrompt(4, context);
-        expect(prompt).toContain("event_whenthisspriteclicked = ");
-        expect(prompt).toContain("data_setvariableto = ");
-        expect(prompt).not.toContain("motion_movesteps = ");
+        expect(paletteOpcodes(prompt).sort()).toEqual([...context.opcodes].sort());
     });
 
     it("shows the whole palette at rung 5 without a step", () => {
