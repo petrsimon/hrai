@@ -6,6 +6,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:slot-order": "node scripts/build-slot-order.mjs",
     "eval": "vitest run --reporter=verbose",
     "eval:game-design": "vitest run test/game-design.test.ts --reporter=verbose",
     "lint": "eslint",

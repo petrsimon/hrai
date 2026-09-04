@@ -17,6 +17,7 @@
  *    shown to the model: they tokenize badly and small models mangle them.
  */
 import { humanizeOpcode, iconSlots, labelTemplate } from "./opcode-labels.ts";
+import slotOrder from "./data/slot-order.json" with { type: "json" };
 
 export interface BlockInput {
     name: string;
@@ -46,6 +47,7 @@ export interface RenderTarget {
     isStage: boolean;
     blocks: Record<string, Block>;
     variables?: Record<string, unknown>;
+    lists?: Record<string, unknown>;
 }
 
 export interface Render {
@@ -71,7 +73,44 @@ function fieldText(value: unknown): string {
     // eslint-disable-next-line @typescript-eslint/no-base-to-string -- primitives only past this point
     return String(value);
 }
+
+function variableValueText(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string") return value.length > 40 ? `${value.slice(0, 40)}…` : value;
+    if (Array.isArray(value)) {
+        return `(${value.length} položek) [${value.slice(0, 5).map(variableValueText).join(", ")}]`;
+    }
+    if (typeof value === "object") return "{…}";
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- primitives only past this point
+    return String(value);
+}
+
+function namedValue(value: unknown): {name: string; value: unknown} | null {
+    if (Array.isArray(value) && value.length >= 2) {
+        return {name: String(value[0]), value: value[1]};
+    }
+    if (typeof value === "object" && value !== null && "name" in value) {
+        const named = value as {name: unknown; value?: unknown};
+        return {name: String(named.name), value: named.value};
+    }
+    return null;
+}
 const INDENT = "  ";
+const BOOLEAN_OPCODES = new Set([
+    "operator_and",
+    "operator_or",
+    "operator_not",
+    "operator_equals",
+    "operator_lt",
+    "operator_gt",
+    "operator_contains",
+    "sensing_touchingobject",
+    "sensing_touchingcolor",
+    "sensing_coloristouchingcolor",
+    "sensing_keypressed",
+    "sensing_mousedown",
+    "data_listcontainsitem",
+]);
 
 class RenderState {
     readonly lines: string[] = [];
@@ -127,7 +166,7 @@ function renderInputValue(blocks: Record<string, Block>, input: BlockInput, loca
 
     const inner = renderBlockLabel(blocks, block, locale);
     // Booleans read as <...> in Scratch; everything else as (...).
-    return block.opcode.startsWith("operator_") || block.opcode.startsWith("sensing_touching")
+    return BOOLEAN_OPCODES.has(block.opcode)
         ? `<${inner}>`
         : `(${inner})`;
 }
@@ -149,14 +188,23 @@ function renderBlockLabel(blocks: Record<string, Block>, block: Block, locale: s
         return field ? fieldText(field.value) : humanizeOpcode(block.opcode);
     }
 
-    // %1, %2... are filled by icon text first, then inputs, then fields, in order.
-    const slots: string[] = [
-        ...iconSlots(block.opcode),
-        ...Object.values(block.inputs)
-            .filter((i) => !i.name.startsWith(BRANCH_PREFIX))
-            .map((i) => renderInputValue(blocks, i, locale)),
-        ...Object.values(block.fields).map((f) => `[${fieldText(f.value)}]`),
-    ];
+    const orderedArguments = (slotOrder as Record<string, string[]>)[block.opcode];
+    const argumentsInDefinitionOrder = orderedArguments
+        ? orderedArguments.flatMap((name) => {
+            const input = block.inputs[name];
+            if (input && !input.name.startsWith(BRANCH_PREFIX)) {
+                return [renderInputValue(blocks, input, locale)];
+            }
+            const field = block.fields[name];
+            return field ? [`[${fieldText(field.value)}]`] : [];
+        })
+        : [
+            ...Object.values(block.inputs)
+                .filter((i) => !i.name.startsWith(BRANCH_PREFIX))
+                .map((i) => renderInputValue(blocks, i, locale)),
+            ...Object.values(block.fields).map((f) => `[${fieldText(f.value)}]`),
+        ];
+    const slots: string[] = [...iconSlots(block.opcode), ...argumentsInDefinitionOrder];
 
     let slot = 0;
     return template.replace(/%\d/g, () => slots[slot++] ?? "()").trim();
@@ -245,15 +293,6 @@ function renderConnectionFacts(state: RenderState, blocks: Record<string, Block>
             : "prázdná větev";
         state.lines.push(`  ${parent} / ${branch.name}: ${chain}`);
     }
-
-    const parentFacts = [...state.aliases]
-        .map(([alias, blockId]) => {
-            const parentId = blocks[blockId]?.parent;
-            const parent = parentId ? state.aliasOf(parentId) : undefined;
-            return parent ? `${alias} <- ${parent}` : null;
-        })
-        .filter((fact): fact is string => fact !== null);
-    if (parentFacts.length > 0) state.lines.push(`  rodičovské bloky: ${parentFacts.join(", ")}`);
 }
 
 /**
@@ -281,25 +320,24 @@ export function renderProject(targets: RenderTarget[], focusedTargetId: string, 
 
     for (const target of targets) {
         if (target.id !== focusedTargetId) continue;
-        state.lines.push(`postava: ${target.name}`);
+        state.lines.push(`${target.isStage ? "scéna" : "postava"}: ${target.name}`);
         const variables = Object.values(target.variables ?? {})
-            .map((variable) => {
-                if (Array.isArray(variable)) {
-                    return `${String(variable[0])}=${fieldText(variable[1])}`;
-                }
-                if (typeof variable === "object" && variable !== null && "name" in variable) {
-                    const namedVariable = variable as { name: unknown; value?: unknown };
-                    return `${String(namedVariable.name)}=${fieldText(namedVariable.value)}`;
-                }
-                return null;
-            })
-            .filter((variable): variable is string => variable !== null);
+            .map(namedValue)
+            .filter((variable): variable is {name: string; value: unknown} => variable !== null)
+            .map((variable) => `${variable.name}=${variableValueText(variable.value)}`);
         if (variables.length > 0) {
             state.lines.push(`proměnné: ${variables.join(", ")}`);
         }
+        const lists = Object.values(target.lists ?? {})
+            .map(namedValue)
+            .filter((list): list is {name: string; value: unknown} => list !== null)
+            .map((list) => `${list.name} (${Array.isArray(list.value) ? list.value.length : 0} položek)`);
+        if (lists.length > 0) {
+            state.lines.push(`seznamy: ${lists.join(", ")}`);
+        }
         const roots = Object.values(target.blocks).filter(isScriptRoot);
         if (roots.length === 0) {
-            state.lines.push("(zatim zadne bloky)");
+            state.lines.push("(zatím žádné bloky)");
         }
         roots.forEach((root, index) => {
             if (index > 0) state.lines.push("");
@@ -314,7 +352,7 @@ export function renderProject(targets: RenderTarget[], focusedTargetId: string, 
         for (const other of others) {
             const scripts = Object.values(other.blocks).filter(isScriptRoot).length;
             const count = Object.values(other.blocks).filter((b) => !b.shadow).length;
-            const kind = other.isStage ? "scena" : "postava";
+            const kind = other.isStage ? "scéna" : "postava";
             state.lines.push(`${kind}: ${other.name}  (${scripts} skriptu, ${count} bloku)`);
         }
     }

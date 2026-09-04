@@ -1,0 +1,384 @@
+{
+  "colour_picker": [
+    "COLOUR"
+  ],
+  "control_create_clone_of": [
+    "CLONE_OPTION"
+  ],
+  "control_create_clone_of_menu": [],
+  "control_delete_this_clone": [],
+  "control_forever": [
+    "SUBSTACK"
+  ],
+  "control_if": [
+    "CONDITION"
+  ],
+  "control_if_else": [
+    "CONDITION"
+  ],
+  "control_repeat": [
+    "TIMES"
+  ],
+  "control_repeat_until": [
+    "CONDITION"
+  ],
+  "control_start_as_clone": [],
+  "control_stop": [
+    "STOP_OPTION"
+  ],
+  "control_wait": [
+    "DURATION"
+  ],
+  "control_wait_until": [
+    "CONDITION"
+  ],
+  "data_addtolist": [
+    "ITEM",
+    "LIST"
+  ],
+  "data_changevariableby": [
+    "VARIABLE",
+    "VALUE"
+  ],
+  "data_deletealloflist": [
+    "LIST"
+  ],
+  "data_deleteoflist": [
+    "INDEX",
+    "LIST"
+  ],
+  "data_hidelist": [
+    "LIST"
+  ],
+  "data_hidevariable": [
+    "VARIABLE"
+  ],
+  "data_insertatlist": [
+    "ITEM",
+    "INDEX",
+    "LIST"
+  ],
+  "data_itemnumoflist": [
+    "ITEM",
+    "LIST"
+  ],
+  "data_itemoflist": [
+    "INDEX",
+    "LIST"
+  ],
+  "data_lengthoflist": [
+    "LIST"
+  ],
+  "data_listcontainsitem": [
+    "LIST",
+    "ITEM"
+  ],
+  "data_listcontents": [
+    "LIST"
+  ],
+  "data_replaceitemoflist": [
+    "INDEX",
+    "LIST",
+    "ITEM"
+  ],
+  "data_setvariableto": [
+    "VARIABLE",
+    "VALUE"
+  ],
+  "data_showlist": [
+    "LIST"
+  ],
+  "data_showvariable": [
+    "VARIABLE"
+  ],
+  "data_variable": [
+    "VARIABLE"
+  ],
+  "event_broadcast": [
+    "BROADCAST_INPUT"
+  ],
+  "event_broadcast_menu": [
+    "BROADCAST_OPTION"
+  ],
+  "event_broadcastandwait": [
+    "BROADCAST_INPUT"
+  ],
+  "event_touchingobjectmenu": [
+    "TOUCHINGOBJECTMENU"
+  ],
+  "event_whenbackdropswitchesto": [],
+  "event_whenbroadcastreceived": [
+    "BROADCAST_OPTION"
+  ],
+  "event_whenflagclicked": [],
+  "event_whengreaterthan": [
+    "WHENGREATERTHANMENU",
+    "VALUE"
+  ],
+  "event_whenkeypressed": [
+    "KEY_OPTION"
+  ],
+  "event_whenstageclicked": [],
+  "event_whenthisspriteclicked": [],
+  "looks_backdropnumbername": [
+    "NUMBER_NAME"
+  ],
+  "looks_changeeffectby": [
+    "EFFECT",
+    "CHANGE"
+  ],
+  "looks_changesizeby": [
+    "CHANGE"
+  ],
+  "looks_cleargraphiceffects": [],
+  "looks_costumenumbername": [
+    "NUMBER_NAME"
+  ],
+  "looks_goforwardbackwardlayers": [
+    "FORWARD_BACKWARD",
+    "NUM"
+  ],
+  "looks_gotofrontback": [
+    "FRONT_BACK"
+  ],
+  "looks_hide": [],
+  "looks_nextbackdrop": [],
+  "looks_nextcostume": [],
+  "looks_say": [
+    "MESSAGE"
+  ],
+  "looks_sayforsecs": [
+    "MESSAGE",
+    "SECS"
+  ],
+  "looks_seteffectto": [
+    "EFFECT",
+    "VALUE"
+  ],
+  "looks_setsizeto": [
+    "SIZE"
+  ],
+  "looks_show": [],
+  "looks_size": [],
+  "looks_switchbackdropto": [
+    "BACKDROP"
+  ],
+  "looks_switchbackdroptoandwait": [
+    "BACKDROP"
+  ],
+  "looks_switchcostumeto": [
+    "COSTUME"
+  ],
+  "looks_think": [
+    "MESSAGE"
+  ],
+  "looks_thinkforsecs": [
+    "MESSAGE",
+    "SECS"
+  ],
+  "math_angle": [
+    "NUM"
+  ],
+  "math_integer": [
+    "NUM"
+  ],
+  "math_number": [
+    "NUM"
+  ],
+  "math_positive_number": [
+    "NUM"
+  ],
+  "math_whole_number": [
+    "NUM"
+  ],
+  "motion_changexby": [
+    "DX"
+  ],
+  "motion_changeyby": [
+    "DY"
+  ],
+  "motion_direction": [],
+  "motion_glidesecstoxy": [
+    "SECS",
+    "X",
+    "Y"
+  ],
+  "motion_glideto": [
+    "SECS",
+    "TO"
+  ],
+  "motion_glideto_menu": [],
+  "motion_goto": [
+    "TO"
+  ],
+  "motion_goto_menu": [],
+  "motion_gotoxy": [
+    "X",
+    "Y"
+  ],
+  "motion_ifonedgebounce": [],
+  "motion_movesteps": [
+    "STEPS"
+  ],
+  "motion_pointindirection": [
+    "DIRECTION"
+  ],
+  "motion_pointtowards": [
+    "TOWARDS"
+  ],
+  "motion_pointtowards_menu": [],
+  "motion_setrotationstyle": [
+    "STYLE"
+  ],
+  "motion_setx": [
+    "X"
+  ],
+  "motion_sety": [
+    "Y"
+  ],
+  "motion_turnleft": [
+    "DEGREES"
+  ],
+  "motion_turnright": [
+    "DEGREES"
+  ],
+  "motion_xposition": [],
+  "motion_yposition": [],
+  "operator_add": [
+    "NUM1",
+    "NUM2"
+  ],
+  "operator_and": [
+    "OPERAND1",
+    "OPERAND2"
+  ],
+  "operator_contains": [
+    "STRING1",
+    "STRING2"
+  ],
+  "operator_divide": [
+    "NUM1",
+    "NUM2"
+  ],
+  "operator_equals": [
+    "OPERAND1",
+    "OPERAND2"
+  ],
+  "operator_gt": [
+    "OPERAND1",
+    "OPERAND2"
+  ],
+  "operator_join": [
+    "STRING1",
+    "STRING2"
+  ],
+  "operator_length": [
+    "STRING"
+  ],
+  "operator_letter_of": [
+    "LETTER",
+    "STRING"
+  ],
+  "operator_lt": [
+    "OPERAND1",
+    "OPERAND2"
+  ],
+  "operator_mathop": [
+    "OPERATOR",
+    "NUM"
+  ],
+  "operator_mod": [
+    "NUM1",
+    "NUM2"
+  ],
+  "operator_multiply": [
+    "NUM1",
+    "NUM2"
+  ],
+  "operator_not": [
+    "OPERAND"
+  ],
+  "operator_or": [
+    "OPERAND1",
+    "OPERAND2"
+  ],
+  "operator_random": [
+    "FROM",
+    "TO"
+  ],
+  "operator_round": [
+    "NUM"
+  ],
+  "operator_subtract": [
+    "NUM1",
+    "NUM2"
+  ],
+  "sensing_answer": [],
+  "sensing_askandwait": [
+    "QUESTION"
+  ],
+  "sensing_coloristouchingcolor": [
+    "COLOR",
+    "COLOR2"
+  ],
+  "sensing_current": [
+    "CURRENTMENU"
+  ],
+  "sensing_dayssince2000": [],
+  "sensing_distanceto": [
+    "DISTANCETOMENU"
+  ],
+  "sensing_distancetomenu": [],
+  "sensing_keyoptions": [
+    "KEY_OPTION"
+  ],
+  "sensing_keypressed": [
+    "KEY_OPTION"
+  ],
+  "sensing_loudness": [],
+  "sensing_mousedown": [],
+  "sensing_mousex": [],
+  "sensing_mousey": [],
+  "sensing_of": [
+    "PROPERTY",
+    "OBJECT"
+  ],
+  "sensing_of_object_menu": [],
+  "sensing_online": [],
+  "sensing_resettimer": [],
+  "sensing_setdragmode": [
+    "DRAG_MODE"
+  ],
+  "sensing_timer": [],
+  "sensing_touchingcolor": [
+    "COLOR"
+  ],
+  "sensing_touchingobject": [
+    "TOUCHINGOBJECTMENU"
+  ],
+  "sensing_touchingobjectmenu": [],
+  "sensing_username": [],
+  "sound_changeeffectby": [
+    "EFFECT",
+    "VALUE"
+  ],
+  "sound_changevolumeby": [
+    "VOLUME"
+  ],
+  "sound_cleareffects": [],
+  "sound_play": [
+    "SOUND_MENU"
+  ],
+  "sound_playuntildone": [
+    "SOUND_MENU"
+  ],
+  "sound_setvolumeto": [
+    "VOLUME"
+  ],
+  "sound_sounds_menu": [],
+  "sound_stopallsounds": [],
+  "sound_volume": [],
+  "text": [
+    "TEXT"
+  ]
+}

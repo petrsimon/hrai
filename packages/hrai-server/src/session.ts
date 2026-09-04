@@ -301,7 +301,7 @@ export class Session {
      */
     render(): string {
         if (this.targets.length === 0) return "(projekt zatim nedorazil)";
-        const { text, aliases } = renderProject(this.targets, this.focusedTargetId);
+        const { text, aliases } = renderProject(this.targets, this.focusedTargetId, "cs");
         this.aliases = aliases;
         return text;
     }
