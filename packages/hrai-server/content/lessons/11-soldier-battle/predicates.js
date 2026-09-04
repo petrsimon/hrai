@@ -55,20 +55,20 @@ export const predicates = {
     ),
 
     healthAndDeath: project => (
-        hasVariable(project, 'health') &&
-        hasAllVariables(project, ['dead enemies', 'living enemies']) &&
+        hasVariable(project, 'životy') &&
+        hasAllVariables(project, ['mrtví nepřátelé', 'živí nepřátelé']) &&
         hasOpcode(project, 'looks_hide')
     ),
 
     bowAttack: project => (
         hasOpcode(project, 'sensing_distanceto') &&
-        hasVariable(project, 'type')
+        hasVariable(project, 'typ')
     ),
 
     reinforcements: project => (
         hasOpcode(project, 'control_create_clone_of') &&
         hasOpcode(project, 'control_wait') &&
-        hasVariable(project, 'reinforcements')
+        hasVariable(project, 'počet posil')
     ),
 
     result: project => (

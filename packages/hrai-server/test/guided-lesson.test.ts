@@ -4,7 +4,7 @@ import {EVAL_MODEL, chat, isModelAvailable, warnSkipped} from '../src/model-clie
 import {systemPrompt, userPrompt} from '../src/prompt.ts';
 
 const PROJECT = `postava: Modry mec
-(zatim zadne bloky)
+(zatím žádné bloky)
 
 postava: Modry luk (0 skriptu, 0 bloku)
 postava: Cerveny mec (0 skriptu, 0 bloku)

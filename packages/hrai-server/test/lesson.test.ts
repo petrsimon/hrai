@@ -26,7 +26,7 @@ const selectionTargets = (
     targetIndex = 1,
 ): RenderTarget[] => targets.map((target, index) => ({
     ...target,
-    variables: withVariable && target.isStage ? {selected: {name: 'libovolný název', value: 1}} : {},
+    variables: withVariable && target.isStage ? {selected: {name: 'vybraný voják', value: 1}} : {},
     blocks: index === targetIndex ? Object.fromEntries(opcodes.map((opcode, blockIndex) => [
         `block-${blockIndex}`,
         selectedBlock(`block-${blockIndex}`, opcode),
@@ -70,6 +70,40 @@ describe('hrai lesson progression', () => {
             'looks_seteffectto',
         ], true), 'blue-1');
         expect(session.evaluateLessonStage()).toBe(true);
+    });
+
+    it('uses the Czech variable names from the soldier battle guide', () => {
+        const workspace = (names: string[], opcodes: string[]): RenderTarget[] => [{
+            id: 'soldier',
+            name: 'Soldier',
+            isStage: false,
+            variables: Object.fromEntries(names.map((name, index) => [`variable-${index}`, {name, value: 0}])),
+            blocks: Object.fromEntries(opcodes.map((opcode, index) => [
+                `block-${index}`,
+                selectedBlock(`block-${index}`, opcode),
+            ])),
+        }];
+
+        const health = new Session();
+        health.startLesson('11-soldier-battle', 5);
+        health.setWorkspace(workspace(
+            ['životy', 'mrtví nepřátelé', 'živí nepřátelé'],
+            ['looks_hide'],
+        ), 'soldier');
+        expect(health.evaluateLessonStage()).toBe(true);
+
+        const bow = new Session();
+        bow.startLesson('11-soldier-battle', 6);
+        bow.setWorkspace(workspace(['typ'], ['sensing_distanceto']), 'soldier');
+        expect(bow.evaluateLessonStage()).toBe(true);
+
+        const reinforcements = new Session();
+        reinforcements.startLesson('11-soldier-battle', 7);
+        reinforcements.setWorkspace(workspace(
+            ['počet posil'],
+            ['control_create_clone_of', 'control_wait'],
+        ), 'soldier');
+        expect(reinforcements.evaluateLessonStage()).toBe(true);
     });
 
     it('rejects unknown lessons', () => {
