@@ -16,7 +16,7 @@ import { parseGameRestore } from "./game-restore.ts";
 import { PALETTE, labelText, opcodesNamedByLabel } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
-import { enforceTutorPolicy } from "./tutor-policy.ts";
+import { enforceTutorPolicy, stripUnknownAliases } from "./tutor-policy.ts";
 import type { RenderTarget } from "./render.ts";
 import {
     MAX_VOICE_BYTES,
@@ -397,10 +397,17 @@ async function resolveModelChoice(
                     backend,
                 ))
                 .then((reply) => {
-                    const text = enforceTutorPolicy(reply.text, {
+                    const policed = enforceTutorPolicy(reply.text, {
                         rung: session.rung,
                         hasGoalContext: Boolean(context),
                     });
+                    const { text, removed } = stripUnknownAliases(
+                        policed,
+                        (alias) => session.resolveAlias(alias) !== undefined,
+                    );
+                    if (removed.length > 0) {
+                        console.warn(`hrai: answer at rung ${session.rung} cited unknown block aliases ${removed.join(", ")}`);
+                    }
                     session.remember("tutor", text);
                     socket.emit("token", { id, delta: text });
                     socket.emit("blocks", { id, blocks: blocksNamedIn(text) });
