@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {evaluateGameAssessment} from "../src/game-assessor.ts";
+import {describeAssessment, evaluateGameAssessment} from "../src/game-assessor.ts";
 import type {GameAssessment} from "../src/game-plan.ts";
 import type {Block, RenderTarget} from "../src/render.ts";
 
@@ -28,6 +28,58 @@ const target = (blocks: Block[], options: Partial<RenderTarget> = {}): RenderTar
 const assessment = (allOf: GameAssessment["allOf"]): GameAssessment => ({allOf});
 
 describe("game milestone assessor", () => {
+    it("describes only aggregate progress at the first two rungs", () => {
+        const contract = assessment([{
+            kind: "scriptContains",
+            opcodes: ["event_whenkeypressed", "motion_changexby"],
+            minimum: 1,
+        }, {
+            kind: "projectContains",
+            opcodes: ["looks_say"],
+        }]);
+
+        expect(describeAssessment(contract, [], 1)).toEqual([
+            "Podmínky milníku: splněno 0 ze 2.",
+        ]);
+        expect(describeAssessment(contract, [], 2)).toEqual([
+            "Podmínky milníku: splněno 0 ze 2.",
+        ]);
+    });
+
+    it("describes missing opcode categories at rung three without naming blocks", () => {
+        const contract = assessment([{
+            kind: "scriptContains",
+            opcodes: ["event_whenkeypressed", "motion_changexby"],
+            minimum: 1,
+        }]);
+
+        const evidence = describeAssessment(contract, [], 3);
+        expect(evidence).toHaveLength(1);
+        expect(evidence[0]).toContain("Události");
+        expect(evidence[0]).toContain("Pohyb");
+        expect(evidence[0]).not.toContain("event_whenkeypressed");
+        expect(evidence[0]).not.toContain("motion_changexby");
+    });
+
+    it("describes each criterion with opcodes at rungs four and five", () => {
+        const contract = assessment([{
+            kind: "scriptContains",
+            opcodes: ["event_whenkeypressed", "motion_changexby"],
+            minimum: 1,
+        }]);
+        const complete = target([
+            block("event", "event_whenkeypressed", {topLevel: true, next: "move"}),
+            block("move", "motion_changexby", {parent: "event"}),
+        ]);
+
+        expect(describeAssessment(contract, [complete], 4)).toEqual([
+            "splněno: event_whenkeypressed, motion_changexby v jednom propojeném skriptu.",
+        ]);
+        expect(describeAssessment(contract, [], 5)).toEqual([
+            "chybí: event_whenkeypressed, motion_changexby v jednom propojeném skriptu.",
+        ]);
+    });
+
     it("requires opcodes to belong to the same connected script", () => {
         const disconnected = target([
             block("event", "event_whenkeypressed", {topLevel: true}),

@@ -18,6 +18,7 @@ const context: TutorPromptContext = {
     instruction: "Z kategorie Události přetáhni blok po kliknutí na tuto postavu.",
     success: "Voják má událost po kliknutí.",
     opcodes: ["event_whenthisspriteclicked", "data_setvariableto"],
+    evidence: ["chybí: event_whenthisspriteclicked v jednom propojeném skriptu."],
 };
 
 const PALETTE_LINE = /^\s+[a-z]+_[a-z0-9_]+ = /m;
@@ -69,6 +70,14 @@ describe("palette scoping by rung", () => {
 });
 
 describe("rules", () => {
+    it("renders project evidence inside the context fence", () => {
+        const prompt = systemPrompt(4, context);
+        expect(prompt).toContain("DŮKAZY V PROJEKTU:");
+        expect(prompt).toContain("- chybí: event_whenthisspriteclicked v jednom propojeném skriptu.");
+        expect(prompt.indexOf("<kontext>")).toBeLessThan(prompt.indexOf("DŮKAZY V PROJEKTU:"));
+        expect(prompt.indexOf("DŮKAZY V PROJEKTU:")).toBeLessThan(prompt.indexOf("</kontext>"));
+    });
+
     it("numbers the rules consecutively", () => {
         const prompt = systemPrompt(3, context);
         const numbers = [...prompt.matchAll(/^(\d+)\. /gmu)].map((match) => Number(match[1]));

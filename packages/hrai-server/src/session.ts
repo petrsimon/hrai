@@ -7,8 +7,13 @@
  * later.
  */
 import { renderProject, type RenderTarget } from "./render.ts";
-import { evaluateLessonStage, lessonStage, type LessonStage } from "./lesson.ts";
-import { evaluateGameAssessment } from "./game-assessor.ts";
+import {
+    describeLessonEvidence,
+    evaluateLessonStage,
+    lessonStage,
+    type LessonStage,
+} from "./lesson.ts";
+import {describeAssessment, evaluateGameAssessment} from "./game-assessor.ts";
 import type { GameMilestone, GamePlan } from "./game-plan.ts";
 import { createGameStarter, type GameStarter } from "./game-starter.ts";
 import type { AssistantPreferences } from "./store.ts";
@@ -192,7 +197,7 @@ export class Session {
      * @returns Whether the current milestone is complete.
      */
     evaluateGameMilestone(): boolean {
-        if (this.gamePhase !== "guided" || !this.activeGamePlan || this.gameMilestoneComplete) {
+        if (this.gamePhase !== "guided" || !this.activeGamePlan) {
             return this.gameMilestoneComplete;
         }
         const milestone = this.activeGamePlan.milestones[this.activeGameMilestoneIndex];
@@ -207,6 +212,7 @@ export class Session {
         if (!next) return null;
         this.activeGameMilestoneIndex += 1;
         this.gameMilestoneComplete = false;
+        this.history.length = 0;
         this.resetRung();
         return next;
     }
@@ -216,11 +222,30 @@ export class Session {
      * @returns Authored lesson or custom game milestone context.
      */
     get tutorContext(): TutorPromptContext | undefined {
+        return this.tutorContextFor(this.currentRung);
+    }
+
+    /**
+     * Builds the active step context at a specific rung.
+     * @param rung Hint-ladder rung controlling evidence detail.
+     * @returns Authored lesson or custom game milestone context.
+     */
+    tutorContextFor(rung: number): TutorPromptContext | undefined {
         const lesson = this.lessonProgress;
-        if (lesson) return lesson.stage;
+        if (lesson) {
+            return {
+                ...lesson.stage,
+                evidence: lesson.complete
+                    ? ["Podmínka kroku je splněna."]
+                    : describeLessonEvidence(lesson.stage, this.targets, rung),
+            };
+        }
 
         const game = this.gameProgress;
         if (!game) return undefined;
+        const opcodes = [...new Set(game.milestone.assessment.allOf.flatMap((criterion) => (
+            "opcodes" in criterion ? criterion.opcodes : []
+        )))];
         return {
             originalGoal: game.plan.originalGoal,
             coreLoop: game.plan.coreLoop,
@@ -229,8 +254,10 @@ export class Session {
             why: game.milestone.why,
             concept: game.milestone.concept,
             playtestFeedback: game.feedback,
-            instruction: game.milestone.outcome,
+            instruction: `Doplň projekt tak, aby: ${game.milestone.doneWhen}`,
             success: game.milestone.doneWhen,
+            opcodes,
+            evidence: describeAssessment(game.milestone.assessment, this.targets, rung),
         };
     }
 
@@ -258,6 +285,7 @@ export class Session {
         if (!stage) return null;
         this.activeStageIndex = nextIndex;
         this.stageComplete = false;
+        this.history.length = 0;
         this.resetRung();
         return stage;
     }
@@ -275,7 +303,7 @@ export class Session {
     }
 
     evaluateLessonStage(): boolean {
-        if (!this.activeLessonId || this.stageComplete) return this.stageComplete;
+        if (!this.activeLessonId) return this.stageComplete;
         this.stageComplete = evaluateLessonStage(this.activeLessonId, this.activeStageIndex, {
             targets: this.targets,
         });

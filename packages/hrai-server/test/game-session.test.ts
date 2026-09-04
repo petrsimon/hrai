@@ -83,7 +83,10 @@ describe("goal-driven game session", () => {
             originalGoal: PLAN.originalGoal,
             coreLoop: PLAN.coreLoop,
             title: FIRST_MILESTONE.title,
+            goal: FIRST_MILESTONE.outcome,
+            instruction: `Doplň projekt tak, aby: ${FIRST_MILESTONE.doneWhen}`,
             why: FIRST_MILESTONE.why,
+            opcodes: ["event_whenkeypressed", "motion_changexby"],
         });
         expect(systemPrompt(1, session.tutorContext)).toContain(`PŮVODNÍ CÍL HRY: ${PLAN.originalGoal}`);
         expect(systemPrompt(1, session.tutorContext)).toContain(`PROČ TENTO KROK PATŘÍ DO HRY: ${FIRST_MILESTONE.why}`);
@@ -125,9 +128,51 @@ describe("goal-driven game session", () => {
         };
         session.setWorkspace([workspace], workspace.id);
         expect(session.evaluateGameMilestone()).toBe(true);
+        expect(session.tutorContextFor(4)?.evidence).toEqual([
+            "splněno: event_whenkeypressed, motion_changexby v jednom propojeném skriptu.",
+        ]);
         expect(session.nextGameMilestone()).toEqual(PLAN.milestones[1]);
         expect(session.gameProgress?.complete).toBe(false);
         expect(session.rung).toBe(1);
+        expect(session.history).toEqual([]);
+    });
+
+    it("re-evaluates a completed milestone when the child breaks it", () => {
+        const session = new Session();
+        session.proposeGamePlan(PLAN);
+        session.acceptGamePlan();
+        session.startGameGuidance();
+
+        const workspace: RenderTarget = {
+            id: "dragon",
+            name: "Drak",
+            isStage: false,
+            blocks: {
+                event: {
+                    id: "event",
+                    opcode: "event_whenkeypressed",
+                    next: "move",
+                    parent: null,
+                    inputs: {},
+                    fields: {},
+                    topLevel: true,
+                },
+                move: {
+                    id: "move",
+                    opcode: "motion_changexby",
+                    next: null,
+                    parent: "event",
+                    inputs: {},
+                    fields: {},
+                },
+            },
+        };
+        session.setWorkspace([workspace], workspace.id);
+        expect(session.evaluateGameMilestone()).toBe(true);
+
+        session.setWorkspace([], "");
+        expect(session.evaluateGameMilestone()).toBe(false);
+        expect(session.gameProgress?.complete).toBe(false);
     });
 
     it("restores an accepted milestone without trusting prior completion", () => {
