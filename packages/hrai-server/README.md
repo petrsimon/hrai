@@ -64,6 +64,16 @@ for an agent CLI that is the CLI's own default, so `--model` is left off entirel
 A backend picked at runtime uses `HRAI_OLLAMA_HOST` or `HRAI_LLAMA_HOST` instead, because a host
 belonging to one backend is wrong for another.
 
+## Block labels and argument order
+
+The render fills each block's label template from `scratch-l10n` in the child's locale. The
+order of a block's arguments comes from `src/data/slot-order.json`, generated from the
+scratch-blocks definitions. Regenerate it after upgrading scratch-blocks:
+
+```sh
+npm run build:slot-order --workspace=packages/hrai-server
+```
+
 ## Running it against the editor
 
 Three terminals:
