@@ -40,6 +40,8 @@ import {
 } from '../../reducers/time-travel';
 import {
     autoUpdateProject,
+    createProject,
+    getIsShowingWithoutId,
     getIsUpdating,
     getIsShowingProject,
     requestNewProject,
@@ -160,11 +162,52 @@ MenuItemTooltip.propTypes = {
     isRtl: PropTypes.bool
 };
 
+/**
+ * The saved-project list entry point. A host that can show the list in place passes onClick and
+ * gets a button, so opening it does not reload the editor and drop the open project.
+ * @param {object} props Label, fallback url, and optional in-place click handler.
+ * @returns {React.ReactElement} Link or button wrapping the my-stuff icon.
+ */
+const MyStuffControl = ({handleClick, label, url}) => {
+    const icon = (
+        <div className={classNames(styles.menuBarItem, styles.hoverable, styles.mystuffButton)}>
+            <img
+                className={styles.mystuffIcon}
+                src={mystuffIcon}
+            />
+        </div>
+    );
+    return handleClick ? (
+        <button
+            aria-label={label}
+            className={styles.myStuffButtonReset}
+            type="button"
+            onClick={handleClick}
+        >
+            {icon}
+        </button>
+    ) : (
+        <a
+            aria-label={label}
+            href={url}
+        >
+            {icon}
+        </a>
+    );
+};
+
+MyStuffControl.propTypes = {
+    handleClick: PropTypes.func,
+    label: PropTypes.string,
+    url: PropTypes.string
+};
+
 class MenuBar extends React.Component {
     constructor (props) {
         super(props);
         bindAll(this, [
             'handleClickNew',
+            'handleClickSave',
             'handleClickSeeCommunity',
             'handleClickShare',
             'handleSetMode',
@@ -192,6 +235,15 @@ class MenuBar extends React.Component {
         );
         if (readyToReplaceProject) {
             this.props.onClickNew(this.props.canSave && this.props.canCreateNew);
+        }
+    }
+    handleClickSave () {
+        // A project the child has never saved has no id yet, and the update action is a no-op
+        // without one. Creating it first is what "save" means the first time round.
+        if (this.props.isShowingWithoutId) {
+            this.props.onCreateProject();
+        } else {
+            this.props.onClickSave();
         }
     }
     handleClickSeeCommunity (waitForUpdate) {
@@ -259,7 +311,7 @@ class MenuBar extends React.Component {
     handleKeyPress (event) {
         const modifier = bowser.mac ? event.metaKey : event.ctrlKey;
         if (modifier && event.key === 's') {
-            this.props.onClickSave();
+            this.handleClickSave();
             event.preventDefault();
         }
     }
@@ -366,7 +418,7 @@ class MenuBar extends React.Component {
                             onStartSelectingFileUpload={this.props.onStartSelectingFileUpload}
                             onClickNew={this.handleClickNew}
                             onClickRemix={this.props.onClickRemix}
-                            onClickSave={this.props.onClickSave}
+                            onClickSave={this.handleClickSave}
                             getSaveToComputerHandler={this.getSaveToComputerHandler}
                             canSave={this.props.canSave}
                             canCreateCopy={this.props.canCreateCopy}
@@ -529,23 +581,11 @@ class MenuBar extends React.Component {
                             // ************ user is logged in ************
                             <React.Fragment>
                                 {menuOpts.myStuffUrl ? (
-                                    <a
-                                        href={menuOpts.myStuffUrl}
-                                        aria-label={this.props.intl.formatMessage(ariaMessages.myStuff)}
-                                    >
-                                        <div
-                                            className={classNames(
-                                                styles.menuBarItem,
-                                                styles.hoverable,
-                                                styles.mystuffButton
-                                            )}
-                                        >
-                                            <img
-                                                className={styles.mystuffIcon}
-                                                src={mystuffIcon}
-                                            />
-                                        </div>
-                                    </a>
+                                    <MyStuffControl
+                                        handleClick={menuOpts.onClickMyStuff}
+                                        label={this.props.intl.formatMessage(ariaMessages.myStuff)}
+                                        url={menuOpts.myStuffUrl}
+                                    />
                                 ) : null}
 
                                 <AccountMenu
@@ -719,7 +759,9 @@ MenuBar.propTypes = {
     onClickMode: PropTypes.func,
     onClickNew: PropTypes.func,
     onClickRemix: PropTypes.func,
+    isShowingWithoutId: PropTypes.bool,
     onClickSave: PropTypes.func,
+    onCreateProject: PropTypes.func,
     onClickSaveAsCopy: PropTypes.func,
     onLogOut: PropTypes.func,
     onOpenRegistration: PropTypes.func,
@@ -767,6 +809,7 @@ const mapStateToProps = (state, ownProps) => {
         isShowingProject: getIsShowingProject(loadingState),
         locale: state.locales.locale,
         loginMenuOpen: loginMenuOpen(state),
+        isShowingWithoutId: getIsShowingWithoutId(loadingState),
         projectTitle: state.scratchGui.projectTitle,
         username: ownProps.username ?? (user ? user.username : null),
         avatarBadge: ownProps.avatarBadge ?? (user ? user.membership_avatar_badge : null),
@@ -809,6 +852,7 @@ const mapDispatchToProps = (dispatch, ownProps) => ({
     onClickNew: needSave => dispatch(requestNewProject(needSave)),
     onClickLogin: ownProps.onClickLogin ?? (() => dispatch(openLoginMenu())),
     onClickSave: () => dispatch(manualUpdateProject()),
+    onCreateProject: () => dispatch(createProject()),
     onClickRemix: () => dispatch(remixProject()),
     onRequestCloseLogin: () => dispatch(closeLoginMenu()),
     onSeeCommunity: ownProps.onSeeCommunity ?? (() => dispatch(setPlayer(true))),

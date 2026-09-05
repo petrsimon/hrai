@@ -12,24 +12,30 @@ global.MutationObserver = class {
     observe () { }
 };
 
-// Stub the manualUpdateProject action creator for later testing
+// Stub the action creators for later testing
 jest.mock('../../../src/reducers/project-state', () => ({
+    createProject: jest.fn(() => ({type: 'stubbedCreate'})),
+    getIsShowingWithoutId: jest.fn(loadingState => loadingState === 'SHOWING_WITHOUT_ID'),
     manualUpdateProject: jest.fn(() => ({type: 'stubbed'}))
 }));
+
+const SAVE_NOW_LABEL = 'Unsaved - save now';
 
 describe('SaveStatus container', () => {
     const mockStore = configureStore();
 
+    const storeWith = ({projectChanged, alertsList = [], loadingState = 'SHOWING_WITH_ID'}) => mockStore({
+        scratchGui: {
+            projectChanged,
+            alerts: {alertsList},
+            projectState: {loadingState}
+        }
+    });
+
     test('if there are inline messages, they are shown instead of save now', () => {
-        const store = mockStore({
-            scratchGui: {
-                projectChanged: true,
-                alerts: {
-                    alertsList: [
-                        {alertId: 'saveSuccess', alertType: AlertTypes.INLINE}
-                    ]
-                }
-            }
+        const store = storeWith({
+            projectChanged: true,
+            alertsList: [{alertId: 'saveSuccess', alertType: AlertTypes.INLINE}]
         });
         const {container} = renderWithIntl(
             <Provider store={store}>
@@ -39,26 +45,19 @@ describe('SaveStatus container', () => {
 
         const inlineMessage = container.querySelector('[aria-label="inline message"]');
         expect(inlineMessage).toBeTruthy();
-        const saveNow = screen.queryByText('Save Now');
+        const saveNow = screen.queryByText(SAVE_NOW_LABEL);
         expect(saveNow).toBeNull();
     });
 
     test('save now is shown if there are project changes and no inline messages', () => {
-        const store = mockStore({
-            scratchGui: {
-                projectChanged: true,
-                alerts: {
-                    alertsList: []
-                }
-            }
-        });
+        const store = storeWith({projectChanged: true});
         const {container} = renderWithIntl(
             <Provider store={store}>
                 <SaveStatus />
             </Provider>
         );
 
-        const saveNow = screen.getByText('Save Now');
+        const saveNow = screen.getByText(SAVE_NOW_LABEL);
         const inlineMessage = container.querySelector('[aria-label="inline message"]');
         expect(inlineMessage).toBeFalsy();
 
@@ -67,15 +66,20 @@ describe('SaveStatus container', () => {
         expect(store.getActions()[0].type).toEqual('stubbed');
     });
 
+    test('save now creates the project when it has never been saved', () => {
+        const store = storeWith({projectChanged: true, loadingState: 'SHOWING_WITHOUT_ID'});
+        renderWithIntl(
+            <Provider store={store}>
+                <SaveStatus />
+            </Provider>
+        );
+
+        fireEvent.click(screen.getByText(SAVE_NOW_LABEL));
+        expect(store.getActions()[0].type).toEqual('stubbedCreate');
+    });
+
     test('neither is shown if there are no project changes or inline messages', () => {
-        const store = mockStore({
-            scratchGui: {
-                projectChanged: false,
-                alerts: {
-                    alertsList: []
-                }
-            }
-        });
+        const store = storeWith({projectChanged: false});
 
         const {container} = renderWithIntl(
             <Provider store={store}>
@@ -85,7 +89,7 @@ describe('SaveStatus container', () => {
 
         const inlineMessage = container.querySelector('[aria-label="inline message"]');
         expect(inlineMessage).toBeFalsy();
-        const saveNow = screen.queryByText('Save Now');
+        const saveNow = screen.queryByText(SAVE_NOW_LABEL);
         expect(saveNow).toBeNull();
     });
 });
