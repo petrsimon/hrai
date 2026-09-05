@@ -139,6 +139,33 @@ default. Both the map's keys and its values are validated on the way in: a key m
 backend id, and a value must be at most 100 characters of `[A-Za-z0-9._:/+-]` and may not start with
 `-`, because it becomes an argv token handed to a spawned CLI.
 
+### Forgotten passwords
+
+A profile may carry a recovery address — usually a parent's, since the children using this
+server mostly have no mailbox of their own. It is optional at registration and can be added
+later in assistant settings. `POST /api/auth/forgot` takes a username or that address and
+answers `{"ok": true}` either way, because a different answer for an unknown profile would
+tell a stranger which usernames exist here. When the profile does have an address, a
+single-use token valid for one hour is mailed as a link back to the editor, where
+`POST /api/auth/reset` spends it. Resetting signs that profile out of every device.
+
+| Variable | Effect |
+| - | - |
+| `HRAI_SMTP_URL` | SMTP relay, e.g. `smtps://user:pass@smtp.example.com`. **Unset, no mail is sent: the link is written to the server log instead**, which is enough for a home machine where an adult can read it. |
+| `HRAI_MAIL_FROM` | Sender address; defaults to `hrai@localhost`. |
+| `HRAI_EDITOR_URL` | Base URL the reset link points at. Defaults to the request's own origin, which is right for the Compose deployment and wrong behind a rewriting proxy. |
+
+When nobody can read the mail either, reset from the machine that holds the data:
+
+```sh
+npm run reset-password --workspace=packages/hrai-server -- --list
+npm run reset-password --workspace=packages/hrai-server -- <username> [password]
+```
+
+It invents a password when none is given, signs that profile out everywhere, and prints what
+it set. The running server keeps the store in memory, so restart it afterwards or its next
+save will write the old password back.
+
 For local Docker deployment, see [`docker/README.md`](../../docker/README.md).
 
 ## Goal-driven custom games

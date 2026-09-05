@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { listBackends } from "./model-catalog.ts";
 import { defaultBackend, EVAL_MODEL } from "./model-client.ts";
+import { sendPasswordReset } from "./mailer.ts";
 import { parseCookies, HraiStore, SESSION_COOKIE, type AuthenticatedUser } from "./store.ts";
 
 const MAX_JSON_BYTES = 32 * 1024 * 1024;
@@ -90,8 +91,23 @@ function userResponse(user: AuthenticatedUser | null): unknown {
         id: user.id,
         username: user.username,
         displayName: user.displayName,
+        email: user.email ?? "",
         assistantPreferences: user.assistantPreferences,
     };
+}
+
+/**
+ * Where the child clicks the reset link back to.
+ * @param request The incoming request, used when no editor URL is configured.
+ * @param token The single-use token the child will spend on a new password.
+ * @returns An absolute URL that opens the editor's set-a-new-password panel.
+ */
+function resetLink(request: IncomingMessage, token: string): string {
+    const configured = process.env.HRAI_EDITOR_URL ?? "";
+    const origin = configured === "" ?
+        (allowedOrigin(request.headers.origin) ?? `http://${request.headers.host ?? "localhost"}`) :
+        configured;
+    return `${origin.replace(/\/$/, "")}/?hrai-reset=${encodeURIComponent(token)}`;
 }
 
 function projectIdFromPath(pathname: string): string | null {
@@ -137,6 +153,7 @@ export async function handleApiRequest(
                 body.username as string,
                 body.password as string,
                 body.displayName as string | undefined,
+                body.email as string | undefined,
             );
             response.setHeader("Set-Cookie", cookieHeader(created.sessionToken, request));
             sendJson(response, 201, userResponse(created));
@@ -162,6 +179,34 @@ export async function handleApiRequest(
             return;
         }
 
+        if (request.method === "POST" && url.pathname === "/api/auth/forgot") {
+            const body = await readJson(request);
+            const reset = await store.createPasswordReset(body.identifier);
+            if (reset) {
+                // Mail failure must not change the answer below, or the timing of it would
+                // still say whether the profile exists.
+                await sendPasswordReset(reset.email, reset.displayName, resetLink(request, reset.token))
+                    .catch((error: unknown) => console.error("hrai: could not send reset mail", error));
+            }
+            // Always the same answer: whether a profile exists here is not a stranger's business.
+            sendJson(response, 200, { ok: true });
+            return;
+        }
+
+        if (request.method === "POST" && url.pathname === "/api/auth/reset") {
+            const body = await readJson(request);
+            if (typeof body.password !== "string") {
+                sendError(response, 400, "invalid_password");
+                return;
+            }
+            if (!(await store.consumePasswordReset(body.token, body.password))) {
+                sendError(response, 400, "invalid_reset_token");
+                return;
+            }
+            sendJson(response, 200, { ok: true });
+            return;
+        }
+
         if (request.method === "GET" && url.pathname === "/api/auth/me") {
             sendJson(response, 200, userResponse(user));
             return;
@@ -182,6 +227,17 @@ export async function handleApiRequest(
 
         if (request.method === "GET" && url.pathname === "/api/profile") {
             sendJson(response, 200, userResponse(user));
+            return;
+        }
+
+        if (request.method === "PUT" && url.pathname === "/api/profile/email") {
+            const body = await readJson(request);
+            const updated = await store.setEmail(user.id, body.email);
+            if (!updated) {
+                sendError(response, 400, "invalid_email");
+                return;
+            }
+            sendJson(response, 200, updated);
             return;
         }
 
@@ -264,7 +320,14 @@ export async function handleApiRequest(
         sendError(response, 404, "not_found");
     } catch (error: unknown) {
         const code = error instanceof Error ? error.message : "request_failed";
-        const status = ["invalid_username", "invalid_password", "invalid_json", "invalid_project", "body_too_large"].includes(code) ? 400 :
+        const status = [
+            "invalid_username",
+            "invalid_password",
+            "invalid_email",
+            "invalid_json",
+            "invalid_project",
+            "body_too_large",
+        ].includes(code) ? 400 :
             code === "username_taken" ? 409 : code === "project_not_found" ? 404 : 500;
         if (status === 500) console.error("hrai: api request failed", error);
         sendError(response, status, code);

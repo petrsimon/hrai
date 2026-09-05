@@ -126,6 +126,10 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
   They skip loudly, printing the reason, when the model is unavailable — never silently green.
 - `npm test --workspace=packages/hrai-server` needs `ollama serve` and `ollama pull qwen3:14b`.
   Override with `HRAI_EVAL_MODEL` / `HRAI_EVAL_HOST`.
+- Password recovery is email-based and optional: `HRAI_SMTP_URL` / `HRAI_MAIL_FROM` /
+  `HRAI_EDITOR_URL`. With no SMTP relay configured the reset link is written to the server
+  log rather than sent, and `npm run reset-password --workspace=packages/hrai-server`
+  resets a password from the machine itself.
 - `HRAI_MODEL_BACKEND` also accepts `cursor`, `pi`, and `codex`. Those spawn a locally installed
   agent CLI instead of calling a model server, and they reach hosted APIs — the child's project
   text leaves the machine. The Compose deployment still uses `llama.cpp`. See the package README.

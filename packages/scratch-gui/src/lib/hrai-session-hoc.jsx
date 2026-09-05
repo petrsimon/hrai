@@ -38,6 +38,20 @@ const messages = defineMessages({
     working: {id: 'gui.hrai.working', defaultMessage: 'Working…', description: 'account form busy state'},
     loading: {id: 'gui.hrai.loading', defaultMessage: 'Loading…', description: 'saved project list loading state'},
     authFailed: {id: 'gui.hrai.authFailed', defaultMessage: 'Sign-in failed. Check your details.', description: 'account authentication error'},
+    forgotLink: {id: 'gui.hrai.forgotLink', defaultMessage: 'I forgot my password', description: 'link to the password reset form'},
+    forgotHeading: {id: 'gui.hrai.forgotHeading', defaultMessage: 'New HRAI password', description: 'password reset form heading'},
+    forgotIdentifier: {id: 'gui.hrai.forgotIdentifier', defaultMessage: 'Username or email', description: 'password reset identifier field'},
+    forgotSubmit: {id: 'gui.hrai.forgotSubmit', defaultMessage: 'Send me a link', description: 'password reset submit button'},
+    forgotSent: {id: 'gui.hrai.forgotSent', defaultMessage: 'If that profile has an email saved, a link is on its way. It works for one hour.', description: 'password reset confirmation, deliberately says nothing about whether the profile exists'},
+    backToSignIn: {id: 'gui.hrai.backToSignIn', defaultMessage: 'Back to signing in', description: 'return from the password reset form'},
+    newPasswordHeading: {id: 'gui.hrai.newPasswordHeading', defaultMessage: 'Choose a new password', description: 'set-new-password panel heading'},
+    newPassword: {id: 'gui.hrai.newPassword', defaultMessage: 'New password', description: 'new password field'},
+    setPassword: {id: 'gui.hrai.setPassword', defaultMessage: 'Save the new password', description: 'set-new-password submit button'},
+    resetDone: {id: 'gui.hrai.resetDone', defaultMessage: 'Done. Sign in with your new password.', description: 'password reset success'},
+    resetFailed: {id: 'gui.hrai.resetFailed', defaultMessage: 'That link no longer works. Ask for a new one.', description: 'expired or spent reset link'},
+    recoveryEmail: {id: 'gui.hrai.recoveryEmail', defaultMessage: 'Email for password recovery', description: 'recovery address field'},
+    recoveryEmailHint: {id: 'gui.hrai.recoveryEmailHint', defaultMessage: 'Optional. A grown-up\u2019s address works well. Without it a forgotten password can only be reset on the server.', description: 'explains what the recovery address is for'},
+    emailInvalid: {id: 'gui.hrai.emailInvalid', defaultMessage: 'That does not look like an email address.', description: 'invalid recovery address error'},
     registerFailed: {id: 'gui.hrai.registerFailed', defaultMessage: 'Could not create the profile. Try again.', description: 'account registration error'},
     usernameRule: {id: 'gui.hrai.usernameRule', defaultMessage: 'Username: 3-32 characters, letters, digits, - or _ only.', description: 'username format rule, shown as a hint and as an error'},
     passwordRule: {id: 'gui.hrai.passwordRule', defaultMessage: 'Password: at least 8 characters.', description: 'password length rule, shown as a hint and as an error'},
@@ -112,6 +126,8 @@ const serverErrorMessage = (code, registering) => {
     case 'invalid_username': return messages.usernameRule;
     case 'invalid_password': return messages.passwordRule;
     case 'invalid_credentials': return messages.authFailed;
+    case 'invalid_email': return messages.emailInvalid;
+    case 'invalid_reset_token': return messages.resetFailed;
     default: return registering ? messages.registerFailed : messages.authFailed;
     }
 };
@@ -120,15 +136,39 @@ const hintStyle = {opacity: 0.75};
 
 const HraiAuthForm = ({defaultRegistering = false, onClose, onSuccess}) => {
     const intl = useIntl();
-    const [registering, setRegistering] = React.useState(defaultRegistering);
+    const [mode, setMode] = React.useState(defaultRegistering ? 'register' : 'login');
     const [username, setUsername] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [displayName, setDisplayName] = React.useState('');
+    const [email, setEmail] = React.useState('');
+    const [identifier, setIdentifier] = React.useState('');
     const [error, setError] = React.useState(null);
+    const [notice, setNotice] = React.useState(null);
     const [busy, setBusy] = React.useState(false);
+
+    const registering = mode === 'register';
 
     const submit = async (event) => {
         event.preventDefault();
+        setNotice(null);
+        if (mode === 'forgot') {
+            setBusy(true);
+            try {
+                await request('/api/auth/forgot', {
+                    method: 'POST',
+                    body: JSON.stringify({identifier})
+                });
+                setError(null);
+                setNotice(messages.forgotSent);
+            } catch {
+                // The endpoint answers the same for every identifier, so the only failure
+                // that reaches here is the request itself.
+                setError(messages.requestFailed);
+            } finally {
+                setBusy(false);
+            }
+            return;
+        }
         const violation = ruleViolation(username, password);
         if (violation) {
             setError(violation);
@@ -140,7 +180,12 @@ const HraiAuthForm = ({defaultRegistering = false, onClose, onSuccess}) => {
             const path = registering ? '/api/auth/register' : '/api/auth/login';
             const user = await request(path, {
                 method: 'POST',
-                body: JSON.stringify({username, password, displayName: displayName || undefined})
+                body: JSON.stringify({
+                    username,
+                    password,
+                    displayName: displayName || undefined,
+                    email: registering && email ? email : undefined
+                })
             });
             onSuccess(user);
             onClose?.();
@@ -151,57 +196,104 @@ const HraiAuthForm = ({defaultRegistering = false, onClose, onSuccess}) => {
         }
     };
 
+    const heading = mode === 'forgot' ? messages.forgotHeading :
+        registering ? messages.createProfile : messages.signIn;
+    const submitLabel = mode === 'forgot' ? messages.forgotSubmit :
+        registering ? messages.createProfileButton : messages.signInButton;
+
     // noValidate: the browser's own bubbles for `required` and `minLength` block submission
     // silently enough to read as a dead button. The rules below are always on screen instead.
     return (
         <form noValidate onSubmit={submit} style={{display: 'grid', gap: '0.5rem', padding: '0.75rem'}}>
             <strong>
-                <FormattedMessage {...(registering ? messages.createProfile : messages.signIn)} />
+                <FormattedMessage {...heading} />
             </strong>
-            {registering ? (
+            {mode === 'forgot' ? (
                 <input
-                    aria-label={intl.formatMessage(messages.displayName)}
-                    placeholder={intl.formatMessage(messages.displayName)}
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                    maxLength={80}
+                    aria-label={intl.formatMessage(messages.forgotIdentifier)}
+                    placeholder={intl.formatMessage(messages.forgotIdentifier)}
+                    value={identifier}
+                    onChange={(event) => setIdentifier(event.target.value)}
+                    autoComplete="username"
+                    required
                 />
-            ) : null}
-            <input
-                aria-describedby="hrai-username-rule"
-                aria-label={intl.formatMessage(messages.username)}
-                placeholder={intl.formatMessage(messages.username)}
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                autoComplete="username"
-                maxLength={32}
-                required
-            />
-            <small id="hrai-username-rule" style={hintStyle}>
-                <FormattedMessage {...messages.usernameRule} />
-            </small>
-            <input
-                aria-describedby="hrai-password-rule"
-                aria-label={intl.formatMessage(messages.password)}
-                placeholder={intl.formatMessage(messages.password)}
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete={registering ? 'new-password' : 'current-password'}
-                required
-            />
-            <small id="hrai-password-rule" style={hintStyle}>
-                <FormattedMessage {...messages.passwordRule} />
-            </small>
+            ) : (
+                <>
+                    {registering ? (
+                        <input
+                            aria-label={intl.formatMessage(messages.displayName)}
+                            placeholder={intl.formatMessage(messages.displayName)}
+                            value={displayName}
+                            onChange={(event) => setDisplayName(event.target.value)}
+                            maxLength={80}
+                        />
+                    ) : null}
+                    <input
+                        aria-describedby="hrai-username-rule"
+                        aria-label={intl.formatMessage(messages.username)}
+                        placeholder={intl.formatMessage(messages.username)}
+                        value={username}
+                        onChange={(event) => setUsername(event.target.value)}
+                        autoComplete="username"
+                        maxLength={32}
+                        required
+                    />
+                    <small id="hrai-username-rule" style={hintStyle}>
+                        <FormattedMessage {...messages.usernameRule} />
+                    </small>
+                    <input
+                        aria-describedby="hrai-password-rule"
+                        aria-label={intl.formatMessage(messages.password)}
+                        placeholder={intl.formatMessage(messages.password)}
+                        type="password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        autoComplete={registering ? 'new-password' : 'current-password'}
+                        required
+                    />
+                    <small id="hrai-password-rule" style={hintStyle}>
+                        <FormattedMessage {...messages.passwordRule} />
+                    </small>
+                    {registering ? (
+                        <>
+                            <input
+                                aria-describedby="hrai-email-hint"
+                                aria-label={intl.formatMessage(messages.recoveryEmail)}
+                                placeholder={intl.formatMessage(messages.recoveryEmail)}
+                                type="email"
+                                value={email}
+                                onChange={(event) => setEmail(event.target.value)}
+                                autoComplete="email"
+                                maxLength={254}
+                            />
+                            <small id="hrai-email-hint" style={hintStyle}>
+                                <FormattedMessage {...messages.recoveryEmailHint} />
+                            </small>
+                        </>
+                    ) : null}
+                </>
+            )}
             {error ? <small role="alert"><FormattedMessage {...error} /></small> : null}
+            {notice ? <small role="status"><FormattedMessage {...notice} /></small> : null}
             <button type="submit" disabled={busy}>
-                {busy ? <FormattedMessage {...messages.working} /> : (
-                    <FormattedMessage {...(registering ? messages.createProfileButton : messages.signInButton)} />
-                )}
+                {busy ? <FormattedMessage {...messages.working} /> : <FormattedMessage {...submitLabel} />}
             </button>
-            <button type="button" onClick={() => setRegistering((value) => !value)}>
-                <FormattedMessage {...(registering ? messages.switchToLogin : messages.createProfileLink)} />
-            </button>
+            {mode === 'forgot' ? (
+                <button type="button" onClick={() => setMode('login')}>
+                    <FormattedMessage {...messages.backToSignIn} />
+                </button>
+            ) : (
+                <>
+                    <button type="button" onClick={() => setMode(registering ? 'login' : 'register')}>
+                        <FormattedMessage {...(registering ? messages.switchToLogin : messages.createProfileLink)} />
+                    </button>
+                    {registering ? null : (
+                        <button type="button" onClick={() => setMode('forgot')}>
+                            <FormattedMessage {...messages.forgotLink} />
+                        </button>
+                    )}
+                </>
+            )}
             {onClose ? (
                 <button type="button" onClick={onClose}>
                     <FormattedMessage {...messages.cancel} />
@@ -220,6 +312,7 @@ HraiAuthForm.propTypes = {
 const AssistantSettings = ({user, onClose, onUpdated}) => {
     const intl = useIntl();
     const [preferences, setPreferences] = React.useState(user.assistantPreferences);
+    const [email, setEmail] = React.useState(user.email ?? '');
     const [modelCatalog, setModelCatalog] = React.useState(null);
     const [modelsFailed, setModelsFailed] = React.useState(false);
     const [error, setError] = React.useState(null);
@@ -248,10 +341,14 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
                 method: 'PUT',
                 body: JSON.stringify(preferences)
             });
-            onUpdated(updated);
+            const withEmail = email === (user.email ?? '') ? updated : await request('/api/profile/email', {
+                method: 'PUT',
+                body: JSON.stringify({email})
+            });
+            onUpdated(withEmail);
             setSaved(true);
         } catch (requestError) {
-            setError(messages.requestFailed);
+            setError(requestError.message === 'invalid_email' ? messages.emailInvalid : messages.requestFailed);
         }
     };
 
@@ -320,6 +417,19 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
                     </label>
                 )}
                 <label>
+                    <FormattedMessage {...messages.recoveryEmail} />
+                    <input
+                        aria-describedby="hrai-settings-email-hint"
+                        type="email"
+                        value={email}
+                        maxLength={254}
+                        onChange={(event) => setEmail(event.target.value)}
+                    />
+                </label>
+                <small id="hrai-settings-email-hint" style={hintStyle}>
+                    <FormattedMessage {...messages.recoveryEmailHint} />
+                </small>
+                <label>
                     <input
                         type="checkbox"
                         checked={preferences.encouragement}
@@ -339,6 +449,79 @@ AssistantSettings.propTypes = {
     user: PropTypes.object.isRequired,
     onClose: PropTypes.func.isRequired,
     onUpdated: PropTypes.func.isRequired
+};
+
+/**
+ * The panel the emailed link opens: spend the token on a new password.
+ * @param {object} props The token from the link and a close handler.
+ * @returns {React.ReactElement} The set-a-new-password dialog.
+ */
+const PasswordResetPanel = ({token, onClose}) => {
+    const intl = useIntl();
+    const [password, setPassword] = React.useState('');
+    const [error, setError] = React.useState(null);
+    const [done, setDone] = React.useState(false);
+    const [busy, setBusy] = React.useState(false);
+
+    const submit = async (event) => {
+        event.preventDefault();
+        if (password.length < MIN_PASSWORD_LENGTH) {
+            setError(messages.passwordRule);
+            return;
+        }
+        setBusy(true);
+        setError(null);
+        try {
+            await request('/api/auth/reset', {
+                method: 'POST',
+                body: JSON.stringify({token, password})
+            });
+            setDone(true);
+        } catch (requestError) {
+            setError(serverErrorMessage(requestError.message, false));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div style={panelStyle} role="dialog" aria-label={intl.formatMessage(messages.newPasswordHeading)}>
+            <form noValidate onSubmit={submit} style={{display: 'grid', gap: '0.5rem'}}>
+                <strong><FormattedMessage {...messages.newPasswordHeading} /></strong>
+                {done ? (
+                    <small role="status"><FormattedMessage {...messages.resetDone} /></small>
+                ) : (
+                    <>
+                        <input
+                            aria-describedby="hrai-reset-rule"
+                            aria-label={intl.formatMessage(messages.newPassword)}
+                            placeholder={intl.formatMessage(messages.newPassword)}
+                            type="password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            autoComplete="new-password"
+                            required
+                        />
+                        <small id="hrai-reset-rule" style={hintStyle}>
+                            <FormattedMessage {...messages.passwordRule} />
+                        </small>
+                        {error ? <small role="alert"><FormattedMessage {...error} /></small> : null}
+                        <button type="submit" disabled={busy}>
+                            {busy ? <FormattedMessage {...messages.working} /> : <FormattedMessage {...messages.setPassword} />}
+                        </button>
+                    </>
+                )}
+                <button type="button" onClick={onClose}>
+                    <FormattedMessage {...messages.close} />
+                </button>
+            </form>
+        </div>
+    );
+};
+
+PasswordResetPanel.propTypes = {
+    onClose: PropTypes.func.isRequired,
+    token: PropTypes.string.isRequired
 };
 
 const AccountDialog = ({children}) => {
@@ -401,6 +584,7 @@ const hraiSessionHOC = (WrappedComponent) => {
             authOpen: false,
             authRegistering: false,
             projectsOpen: false,
+            resetToken: null,
             settingsOpen: false
         };
 
@@ -415,8 +599,17 @@ const hraiSessionHOC = (WrappedComponent) => {
             const params = new URLSearchParams(window.location.search);
             this.setState({
                 projectsOpen: params.get('hrai-projects') === '1',
+                resetToken: params.get('hrai-reset'),
                 settingsOpen: params.get('hrai-settings') === '1'
             });
+        }
+
+        closeReset () {
+            const url = new URL(window.location.href);
+            // The token is spent, and a link left in the address bar is a link left in history.
+            url.searchParams.delete('hrai-reset');
+            window.history.replaceState({}, '', url);
+            this.setState({resetToken: null});
         }
 
         closePanel (name) {
@@ -441,7 +634,7 @@ const hraiSessionHOC = (WrappedComponent) => {
         handleAuthenticated = (user) => this.setState({user, authOpen: false});
 
         render () {
-            const {user, authLoaded, authOpen, authRegistering, projectsOpen, settingsOpen} = this.state;
+            const {user, authLoaded, authOpen, authRegistering, projectsOpen, resetToken, settingsOpen} = this.state;
             const canSave = authLoaded && Boolean(user) && this.props.canSave !== false;
             const accountMenuOptions = {
                 canHaveSession: true,
@@ -475,6 +668,12 @@ const hraiSessionHOC = (WrappedComponent) => {
                                     onSuccess={this.handleAuthenticated}
                                 />
                             </AccountDialog>
+                        ) : null}
+                        {resetToken ? (
+                            <PasswordResetPanel
+                                token={resetToken}
+                                onClose={() => this.closeReset()}
+                            />
                         ) : null}
                         {settingsOpen && user ? (
                             <AssistantSettings

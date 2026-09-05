@@ -146,6 +146,21 @@ const cs = {
     'gui.hrai.model': 'Model',
     'gui.hrai.backendDefault': 'Výchozí model',
     'gui.hrai.saveSettings': 'Uložit nastavení',
+    'gui.hrai.forgotLink': 'Zapomněl jsem heslo',
+    'gui.hrai.forgotHeading': 'Nové heslo do HRAI',
+    'gui.hrai.forgotIdentifier': 'Uživatelské jméno nebo e-mail',
+    'gui.hrai.forgotSubmit': 'Pošli mi odkaz',
+    'gui.hrai.forgotSent': 'Pokud má profil uložený e-mail, odkaz je na cestě. Platí jednu hodinu.',
+    'gui.hrai.backToSignIn': 'Zpět na přihlášení',
+    'gui.hrai.newPasswordHeading': 'Zvol si nové heslo',
+    'gui.hrai.newPassword': 'Nové heslo',
+    'gui.hrai.setPassword': 'Uložit nové heslo',
+    'gui.hrai.resetDone': 'Hotovo. Přihlas se novým heslem.',
+    'gui.hrai.resetFailed': 'Tenhle odkaz už neplatí. Nech si poslat nový.',
+    'gui.hrai.recoveryEmail': 'E-mail pro obnovu hesla',
+    'gui.hrai.recoveryEmailHint':
+        'Nepovinné. Hodí se e-mail někoho dospělého. Bez něj jde zapomenuté heslo změnit jen na serveru.',
+    'gui.hrai.emailInvalid': 'Tohle nevypadá jako e-mailová adresa.',
     'gui.hrai.saved': 'Uloženo.'
 };
 
@@ -262,6 +277,22 @@ const en = {
     'gui.hrai.model': 'Model',
     'gui.hrai.backendDefault': 'Backend default',
     'gui.hrai.saveSettings': 'Save settings',
+    'gui.hrai.forgotLink': 'I forgot my password',
+    'gui.hrai.forgotHeading': 'New HRAI password',
+    'gui.hrai.forgotIdentifier': 'Username or email',
+    'gui.hrai.forgotSubmit': 'Send me a link',
+    'gui.hrai.forgotSent': 'If that profile has an email saved, a link is on its way. It works for one hour.',
+    'gui.hrai.backToSignIn': 'Back to signing in',
+    'gui.hrai.newPasswordHeading': 'Choose a new password',
+    'gui.hrai.newPassword': 'New password',
+    'gui.hrai.setPassword': 'Save the new password',
+    'gui.hrai.resetDone': 'Done. Sign in with your new password.',
+    'gui.hrai.resetFailed': 'That link no longer works. Ask for a new one.',
+    'gui.hrai.recoveryEmail': 'Email for password recovery',
+    'gui.hrai.recoveryEmailHint':
+        'Optional. A grown-up\u2019s address works well. ' +
+        'Without it a forgotten password can only be reset on the server.',
+    'gui.hrai.emailInvalid': 'That does not look like an email address.',
     'gui.hrai.saved': 'Saved.'
 };
 
