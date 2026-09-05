@@ -449,6 +449,7 @@ const hraiSessionHOC = (WrappedComponent) => {
                 canLogin: true,
                 canLogout: Boolean(user),
                 myStuffUrl: user ? '?hrai-projects=1' : undefined,
+                onClickMyStuff: user ? () => this.openPanel('projectsOpen') : undefined,
                 profileUrl: user ? '?hrai-settings=1' : undefined,
                 accountSettingsUrl: user ? '?hrai-settings=1' : undefined
             };

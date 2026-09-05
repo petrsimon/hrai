@@ -9,6 +9,7 @@ export interface AccountMenuOptions {
 
     avatarUrl?: string;
     myStuffUrl?: string;
+    onClickMyStuff?: () => void;
     profileUrl?: string;
     myClassesUrl?: string;
     myClassUrl?: string;
@@ -24,6 +25,7 @@ export const AccountMenuOptionsPropTypes = PropTypes.shape({
 
     avatarUrl: PropTypes.string,
     myStuffUrl: PropTypes.string,
+    onClickMyStuff: PropTypes.func,
     profileUrl: PropTypes.string,
     myClassesUrl: PropTypes.string,
     myClassUrl: PropTypes.string,
