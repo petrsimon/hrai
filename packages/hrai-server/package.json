@@ -10,6 +10,7 @@
     "eval": "vitest run --reporter=verbose",
     "eval:game-design": "vitest run test/game-design.test.ts --reporter=verbose",
     "lint": "eslint",
+    "reset-password": "node --experimental-strip-types scripts/reset-password.ts",
     "start": "node --experimental-strip-types src/main.ts",
     "test": "vitest run"
   },
@@ -22,6 +23,7 @@
     "vitest": "4.1.11"
   },
   "dependencies": {
+    "nodemailer": "^10.0.0",
     "scratch-l10n": "6.1.111",
     "socket.io": "4.8.1"
   }

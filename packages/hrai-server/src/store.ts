@@ -9,7 +9,12 @@ const scrypt = promisify(nodeScrypt);
 export const SESSION_COOKIE = "hrai_session";
 const PASSWORD_HASH_BYTES = 64;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const RESET_TTL_MS = 60 * 60 * 1000;
 const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
+// Deliberately loose. The only authority on whether an address works is whether the mail
+// arrives, and a stricter pattern here would reject valid addresses a family actually uses.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+\.[^\s@]+$/;
+const MAX_EMAIL_LENGTH = 254;
 
 export type AssistantPersona = "patient" | "socratic" | "coach";
 export type AssistantVerbosity = "concise" | "balanced" | "detailed";
@@ -41,12 +46,19 @@ interface UserRecord {
     id: string;
     username: string;
     displayName: string;
+    /** Recovery address, usually a parent's. Absent for profiles created without one. */
+    email?: string;
     passwordHash: string;
     assistantPreferences: AssistantPreferences;
     createdAt: string;
 }
 
 interface SessionRecord {
+    userId: string;
+    expiresAt: number;
+}
+
+interface ResetRecord {
     userId: string;
     expiresAt: number;
 }
@@ -70,6 +82,8 @@ interface StoreData {
     nextProjectId: number;
     users: UserRecord[];
     sessions: Record<string, SessionRecord>;
+    /** Live password-reset tokens, keyed by hash so the store never holds a usable one. */
+    resets: Record<string, ResetRecord>;
     projects: ProjectRecord[];
     assets: Record<string, AssetRecord>;
 }
@@ -78,6 +92,7 @@ export interface PublicUser {
     id: string;
     username: string;
     displayName: string;
+    email?: string;
     assistantPreferences: AssistantPreferences;
 }
 
@@ -86,7 +101,7 @@ export interface AuthenticatedUser extends PublicUser {
 }
 
 function emptyData(): StoreData {
-    return { nextProjectId: 1, users: [], sessions: {}, projects: [], assets: {} };
+    return { nextProjectId: 1, users: [], sessions: {}, resets: {}, projects: [], assets: {} };
 }
 
 function now(): string {
@@ -116,6 +131,7 @@ function publicUser(user: UserRecord): PublicUser {
         id: user.id,
         username: user.username,
         displayName: user.displayName,
+        ...(user.email ? { email: user.email } : {}),
         assistantPreferences: {
             ...user.assistantPreferences,
             modelByBackend: { ...user.assistantPreferences.modelByBackend },
@@ -135,6 +151,13 @@ function projectSummary(project: ProjectRecord) {
 export function validateUsername(username: unknown): string | null {
     if (typeof username !== "string" || !USERNAME_PATTERN.test(username)) return null;
     return username.toLowerCase();
+}
+
+export function validateEmail(email: unknown): string | null {
+    if (typeof email !== "string") return null;
+    const normalized = email.trim().toLowerCase();
+    if (normalized.length > MAX_EMAIL_LENGTH || !EMAIL_PATTERN.test(normalized)) return null;
+    return normalized;
 }
 
 export function validatePassword(password: unknown): string | null {
@@ -209,6 +232,8 @@ export class HraiStore {
             // Profiles written before a preference existed lack that key entirely. Filling the
             // defaults here means the rest of the server can read preferences as a whole object
             // instead of every caller guarding for a field that predates it.
+            // Stores written before password reset existed have no resets map at all.
+            this.data.resets = (this.data as Partial<StoreData>).resets ?? {};
             for (const user of this.data.users) {
                 user.assistantPreferences = {
                     ...DEFAULT_ASSISTANT_PREFERENCES,
@@ -238,17 +263,25 @@ export class HraiStore {
         if (!this.loaded) throw new Error("HraiStore.load() must complete before use");
     }
 
-    async createUser(username: string, password: string, displayName?: string): Promise<AuthenticatedUser> {
+    async createUser(
+        username: string,
+        password: string,
+        displayName?: string,
+        email?: string,
+    ): Promise<AuthenticatedUser> {
         this.requireLoaded();
         const normalizedUsername = validateUsername(username);
         if (!normalizedUsername) throw new Error("invalid_username");
         if (!validatePassword(password)) throw new Error("invalid_password");
         const passwordHash = await this.hashPassword(password);
         if (this.data.users.some(user => user.username === normalizedUsername)) throw new Error("username_taken");
+        const normalizedEmail = email === undefined || email === "" ? null : validateEmail(email);
+        if (normalizedEmail === null && email !== undefined && email !== "") throw new Error("invalid_email");
         const user: UserRecord = {
             id: `u${randomBytes(12).toString("hex")}`,
             username: normalizedUsername,
             displayName: typeof displayName === "string" && displayName.trim() ? displayName.trim().slice(0, 80) : normalizedUsername,
+            ...(normalizedEmail ? { email: normalizedEmail } : {}),
             passwordHash,
             assistantPreferences: { ...DEFAULT_ASSISTANT_PREFERENCES },
             createdAt: now(),
@@ -296,6 +329,124 @@ export class HraiStore {
             delete this.data.sessions[sessionKey(token)];
             await this.persist();
         }
+    }
+
+    /**
+     * Sets a new password for an existing profile and ends that profile's sessions.
+     *
+     * Signing the sessions out is the point of a reset: whoever prompted it must not stay
+     * signed in on a device the owner has lost control of.
+     * @param username Profile to reset.
+     * @param password The new password.
+     * @returns True when the profile existed and the password was replaced.
+     * @throws {Error} invalid_password when the new password fails the same rules as registration.
+     */
+    async resetPassword(username: string, password: string): Promise<boolean> {
+        this.requireLoaded();
+        const normalizedUsername = validateUsername(username);
+        if (!normalizedUsername) return false;
+        if (!validatePassword(password)) throw new Error("invalid_password");
+        const user = this.data.users.find(candidate => candidate.username === normalizedUsername);
+        if (!user) return false;
+        user.passwordHash = await this.hashPassword(password);
+        for (const [key, session] of Object.entries(this.data.sessions)) {
+            if (session.userId === user.id) delete this.data.sessions[key];
+        }
+        await this.persist();
+        return true;
+    }
+
+    /**
+     * Sets or clears the recovery address on a profile.
+     * @param userId Whose profile.
+     * @param email The new address, or an empty string to remove it.
+     * @returns The updated profile, or null when the address is unusable or the profile is gone.
+     */
+    async setEmail(userId: string, email: unknown): Promise<PublicUser | null> {
+        this.requireLoaded();
+        const user = this.data.users.find(candidate => candidate.id === userId);
+        if (!user) return null;
+        if (email === "") {
+            delete user.email;
+            await this.persist();
+            return publicUser(user);
+        }
+        const normalized = validateEmail(email);
+        if (!normalized) return null;
+        user.email = normalized;
+        await this.persist();
+        return publicUser(user);
+    }
+
+    /**
+     * Issues a single-use reset token for whoever owns an identifier.
+     *
+     * Returns null for an unknown profile and for one with no recovery address, and the
+     * caller must answer the same either way: a different answer would tell a stranger
+     * which usernames exist here.
+     * @param identifier A username or a recovery address.
+     * @returns The token and the address to send it to, or null when there is nowhere to send it.
+     */
+    async createPasswordReset(identifier: unknown): Promise<{ token: string; email: string; displayName: string } | null> {
+        this.requireLoaded();
+        if (typeof identifier !== "string") return null;
+        const normalized = identifier.trim().toLowerCase();
+        const user = this.data.users.find(candidate => (
+            candidate.username === normalized || (candidate.email !== undefined && candidate.email === normalized)
+        ));
+        if (!user?.email) return null;
+        // One live token per profile: a new request should retire the previous link.
+        for (const [key, reset] of Object.entries(this.data.resets)) {
+            if (reset.userId === user.id) delete this.data.resets[key];
+        }
+        const token = randomBytes(32).toString("base64url");
+        this.data.resets[sessionKey(token)] = { userId: user.id, expiresAt: Date.now() + RESET_TTL_MS };
+        await this.persist();
+        return { token, email: user.email, displayName: user.displayName };
+    }
+
+    /**
+     * Spends a reset token on a new password.
+     * @param token The token from the emailed link.
+     * @param password The new password.
+     * @returns True when the token was live and the password was replaced.
+     * @throws {Error} invalid_password when the new password fails the registration rules.
+     */
+    async consumePasswordReset(token: unknown, password: string): Promise<boolean> {
+        this.requireLoaded();
+        if (typeof token !== "string" || !token) return false;
+        const key = sessionKey(token);
+        const reset = this.data.resets[key];
+        if (!reset) return false;
+        delete this.data.resets[key];
+        if (reset.expiresAt <= Date.now()) {
+            await this.persist();
+            return false;
+        }
+        const user = this.data.users.find(candidate => candidate.id === reset.userId);
+        if (!user) {
+            await this.persist();
+            return false;
+        }
+        if (!validatePassword(password)) {
+            await this.persist();
+            throw new Error("invalid_password");
+        }
+        user.passwordHash = await this.hashPassword(password);
+        for (const [sessionId, session] of Object.entries(this.data.sessions)) {
+            if (session.userId === user.id) delete this.data.sessions[sessionId];
+        }
+        await this.persist();
+        return true;
+    }
+
+    /**
+     * Lists the profiles on this server.
+     * @returns Usernames, oldest first.
+     */
+    listUsernames(): string[] {
+        this.requireLoaded();
+        return this.data.users.map(user => user.username);
     }
 
     async updateAssistantPreferences(userId: string, input: unknown): Promise<PublicUser | null> {

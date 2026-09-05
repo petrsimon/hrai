@@ -19,6 +19,7 @@
     "noUncheckedIndexedAccess": true
   },
   "include": [
+    "scripts/reset-password.ts",
     "src",
     "test",
     "vitest.config.ts"
