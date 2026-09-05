@@ -13,6 +13,7 @@ import { listBackends } from "./model-catalog.ts";
 import { planGame } from "./game-planner.ts";
 import { MAX_GAME_IDEA_LENGTH } from "./game-plan.ts";
 import { parseGameRestore } from "./game-restore.ts";
+import { suggestProjectTitle } from "./project-title.ts";
 import { PALETTE, labelText, opcodesNamedByLabel } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
@@ -277,6 +278,30 @@ async function resolveModelChoice(
                 .finally(() => {
                     modelCallPending = false;
                     socket.emit("thinking", {thinking: false});
+                });
+        });
+
+        socket.on("projectTitle", () => {
+            const workspace = session.render();
+            // Naming an empty stage would only produce a guess about nothing.
+            if (!session.hasWorkspace) return;
+            if (modelCallPending) {
+                console.warn("hrai: ignored project-title request while a model call is pending");
+                return;
+            }
+            modelCallPending = true;
+            void resolveModelChoice(session.assistantPreferences)
+                .then(({ backend, model }) => suggestProjectTitle(
+                    workspace,
+                    (system, user) => chat(system, user, model, backend),
+                ))
+                .then((title) => socket.emit("projectTitleSuggested", { title }))
+                .catch((error: unknown) => {
+                    // The child keeps the default title; nothing about the project is lost.
+                    console.warn("hrai: project titling failed", error);
+                })
+                .finally(() => {
+                    modelCallPending = false;
                 });
         });
 

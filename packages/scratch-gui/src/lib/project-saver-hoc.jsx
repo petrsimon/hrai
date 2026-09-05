@@ -249,7 +249,10 @@ const ProjectSaverHOC = function (WrappedComponent) {
          * @param {?object} options - additional options for the store operation
          */
         storeProject (projectId, requestParams, options) {
-            requestParams = requestParams || {};
+            // Every save carries the title the editor is showing, so a project created or
+            // renamed in the editor is not left under a stale name in storage. Callers that
+            // set their own title (copies, remixes) still win.
+            requestParams = {title: this.props.reduxProjectTitle, ...requestParams};
             this.clearAutoSaveTimeout();
             // Serialize VM state now before embarking on
             // the asynchronous journey of storing assets to

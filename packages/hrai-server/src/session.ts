@@ -321,6 +321,14 @@ export class Session {
     }
 
     /**
+     * Whether the panel has pushed a workspace yet.
+     * @returns True once at least one target is known.
+     */
+    get hasWorkspace(): boolean {
+        return this.targets.length > 0;
+    }
+
+    /**
      * Renders the current workspace and refreshes the alias map.
      *
      * Aliases are regenerated per render, so a stale alias from an earlier turn is not

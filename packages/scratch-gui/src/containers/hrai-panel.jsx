@@ -13,7 +13,8 @@ import {loadGameStarter} from '../lib/hrai-game-starter';
 import lessons from '../lib/hrai-lessons';
 import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
-import {createProject} from '../reducers/project-state';
+import {createProject, getIsShowingWithId, manualUpdateProject} from '../reducers/project-state';
+import {setProjectTitle} from '../reducers/project-title';
 
 const HRAI_SERVER_URL = process.env.HRAI_SERVER_URL ||
     (typeof window === 'object' ? window.location.origin : 'http://localhost:8791');
@@ -24,6 +25,11 @@ const messages = defineMessages({
         id: 'gui.hrai.helperUnavailable',
         defaultMessage: 'Pomocník teď není k dispozici.',
         description: 'calm message shown when the hrai tutor server cannot be reached'
+    },
+    defaultProjectTitle: {
+        id: 'gui.gui.defaultProjectTitle',
+        defaultMessage: 'Scratch Project',
+        description: 'default project title, used to tell an unnamed project from a named one'
     },
     newProjectConfirmation: {
         id: 'gui.hrai.newProjectConfirmation',
@@ -63,6 +69,9 @@ const HraiPanel = ({
     assistantPreferences,
     onCreateProject,
     onNextStage,
+    isShowingWithId,
+    onSaveProject,
+    onSetProjectTitle,
     projectId,
     projectTitle,
     vm
@@ -209,6 +218,13 @@ const HraiPanel = ({
             setRung(responseRung);
         });
 
+        socket.on('projectTitleSuggested', ({title}) => {
+            onSetProjectTitle(title);
+            // The project is already stored under its default name, so persist the new one
+            // rather than leaving the editor and the saved project disagreeing.
+            onSaveProject();
+        });
+
         socket.on('gamePlanProposed', plan => {
             setGamePlan(plan);
             setGamePlaytest(null);
@@ -286,6 +302,7 @@ const HraiPanel = ({
             socket.off('token');
             socket.off('blocks');
             socket.off('done');
+            socket.off('projectTitleSuggested');
             socket.off('gamePlanProposed');
             socket.off('gamePlaytest');
             socket.off('gameProgress');
@@ -397,6 +414,19 @@ const HraiPanel = ({
         });
     }, [intl.locale]);
 
+    // A project saved for the first time without a plan behind it has nothing but the
+    // default title. Ask the tutor to name it from what the child actually built.
+    const hadProjectIdRef = useRef(false);
+    const defaultProjectTitle = intl.formatMessage(messages.defaultProjectTitle);
+    useEffect(() => {
+        const isNamed = projectTitle && projectTitle !== defaultProjectTitle;
+        if (isShowingWithId && !hadProjectIdRef.current &&
+            !gamePlan && !gamePlaytest && !gameProgress && !isNamed) {
+            socketRef.current?.emit('projectTitle');
+        }
+        hadProjectIdRef.current = isShowingWithId;
+    }, [defaultProjectTitle, gamePlan, gamePlaytest, gameProgress, isShowingWithId, projectTitle]);
+
     const handleGamePlanRequest = useCallback(text => {
         if (socketRef.current?.connected) {
             pendingNewGameIdeaRef.current = null;
@@ -418,9 +448,11 @@ const HraiPanel = ({
     const handleGamePlanAccept = useCallback(() => {
         if (socketRef.current?.connected && gamePlan && !isPlanning) {
             setIsPlanning(true);
+            // The plan the child just accepted already carries a short Czech title.
+            if (gamePlan.title) onSetProjectTitle(gamePlan.title);
             socketRef.current.emit('gamePlanAccept');
         }
-    }, [gamePlan, isPlanning]);
+    }, [gamePlan, isPlanning, onSetProjectTitle]);
 
     const handleGamePlanEdit = useCallback(() => {
         setGamePlan(null);
@@ -492,6 +524,9 @@ HraiPanel.propTypes = {
     assistantPreferences: PropTypes.object,
     onCreateProject: PropTypes.func.isRequired,
     onNextStage: PropTypes.func.isRequired,
+    isShowingWithId: PropTypes.bool,
+    onSaveProject: PropTypes.func.isRequired,
+    onSetProjectTitle: PropTypes.func.isRequired,
     projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     projectTitle: PropTypes.string,
     vm: PropTypes.instanceOf(VM).isRequired
@@ -503,6 +538,7 @@ HraiPanel.defaultProps = {
 
 const mapStateToProps = state => ({
     activeLessonId: state.scratchGui.hraiLesson.lessonId,
+    isShowingWithId: getIsShowingWithId(state.scratchGui.projectState.loadingState),
     projectId: state.scratchGui.projectState.projectId,
     projectTitle: state.scratchGui.projectTitle,
     vm: state.scratchGui.vm
@@ -510,6 +546,8 @@ const mapStateToProps = state => ({
 
 const mapDispatchToProps = dispatch => ({
     onCreateProject: () => dispatch(createProject()),
+    onSaveProject: () => dispatch(manualUpdateProject()),
+    onSetProjectTitle: title => dispatch(setProjectTitle(title)),
     onNextStage: () => dispatch(nextHraiStage())
 });
 
