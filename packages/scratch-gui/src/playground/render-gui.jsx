@@ -10,6 +10,10 @@ import {HraiStorage} from '../lib/hrai-storage';
 import log from '../lib/log.js';
 import {PLATFORM} from '../lib/platform.js';
 
+// Children lose track of unsaved work quickly, so autosave runs far more often than the
+// upstream ten-minute default.
+const AUTOSAVE_INTERVAL_SECS = 60;
+
 const onClickLogo = () => {
     window.location = 'https://scratch.mit.edu';
 };
@@ -93,6 +97,7 @@ export default appTarget => {
                 canEditTitle
                 backpackVisible
                 showComingSoon
+                autoSaveIntervalSecs={AUTOSAVE_INTERVAL_SECS}
                 backpackHost={backpackHost}
                 onClickLogo={onClickLogo}
                 showHraiPanel={showHraiPanel}

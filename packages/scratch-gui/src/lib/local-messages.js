@@ -106,6 +106,7 @@ const cs = {
     'gui.stageHeader.hraiAssistantOff': 'Zapnout asistenta HRAI',
     'gui.hrai.helperUnavailable': 'Pomocník teď není k dispozici.',
     'gui.menuBar.joinHrai': 'Vytvořit profil HRAI',
+    'gui.menuBar.saveNowLink': 'Neuloženo – ulož teď',
     'gui.menuBar.signIn': 'Přihlásit se',
     'gui.hrai.accountDialog': 'Účet HRAI',
     'gui.hrai.signIn': 'Přihlas se do HRAI',
