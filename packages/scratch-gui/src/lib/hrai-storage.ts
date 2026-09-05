@@ -4,10 +4,10 @@ import {GUIStorage, ProjectId} from '../gui-config';
 
 declare const process: {env: {HRAI_SERVER_URL?: string}};
 
-const getApiBase = () => {
-    if (typeof process !== 'undefined' && process.env.HRAI_SERVER_URL) return process.env.HRAI_SERVER_URL;
-    return typeof window === 'object' ? window.location.origin : 'http://localhost:8791';
-};
+// webpack's DefinePlugin substitutes this expression at build time. A `typeof process`
+// guard would defeat it: the identifier itself does not exist in the browser bundle.
+const getApiBase = () => process.env.HRAI_SERVER_URL ||
+    (typeof window === 'object' ? window.location.origin : 'http://localhost:8791');
 
 const jsonHeaders = {'Content-Type': 'application/json'};
 
