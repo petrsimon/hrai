@@ -94,8 +94,36 @@ The panel is off without `?hrai=true`, because it needs a local model server and
 editor that silently fails to reach one is confusing. If the server is down the panel
 still opens and says so calmly — a child should never meet a stack trace.
 
+To run the tutor through an agent CLI instead of ollama, replace terminal 1 with the
+backend variables. The `pi` CLI's `local` provider expects an ollama at `:11434`, so on a
+machine without one name a hosted model:
+
+```sh
+HRAI_MODEL_BACKEND=pi HRAI_PI_MODEL=openai-codex/gpt-5.4 HRAI_AGENT_TIMEOUT_MS=300000 \
+npm start --workspace=packages/hrai-server
+```
+
 Override the server location with `HRAI_SERVER_URL` at build time, and the port it
 listens on with `HRAI_PORT`.
+
+### Voice input outside Compose
+
+Speech to text talks to a whisper.cpp server at `HRAI_STT_HOST`, default
+`http://whisper:8080` — the Compose service name, so a plain `npm start` has no voice
+and the editor disables its microphone button. The host also needs `ffmpeg` on `PATH`;
+the server converts the browser's WebM/Opus recording to 16 kHz mono WAV before posting
+it to `/inference`.
+
+Run the Compose whisper service alone and point the tutor at it. The published port is
+free to choose; `8082` avoids the editor image on `8080`:
+
+```sh
+docker compose -f docker-compose.yml run --rm -p 8082:8080 whisper
+HRAI_STT_HOST=http://127.0.0.1:8082 npm start --workspace=packages/hrai-server
+```
+
+The first run downloads `ggml-small.bin` into the `whisper-model-cache` volume, the same
+one the full stack uses. `HRAI_STT_TIMEOUT_MS` caps one transcription, default `30000`.
 
 Self-hosted profiles and projects use the HTTP API on the same server. Set
 `HRAI_DATA_DIR` to a persistent directory (the Compose deployment uses `/data`).
