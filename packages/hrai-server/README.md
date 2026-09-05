@@ -84,15 +84,8 @@ npm start --workspace=packages/hrai-server      # 2. the tutor server on :8791
 npm start --workspace=packages/scratch-gui      # 3. the editor on :8601
 ```
 
-Then open the editor with the panel switched on:
-
-```
-http://localhost:8601/?hrai=true
-```
-
-The panel is off without `?hrai=true`, because it needs a local model server and an
-editor that silently fails to reach one is confusing. If the server is down the panel
-still opens and says so calmly — a child should never meet a stack trace.
+Then open the editor at `http://localhost:8601/`. The panel is always on; if the server
+is down it opens and says so calmly — a child should never meet a stack trace.
 
 To run the tutor through an agent CLI instead of ollama, replace terminal 1 with the
 backend variables. The `pi` CLI's `local` provider expects an ollama at `:11434`, so on a
