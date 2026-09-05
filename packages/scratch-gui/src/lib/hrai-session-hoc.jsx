@@ -1,7 +1,10 @@
 /* eslint-disable react/jsx-no-bind, react/jsx-max-props-per-line, no-undefined, no-negated-condition, @stylistic/max-len, @stylistic/arrow-parens */
 import React from 'react';
 import PropTypes from 'prop-types';
-import {defineMessages, FormattedMessage, IntlProvider} from 'react-intl';
+import {defineMessages, FormattedMessage, IntlProvider, useIntl} from 'react-intl';
+import editorMessages from 'scratch-l10n/locales/editor-msgs';
+import {detectLocale} from './detect-locale';
+import {forLocale as localMessagesForLocale} from './local-messages';
 
 const messages = defineMessages({
     accountDialog: {id: 'gui.hrai.accountDialog', defaultMessage: 'HRAI account', description: 'HRAI account dialog label'},
@@ -35,6 +38,9 @@ const messages = defineMessages({
     working: {id: 'gui.hrai.working', defaultMessage: 'Working…', description: 'account form busy state'},
     loading: {id: 'gui.hrai.loading', defaultMessage: 'Loading…', description: 'saved project list loading state'},
     authFailed: {id: 'gui.hrai.authFailed', defaultMessage: 'Sign-in failed. Check your details.', description: 'account authentication error'},
+    registerFailed: {id: 'gui.hrai.registerFailed', defaultMessage: 'Could not create the profile. Try again.', description: 'account registration error'},
+    usernameRule: {id: 'gui.hrai.usernameRule', defaultMessage: 'Username: 3-32 characters, letters, digits, - or _ only.', description: 'username format rule, shown as a hint and as an error'},
+    passwordRule: {id: 'gui.hrai.passwordRule', defaultMessage: 'Password: at least 8 characters.', description: 'password length rule, shown as a hint and as an error'},
     usernameTaken: {id: 'gui.hrai.usernameTaken', defaultMessage: 'That username is already in use.', description: 'duplicate username error'},
     username: {id: 'gui.hrai.username', defaultMessage: 'Username', description: 'account username field'},
     password: {id: 'gui.hrai.password', defaultMessage: 'Password', description: 'account password field'},
@@ -42,10 +48,25 @@ const messages = defineMessages({
     assistantSettings: {id: 'gui.hrai.assistantSettings', defaultMessage: 'Assistant settings', description: 'assistant settings dialog heading'}
 });
 
-const apiBase = () => {
-    if (typeof process !== 'undefined' && process.env.HRAI_SERVER_URL) return process.env.HRAI_SERVER_URL;
-    return typeof window === 'object' ? window.location.origin : 'http://localhost:8791';
+// webpack's DefinePlugin substitutes this expression at build time. A `typeof process`
+// guard would defeat it: the identifier itself does not exist in the browser bundle.
+// These panels render outside the editor's own IntlProvider, so they resolve the locale the
+// same way editor-state does and carry their own provider with the real message catalogue.
+let panelIntl = null;
+
+const panelIntlProps = () => {
+    if (!panelIntl) {
+        const locale = detectLocale(Object.keys(editorMessages));
+        panelIntl = {
+            locale,
+            messages: {...editorMessages[locale], ...localMessagesForLocale(locale)}
+        };
+    }
+    return panelIntl;
 };
+
+const apiBase = () => process.env.HRAI_SERVER_URL ||
+    (typeof window === 'object' ? window.location.origin : 'http://localhost:8791');
 
 const request = async (path, options = {}) => {
     const response = await fetch(`${apiBase().replace(/\/$/, '')}${path}`, {
@@ -74,8 +95,32 @@ const panelStyle = {
     boxShadow: '0 0.5rem 2rem rgba(0, 0, 0, .2)'
 };
 
-const HraiAuthForm = ({onClose, onSuccess}) => {
-    const [registering, setRegistering] = React.useState(false);
+// Mirrors the server's own rules in store.ts, so a name the server would reject never
+// costs the child a round trip that comes back as an unexplained failure.
+const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{3,32}$/;
+const MIN_PASSWORD_LENGTH = 8;
+
+const ruleViolation = (username, password) => {
+    if (!USERNAME_PATTERN.test(username)) return messages.usernameRule;
+    if (password.length < MIN_PASSWORD_LENGTH) return messages.passwordRule;
+    return null;
+};
+
+const serverErrorMessage = (code, registering) => {
+    switch (code) {
+    case 'username_taken': return messages.usernameTaken;
+    case 'invalid_username': return messages.usernameRule;
+    case 'invalid_password': return messages.passwordRule;
+    case 'invalid_credentials': return messages.authFailed;
+    default: return registering ? messages.registerFailed : messages.authFailed;
+    }
+};
+
+const hintStyle = {opacity: 0.75};
+
+const HraiAuthForm = ({defaultRegistering = false, onClose, onSuccess}) => {
+    const intl = useIntl();
+    const [registering, setRegistering] = React.useState(defaultRegistering);
     const [username, setUsername] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [displayName, setDisplayName] = React.useState('');
@@ -84,6 +129,11 @@ const HraiAuthForm = ({onClose, onSuccess}) => {
 
     const submit = async (event) => {
         event.preventDefault();
+        const violation = ruleViolation(username, password);
+        if (violation) {
+            setError(violation);
+            return;
+        }
         setBusy(true);
         setError(null);
         try {
@@ -95,46 +145,55 @@ const HraiAuthForm = ({onClose, onSuccess}) => {
             onSuccess(user);
             onClose?.();
         } catch (requestError) {
-            setError(requestError.message === 'username_taken' ?
-                messages.usernameTaken.defaultMessage : messages.authFailed.defaultMessage);
+            setError(serverErrorMessage(requestError.message, registering));
         } finally {
             setBusy(false);
         }
     };
 
+    // noValidate: the browser's own bubbles for `required` and `minLength` block submission
+    // silently enough to read as a dead button. The rules below are always on screen instead.
     return (
-        <form onSubmit={submit} style={{display: 'grid', gap: '0.5rem', padding: '0.75rem'}}>
+        <form noValidate onSubmit={submit} style={{display: 'grid', gap: '0.5rem', padding: '0.75rem'}}>
             <strong>
                 <FormattedMessage {...(registering ? messages.createProfile : messages.signIn)} />
             </strong>
             {registering ? (
                 <input
-                    aria-label={messages.displayName.defaultMessage}
-                    placeholder={messages.displayName.defaultMessage}
+                    aria-label={intl.formatMessage(messages.displayName)}
+                    placeholder={intl.formatMessage(messages.displayName)}
                     value={displayName}
                     onChange={(event) => setDisplayName(event.target.value)}
                     maxLength={80}
                 />
             ) : null}
             <input
-                aria-label={messages.username.defaultMessage}
-                placeholder={messages.username.defaultMessage}
+                aria-describedby="hrai-username-rule"
+                aria-label={intl.formatMessage(messages.username)}
+                placeholder={intl.formatMessage(messages.username)}
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"
+                maxLength={32}
                 required
             />
+            <small id="hrai-username-rule" style={hintStyle}>
+                <FormattedMessage {...messages.usernameRule} />
+            </small>
             <input
-                aria-label={messages.password.defaultMessage}
-                placeholder={messages.password.defaultMessage}
+                aria-describedby="hrai-password-rule"
+                aria-label={intl.formatMessage(messages.password)}
+                placeholder={intl.formatMessage(messages.password)}
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete={registering ? 'new-password' : 'current-password'}
-                minLength={8}
                 required
             />
-            {error ? <small role="alert">{error}</small> : null}
+            <small id="hrai-password-rule" style={hintStyle}>
+                <FormattedMessage {...messages.passwordRule} />
+            </small>
+            {error ? <small role="alert"><FormattedMessage {...error} /></small> : null}
             <button type="submit" disabled={busy}>
                 {busy ? <FormattedMessage {...messages.working} /> : (
                     <FormattedMessage {...(registering ? messages.createProfileButton : messages.signInButton)} />
@@ -153,11 +212,13 @@ const HraiAuthForm = ({onClose, onSuccess}) => {
 };
 
 HraiAuthForm.propTypes = {
+    defaultRegistering: PropTypes.bool,
     onClose: PropTypes.func,
     onSuccess: PropTypes.func.isRequired
 };
 
 const AssistantSettings = ({user, onClose, onUpdated}) => {
+    const intl = useIntl();
     const [preferences, setPreferences] = React.useState(user.assistantPreferences);
     const [modelCatalog, setModelCatalog] = React.useState(null);
     const [modelsFailed, setModelsFailed] = React.useState(false);
@@ -190,7 +251,7 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
             onUpdated(updated);
             setSaved(true);
         } catch (requestError) {
-            setError(messages.requestFailed.defaultMessage);
+            setError(messages.requestFailed);
         }
     };
 
@@ -199,7 +260,7 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
     const selectedModel = preferences.modelByBackend[preferences.modelBackend] ?? '';
 
     return (
-        <div style={panelStyle} role="dialog" aria-label={messages.assistantSettings.defaultMessage}>
+        <div style={panelStyle} role="dialog" aria-label={intl.formatMessage(messages.assistantSettings)}>
             <form onSubmit={save} style={{display: 'grid', gap: '0.6rem'}}>
                 <strong><FormattedMessage {...messages.assistantSettings} /></strong>
                 <label>
@@ -265,7 +326,7 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
                         onChange={(event) => update('encouragement', event.target.checked)}
                     /> <FormattedMessage {...messages.encouragement} />
                 </label>
-                {error ? <small role="alert">{error}</small> : null}
+                {error ? <small role="alert"><FormattedMessage {...error} /></small> : null}
                 {saved ? <small><FormattedMessage {...messages.saved} /></small> : null}
                 <button type="submit"><FormattedMessage {...messages.saveSettings} /></button>
                 <button type="button" onClick={onClose}><FormattedMessage {...messages.close} /></button>
@@ -280,18 +341,32 @@ AssistantSettings.propTypes = {
     onUpdated: PropTypes.func.isRequired
 };
 
+const AccountDialog = ({children}) => {
+    const intl = useIntl();
+    return (
+        <div style={panelStyle} role="dialog" aria-label={intl.formatMessage(messages.accountDialog)}>
+            {children}
+        </div>
+    );
+};
+
+AccountDialog.propTypes = {
+    children: PropTypes.node
+};
+
 const ProjectsPanel = ({onClose, onOpen}) => {
+    const intl = useIntl();
     const [projects, setProjects] = React.useState(null);
     const [error, setError] = React.useState(null);
     React.useEffect(() => {
         request('/api/projects')
             .then((body) => setProjects(body.projects))
-            .catch(() => setError(messages.requestFailed.defaultMessage));
+            .catch(() => setError(messages.requestFailed));
     }, []);
     return (
-        <div style={panelStyle} role="dialog" aria-label={messages.projects.defaultMessage}>
+        <div style={panelStyle} role="dialog" aria-label={intl.formatMessage(messages.projects)}>
             <strong><FormattedMessage {...messages.projects} /></strong>
-            {error ? <p role="alert">{error}</p> : null}
+            {error ? <p role="alert"><FormattedMessage {...error} /></p> : null}
             {!projects ? <p><FormattedMessage {...messages.loading} /></p> : projects.length === 0 ? (
                 <p><FormattedMessage {...messages.noProjects} /></p>
             ) : (
@@ -320,7 +395,14 @@ ProjectsPanel.propTypes = {
  */
 const hraiSessionHOC = (WrappedComponent) => {
     class HraiSession extends React.Component {
-        state = {user: null, authLoaded: false, authOpen: false, projectsOpen: false, settingsOpen: false};
+        state = {
+            user: null,
+            authLoaded: false,
+            authOpen: false,
+            authRegistering: false,
+            projectsOpen: false,
+            settingsOpen: false
+        };
 
         componentDidMount () {
             request('/api/auth/me')
@@ -359,7 +441,7 @@ const hraiSessionHOC = (WrappedComponent) => {
         handleAuthenticated = (user) => this.setState({user, authOpen: false});
 
         render () {
-            const {user, authLoaded, authOpen, projectsOpen, settingsOpen} = this.state;
+            const {user, authLoaded, authOpen, authRegistering, projectsOpen, settingsOpen} = this.state;
             const canSave = authLoaded && Boolean(user) && this.props.canSave !== false;
             const accountMenuOptions = {
                 canHaveSession: true,
@@ -378,16 +460,20 @@ const hraiSessionHOC = (WrappedComponent) => {
                         username={user?.username}
                         assistantPreferences={user?.assistantPreferences}
                         accountMenuOptions={accountMenuOptions}
-                        onClickLogin={() => this.setState({authOpen: true})}
-                        onOpenRegistration={() => this.setState({authOpen: true})}
+                        onClickLogin={() => this.setState({authOpen: true, authRegistering: false})}
+                        onOpenRegistration={() => this.setState({authOpen: true, authRegistering: true})}
                         renderLogin={({onClose}) => <HraiAuthForm onClose={onClose} onSuccess={this.handleAuthenticated} />}
                         onLogOut={this.handleLogout}
                     />
-                    <IntlProvider locale="en" messages={{}}>
+                    <IntlProvider {...panelIntlProps()}>
                         {authOpen ? (
-                            <div style={panelStyle} role="dialog" aria-label={messages.accountDialog.defaultMessage}>
-                                <HraiAuthForm onClose={() => this.setState({authOpen: false})} onSuccess={this.handleAuthenticated} />
-                            </div>
+                            <AccountDialog>
+                                <HraiAuthForm
+                                    defaultRegistering={authRegistering}
+                                    onClose={() => this.setState({authOpen: false})}
+                                    onSuccess={this.handleAuthenticated}
+                                />
+                            </AccountDialog>
                         ) : null}
                         {settingsOpen && user ? (
                             <AssistantSettings
