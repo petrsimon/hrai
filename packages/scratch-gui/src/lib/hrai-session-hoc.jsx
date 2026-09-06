@@ -33,6 +33,18 @@ const messages = defineMessages({
     assistantName: {id: 'gui.hrai.assistantName', defaultMessage: 'Assistant name', description: 'assistant preference label'},
     model: {id: 'gui.hrai.model', defaultMessage: 'Model', description: 'assistant model label'},
     backendDefault: {id: 'gui.hrai.backendDefault', defaultMessage: 'Backend default', description: 'backend default model option'},
+    thinkingLevel: {id: 'gui.hrai.thinkingLevel', defaultMessage: 'Thinking', description: 'assistant thinking-level preference label'},
+    thinkingDefault: {id: 'gui.hrai.thinkingDefault', defaultMessage: 'Default', description: 'use the server default thinking level'},
+    thinkingOff: {id: 'gui.hrai.thinkingOff', defaultMessage: 'Off', description: 'disable model thinking'},
+    thinkingMinimal: {id: 'gui.hrai.thinkingMinimal', defaultMessage: 'minimal', description: 'minimal thinking level'},
+    thinkingLow: {id: 'gui.hrai.thinkingLow', defaultMessage: 'low', description: 'low thinking level'},
+    thinkingMedium: {id: 'gui.hrai.thinkingMedium', defaultMessage: 'medium', description: 'medium thinking level'},
+    thinkingHigh: {id: 'gui.hrai.thinkingHigh', defaultMessage: 'high', description: 'high thinking level'},
+    thinkingXhigh: {id: 'gui.hrai.thinkingXhigh', defaultMessage: 'xhigh', description: 'extra-high thinking level'},
+    thinkingMax: {id: 'gui.hrai.thinkingMax', defaultMessage: 'max', description: 'maximum thinking level'},
+    providerSignedIn: {id: 'gui.hrai.providerSignedIn', defaultMessage: ' · signed in', description: 'suffix on a provider that has credentials'},
+    providerSubscription: {id: 'gui.hrai.providerSubscription', defaultMessage: ' · subscription', description: 'suffix on a provider using a subscription'},
+    loginFirst: {id: 'gui.hrai.loginFirst', defaultMessage: 'Sign in first.', description: 'hint when a provider has no credentials yet'},
     socratic: {id: 'gui.hrai.socratic', defaultMessage: 'Socratic guide', description: 'assistant persona option'},
     coach: {id: 'gui.hrai.coach', defaultMessage: 'Encouraging coach', description: 'assistant persona option'},
     working: {id: 'gui.hrai.working', defaultMessage: 'Working…', description: 'account form busy state'},
@@ -309,9 +321,31 @@ HraiAuthForm.propTypes = {
     onSuccess: PropTypes.func.isRequired
 };
 
+const splitModelRef = (model) => {
+    if (!model || model === 'default') return {providerId: 'default', modelId: ''};
+    const slash = model.indexOf('/');
+    if (slash < 0) return {providerId: 'default', modelId: ''};
+    return {providerId: model.slice(0, slash), modelId: model.slice(slash + 1)};
+};
+
+const THINKING_OPTIONS = [
+    ['default', messages.thinkingDefault],
+    ['off', messages.thinkingOff],
+    ['minimal', messages.thinkingMinimal],
+    ['low', messages.thinkingLow],
+    ['medium', messages.thinkingMedium],
+    ['high', messages.thinkingHigh],
+    ['xhigh', messages.thinkingXhigh],
+    ['max', messages.thinkingMax]
+];
+
 const AssistantSettings = ({user, onClose, onUpdated}) => {
     const intl = useIntl();
-    const [preferences, setPreferences] = React.useState(user.assistantPreferences);
+    const [preferences, setPreferences] = React.useState({
+        ...user.assistantPreferences,
+        model: user.assistantPreferences.model || 'default',
+        thinkingLevel: user.assistantPreferences.thinkingLevel || 'default'
+    });
     const [email, setEmail] = React.useState(user.email ?? '');
     const [modelCatalog, setModelCatalog] = React.useState(null);
     const [modelsFailed, setModelsFailed] = React.useState(false);
@@ -325,13 +359,35 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
     }, []);
 
     const update = (field, value) => setPreferences((current) => ({...current, [field]: value}));
-    const updateBackend = (value) => setPreferences((current) => ({...current, modelBackend: value}));
-    const updateModel = (value) => setPreferences((current) => {
-        const modelByBackend = {...current.modelByBackend};
-        if (value === '') delete modelByBackend[current.modelBackend];
-        else modelByBackend[current.modelBackend] = value;
-        return {...current, modelByBackend};
-    });
+    const {providerId, modelId} = splitModelRef(preferences.model);
+    const selectedProvider = modelCatalog?.providers.find((provider) => provider.id === providerId);
+    const selectedModel = selectedProvider?.models.find((model) => model.id === modelId);
+    const modelLocked = Boolean(
+        selectedProvider &&
+        !selectedProvider.configured &&
+        (selectedProvider.login.oauth || selectedProvider.login.apiKey)
+    );
+    const showThinking = providerId === 'default' || Boolean(selectedModel?.reasoning);
+
+    const updateProvider = (nextProviderId) => {
+        if (nextProviderId === 'default') {
+            update('model', 'default');
+            return;
+        }
+        const provider = modelCatalog?.providers.find((entry) => entry.id === nextProviderId);
+        const nextModelId = provider?.models.some((model) => model.id === modelId) ?
+            modelId :
+            (provider?.models[0]?.id ?? '');
+        update('model', nextModelId ? `${nextProviderId}/${nextModelId}` : nextProviderId);
+    };
+
+    const providerLabel = (provider) => {
+        let label = provider.name;
+        if (provider.configured) label += intl.formatMessage(messages.providerSignedIn);
+        if (provider.subscription) label += intl.formatMessage(messages.providerSubscription);
+        return label;
+    };
+
     const save = async (event) => {
         event.preventDefault();
         setError(null);
@@ -353,8 +409,6 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
     };
 
     const modelControlsDisabled = !modelCatalog || modelsFailed;
-    const selectedBackend = modelCatalog?.backends.find((backend) => backend.id === preferences.modelBackend);
-    const selectedModel = preferences.modelByBackend[preferences.modelBackend] ?? '';
 
     return (
         <div style={panelStyle} role="dialog" aria-label={intl.formatMessage(messages.assistantSettings)}>
@@ -382,40 +436,55 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
                 </label>
                 <label>
                     <FormattedMessage {...messages.provider} />
-                    <select value={preferences.modelBackend} disabled={modelControlsDisabled} onChange={(event) => updateBackend(event.target.value)}>
+                    <select value={providerId} disabled={modelControlsDisabled} onChange={(event) => updateProvider(event.target.value)}>
                         {modelCatalog && !modelsFailed ? (
                             <>
                                 <option value="default"><FormattedMessage {...messages.serverDefault} /></option>
-                                {modelCatalog.backends.map((backend) => (
-                                    <option key={backend.id} value={backend.id} disabled={!backend.available}>{backend.label}</option>
+                                {modelCatalog.providers.map((provider) => (
+                                    <option key={provider.id} value={provider.id}>{providerLabel(provider)}</option>
                                 ))}
                             </>
                         ) : (
-                            <option value={preferences.modelBackend}><FormattedMessage {...messages.loading} /></option>
+                            <option value={providerId}><FormattedMessage {...messages.loading} /></option>
                         )}
                     </select>
                 </label>
-                {modelControlsDisabled ? (
-                    <label>
-                        <FormattedMessage {...messages.model} />
-                        <select value={selectedModel} disabled>
-                            <option value={selectedModel}><FormattedMessage {...messages.loading} /></option>
-                        </select>
-                    </label>
-                ) : preferences.modelBackend === 'default' ? null : selectedBackend?.freeform ? (
-                    <label>
-                        <FormattedMessage {...messages.model} />
-                        <input value={selectedModel} maxLength={100} onChange={(event) => updateModel(event.target.value)} />
-                    </label>
+                {modelControlsDisabled || providerId === 'default' ? (
+                    modelControlsDisabled ? (
+                        <label>
+                            <FormattedMessage {...messages.model} />
+                            <select value={modelId} disabled>
+                                <option value={modelId}><FormattedMessage {...messages.loading} /></option>
+                            </select>
+                        </label>
+                    ) : null
                 ) : (
                     <label>
                         <FormattedMessage {...messages.model} />
-                        <select value={selectedModel} onChange={(event) => updateModel(event.target.value)}>
-                            <option value=""><FormattedMessage {...messages.backendDefault} /></option>
-                            {selectedBackend?.models.map((model) => <option key={model} value={model}>{model}</option>)}
+                        <select
+                            value={modelId}
+                            disabled={modelLocked}
+                            onChange={(event) => update('model', `${providerId}/${event.target.value}`)}
+                        >
+                            {selectedProvider?.models.map((model) => (
+                                <option key={model.id} value={model.id}>{model.name}</option>
+                            ))}
                         </select>
                     </label>
                 )}
+                {modelLocked ? (
+                    <small style={hintStyle}><FormattedMessage {...messages.loginFirst} /></small>
+                ) : null}
+                {showThinking ? (
+                    <label>
+                        <FormattedMessage {...messages.thinkingLevel} />
+                        <select value={preferences.thinkingLevel} onChange={(event) => update('thinkingLevel', event.target.value)}>
+                            {THINKING_OPTIONS.map(([value, message]) => (
+                                <option key={value} value={value}><FormattedMessage {...message} /></option>
+                            ))}
+                        </select>
+                    </label>
+                ) : null}
                 <label>
                     <FormattedMessage {...messages.recoveryEmail} />
                     <input

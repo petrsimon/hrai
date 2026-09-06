@@ -221,4 +221,97 @@ describe('HRAI session HOC', () => {
             displayName: 'Petr'
         });
     });
+
+    test('assistant settings pick a provider, model and thinking level', async () => {
+        const user = {
+            username: 'kid',
+            email: '',
+            assistantPreferences: {
+                assistantName: 'hrai',
+                persona: 'patient',
+                verbosity: 'concise',
+                language: 'cs',
+                encouragement: true,
+                model: 'default',
+                thinkingLevel: 'default'
+            }
+        };
+        const catalog = {
+            default: 'openai-codex/gpt-5.4',
+            providers: [
+                {
+                    id: 'openai-codex',
+                    name: 'OpenAI Codex',
+                    configured: true,
+                    subscription: true,
+                    login: {oauth: true, apiKey: false},
+                    models: [
+                        {id: 'gpt-5.4', name: 'GPT-5.4', reasoning: true},
+                        {id: 'gpt-4.1', name: 'GPT-4.1', reasoning: false}
+                    ]
+                },
+                {
+                    id: 'openrouter',
+                    name: 'OpenRouter',
+                    configured: false,
+                    subscription: false,
+                    login: {oauth: false, apiKey: true},
+                    models: [{id: 'some-model', name: 'Some model', reasoning: false}]
+                }
+            ]
+        };
+        global.fetch = jest.fn(url => {
+            const path = String(url);
+            if (path.includes('/api/auth/me')) {
+                return Promise.resolve({ok: true, json: () => Promise.resolve(user)});
+            }
+            if (path.includes('/api/models')) {
+                return Promise.resolve({ok: true, json: () => Promise.resolve(catalog)});
+            }
+            if (path.includes('/api/profile/assistant')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ...user,
+                        assistantPreferences: {
+                            ...user.assistantPreferences,
+                            model: 'openai-codex/gpt-5.4',
+                            thinkingLevel: 'high'
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ok: true, json: () => Promise.resolve(null)});
+        });
+        window.history.replaceState({}, '', '/?hrai-settings=1');
+        render(<WrappedComponent />);
+
+        await waitFor(() => expect(screen.getByText('Assistant settings')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByRole('option', {name: /OpenAI Codex/})).toBeInTheDocument());
+        expect(screen.getByRole('option', {name: 'OpenAI Codex · signed in · subscription'})).toBeInTheDocument();
+        expect(screen.queryByLabelText('Model')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Thinking')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Provider'), {target: {value: 'openai-codex'}});
+        expect(screen.getByLabelText('Model')).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Thinking'), {target: {value: 'high'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Save settings'}));
+
+        await waitFor(() => expect(global.fetch.mock.calls.some(
+            ([requestUrl]) => String(requestUrl).includes('/api/profile/assistant')
+        )).toBe(true));
+        const saveCall = global.fetch.mock.calls.find(
+            ([requestUrl]) => String(requestUrl).includes('/api/profile/assistant')
+        );
+        expect(JSON.parse(saveCall[1].body)).toMatchObject({
+            model: 'openai-codex/gpt-5.4',
+            thinkingLevel: 'high'
+        });
+
+        fireEvent.change(screen.getByLabelText('Provider'), {target: {value: 'openrouter'}});
+        expect(screen.getByText('Sign in first.')).toBeInTheDocument();
+        expect(screen.getByLabelText('Model').disabled).toBe(true);
+        expect(screen.queryByLabelText('Thinking')).not.toBeInTheDocument();
+        window.history.replaceState({}, '', '/');
+    });
 });
