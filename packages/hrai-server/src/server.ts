@@ -193,7 +193,9 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
 async function resolveModelChoice(
     preferences?: AssistantPreferences,
 ): Promise<{ backend: BackendId; model: string }> {
-    const fallback = { backend: defaultBackend(), model: EVAL_MODEL };
+    // defaultModelFor lets HRAI_PI_MODEL and its siblings win, which EVAL_MODEL alone does not:
+    // a per-backend model name would otherwise be ignored whenever the child keeps the default.
+    const fallback = { backend: defaultBackend(), model: defaultModelFor(defaultBackend()) };
     if (preferences === undefined || preferences.modelBackend === "default") return fallback;
 
     const backend = preferences.modelBackend;
