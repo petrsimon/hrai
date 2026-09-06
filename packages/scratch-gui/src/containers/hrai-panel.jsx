@@ -11,6 +11,7 @@ import log from '../lib/log.js';
 import {clearGameProgress, loadGameProgress, saveGamePlaytest, saveGameProgress} from '../lib/hrai-game-progress';
 import {loadGameStarter} from '../lib/hrai-game-starter';
 import {addTranscriptEvents} from '../lib/hrai-transcript.js';
+import {setHraiSocket} from '../lib/hrai-socket.js';
 import lessons from '../lib/hrai-lessons';
 import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
@@ -124,6 +125,7 @@ const HraiPanel = ({
             timeout: 5000
         });
         socketRef.current = socket;
+        setHraiSocket(socket);
 
         const markUnavailable = () => {
             setIsServerAvailable(false);
@@ -320,6 +322,7 @@ const HraiPanel = ({
             socket.off('error');
             socket.disconnect();
             socketRef.current = null;
+            setHraiSocket(null);
         };
     }, [
         activeLessonId,

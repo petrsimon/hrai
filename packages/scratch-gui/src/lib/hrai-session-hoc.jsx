@@ -5,6 +5,7 @@ import {defineMessages, FormattedMessage, IntlProvider, useIntl} from 'react-int
 import editorMessages from 'scratch-l10n/locales/editor-msgs';
 import {detectLocale} from './detect-locale';
 import {forLocale as localMessagesForLocale} from './local-messages';
+import {emitHrai, subscribeHraiSocket} from './hrai-socket';
 
 const messages = defineMessages({
     accountDialog: {id: 'gui.hrai.accountDialog', defaultMessage: 'HRAI account', description: 'HRAI account dialog label'},
@@ -45,6 +46,16 @@ const messages = defineMessages({
     providerSignedIn: {id: 'gui.hrai.providerSignedIn', defaultMessage: ' · signed in', description: 'suffix on a provider that has credentials'},
     providerSubscription: {id: 'gui.hrai.providerSubscription', defaultMessage: ' · subscription', description: 'suffix on a provider using a subscription'},
     loginFirst: {id: 'gui.hrai.loginFirst', defaultMessage: 'Sign in first.', description: 'hint when a provider has no credentials yet'},
+    providerLogin: {id: 'gui.hrai.providerLogin', defaultMessage: 'Sign in', description: 'button to start provider login'},
+    providerLogout: {id: 'gui.hrai.providerLogout', defaultMessage: 'Sign out', description: 'button to log out of a provider'},
+    loginWithAccount: {id: 'gui.hrai.loginWithAccount', defaultMessage: 'Sign in with account', description: 'start the provider oauth login flow'},
+    loginWithKey: {id: 'gui.hrai.loginWithKey', defaultMessage: 'Enter API key', description: 'start the provider api-key login flow'},
+    copyLink: {id: 'gui.hrai.copyLink', defaultMessage: 'Copy', description: 'copy the provider login URL'},
+    copied: {id: 'gui.hrai.copied', defaultMessage: 'Copied.', description: 'confirmation after copying a login URL'},
+    openAuthUrl: {id: 'gui.hrai.openAuthUrl', defaultMessage: 'Open sign-in', description: 'link that opens the provider login page'},
+    manualCodeHint: {id: 'gui.hrai.manualCodeHint', defaultMessage: 'Paste the address the browser sent you to after signing in', description: 'hint for the manual_code login field'},
+    loginContinue: {id: 'gui.hrai.loginContinue', defaultMessage: 'Continue', description: 'submit the current provider login prompt'},
+    providerLoginHeading: {id: 'gui.hrai.providerLoginHeading', defaultMessage: 'Provider sign-in', description: 'heading of the provider login panel'},
     socratic: {id: 'gui.hrai.socratic', defaultMessage: 'Socratic guide', description: 'assistant persona option'},
     coach: {id: 'gui.hrai.coach', defaultMessage: 'Encouraging coach', description: 'assistant persona option'},
     working: {id: 'gui.hrai.working', defaultMessage: 'Working…', description: 'account form busy state'},
@@ -339,6 +350,109 @@ const THINKING_OPTIONS = [
     ['max', messages.thinkingMax]
 ];
 
+const LOGIN_EVENTS = [
+    'provider:login:event',
+    'provider:login:prompt',
+    'provider:login:withdraw',
+    'provider:login:done',
+    'provider:logout:done'
+];
+
+const LoginEventList = ({events, copiedUrl, onCopy}) => (
+    <>
+        {events.map((event, index) => {
+            if (event.type === 'info' || event.type === 'progress') {
+                return (
+                    <p key={`${event.type}-${index}`}>
+                        {event.message}
+                        {event.links?.map((link) => (
+                            <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
+                                {link.label || link.url}
+                            </a>
+                        ))}
+                    </p>
+                );
+            }
+            if (event.type === 'auth_url') {
+                return (
+                    <p key={`auth-${index}`}>
+                        {event.instructions ? <span>{event.instructions} </span> : null}
+                        <a href={event.url} target="_blank" rel="noreferrer">
+                            <FormattedMessage {...messages.openAuthUrl} />
+                        </a>
+                        {' '}
+                        <button type="button" onClick={() => onCopy(event.url)}>
+                            <FormattedMessage {...(copiedUrl === event.url ? messages.copied : messages.copyLink)} />
+                        </button>
+                    </p>
+                );
+            }
+            if (event.type === 'device_code') {
+                return (
+                    <p key={`device-${index}`}>
+                        <strong style={{fontSize: '1.25rem', letterSpacing: '0.08em'}}>{event.userCode}</strong>
+                        <br />
+                        <a href={event.verificationUri} target="_blank" rel="noreferrer">{event.verificationUri}</a>
+                    </p>
+                );
+            }
+            return null;
+        })}
+    </>
+);
+
+LoginEventList.propTypes = {
+    copiedUrl: PropTypes.string,
+    events: PropTypes.array.isRequired,
+    onCopy: PropTypes.func.isRequired
+};
+
+const LoginPromptForm = ({answer, onAnswer, onSubmit, prompt, promptId}) => {
+    const field = prompt.type === 'secret' ? 'password' : 'text';
+    return (
+        <div style={{display: 'grid', gap: '0.4rem'}}>
+            <p>{prompt.message}</p>
+            {prompt.type === 'manual_code' ? (
+                <small style={hintStyle}><FormattedMessage {...messages.manualCodeHint} /></small>
+            ) : null}
+            {prompt.type === 'select' ? (
+                prompt.options.map((option) => (
+                    <label key={option.id}>
+                        <input
+                            type="radio"
+                            name={`hrai-login-${promptId}`}
+                            value={option.id}
+                            checked={answer === option.id}
+                            onChange={() => onAnswer(option.id)}
+                        />
+                        {option.label}
+                        {option.description ? <small style={hintStyle}> {option.description}</small> : null}
+                    </label>
+                ))
+            ) : (
+                <input
+                    type={field}
+                    value={answer}
+                    placeholder={prompt.placeholder || ''}
+                    aria-label={prompt.message}
+                    onChange={(event) => onAnswer(event.target.value)}
+                />
+            )}
+            <button type="button" onClick={onSubmit}>
+                <FormattedMessage {...messages.loginContinue} />
+            </button>
+        </div>
+    );
+};
+
+LoginPromptForm.propTypes = {
+    answer: PropTypes.string.isRequired,
+    onAnswer: PropTypes.func.isRequired,
+    onSubmit: PropTypes.func.isRequired,
+    prompt: PropTypes.object.isRequired,
+    promptId: PropTypes.string.isRequired
+};
+
 const AssistantSettings = ({user, onClose, onUpdated}) => {
     const intl = useIntl();
     const [preferences, setPreferences] = React.useState({
@@ -351,11 +465,86 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
     const [modelsFailed, setModelsFailed] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [saved, setSaved] = React.useState(false);
+    const [login, setLogin] = React.useState(null);
+    const [logoutError, setLogoutError] = React.useState(null);
+    const [copiedUrl, setCopiedUrl] = React.useState(null);
+    const loginRef = React.useRef(null);
+    loginRef.current = login;
 
     React.useEffect(() => {
         request('/api/models')
             .then((catalog) => setModelCatalog(catalog))
             .catch(() => setModelsFailed(true));
+    }, []);
+
+    React.useEffect(() => {
+        const applyCatalog = (selectProviderId) => {
+            request('/api/models')
+                .then((catalog) => {
+                    setModelCatalog(catalog);
+                    if (!selectProviderId) return;
+                    const provider = catalog.providers.find((entry) => entry.id === selectProviderId);
+                    const nextModelId = provider?.models[0]?.id;
+                    if (nextModelId) {
+                        setPreferences((current) => ({...current, model: `${selectProviderId}/${nextModelId}`}));
+                    }
+                })
+                .catch(() => setModelsFailed(true));
+        };
+        let currentSocket = null;
+        const onEvent = (payload) => {
+            if (!payload || payload.providerId !== loginRef.current?.providerId) return;
+            setLogin((current) => current && {
+                ...current,
+                events: [...current.events, payload.event]
+            });
+        };
+        const onPrompt = (payload) => {
+            if (!payload || payload.providerId !== loginRef.current?.providerId) return;
+            setLogin((current) => current && {
+                ...current,
+                prompt: {promptId: payload.promptId, prompt: payload.prompt},
+                answer: '',
+                error: null
+            });
+        };
+        const onWithdraw = (payload) => {
+            if (!payload || payload.providerId !== loginRef.current?.providerId) return;
+            setLogin((current) => {
+                if (!current?.prompt || current.prompt.promptId !== payload.promptId) return current;
+                return {...current, prompt: null, answer: ''};
+            });
+        };
+        const onDone = (payload) => {
+            if (!payload || payload.providerId !== loginRef.current?.providerId) return;
+            if (payload.ok) {
+                setLogin(null);
+                applyCatalog(payload.providerId);
+            } else {
+                setLogin((current) => current && {...current, error: payload.error, prompt: null});
+            }
+        };
+        const onLogout = (payload) => {
+            applyCatalog();
+            setLogoutError(payload?.ok ? null : (payload?.error || true));
+        };
+        const bind = (next) => {
+            if (currentSocket) {
+                LOGIN_EVENTS.forEach((event) => currentSocket.off(event));
+            }
+            currentSocket = next;
+            if (!next) return;
+            next.on('provider:login:event', onEvent);
+            next.on('provider:login:prompt', onPrompt);
+            next.on('provider:login:withdraw', onWithdraw);
+            next.on('provider:login:done', onDone);
+            next.on('provider:logout:done', onLogout);
+        };
+        const unsubscribe = subscribeHraiSocket(bind);
+        return () => {
+            unsubscribe();
+            bind(null);
+        };
     }, []);
 
     const update = (field, value) => setPreferences((current) => ({...current, [field]: value}));
@@ -387,6 +576,37 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
         if (provider.subscription) label += intl.formatMessage(messages.providerSubscription);
         return label;
     };
+
+    const startLogin = (type) => {
+        setLogoutError(null);
+        setLogin({providerId, type, events: [], prompt: null, answer: '', error: null});
+        emitHrai('provider:login', {providerId, type});
+    };
+
+    const cancelLogin = () => {
+        emitHrai('provider:login:cancel');
+        setLogin(null);
+    };
+
+    const logoutProvider = () => {
+        setLogoutError(null);
+        emitHrai('provider:logout', {providerId});
+    };
+
+    const copyUrl = (url) => {
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(url).then(() => setCopiedUrl(url));
+        }
+    };
+
+    const submitLoginPrompt = () => {
+        if (!login?.prompt) return;
+        emitHrai('provider:login:answer', {promptId: login.prompt.promptId, value: login.answer});
+        setLogin((current) => current && {...current, prompt: null, answer: ''});
+    };
+
+    const offersLogin = selectedProvider && (selectedProvider.login.oauth || selectedProvider.login.apiKey);
+    const bothLoginFlows = selectedProvider?.login.oauth && selectedProvider?.login.apiKey;
 
     const save = async (event) => {
         event.preventDefault();
@@ -449,6 +669,36 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
                         )}
                     </select>
                 </label>
+                {!modelControlsDisabled && offersLogin && !selectedProvider.configured ? (
+                    bothLoginFlows ? (
+                        <div>
+                            <button type="button" onClick={() => startLogin('oauth')}>
+                                <FormattedMessage {...messages.loginWithAccount} />
+                            </button>
+                            {' '}
+                            <button type="button" onClick={() => startLogin('api_key')}>
+                                <FormattedMessage {...messages.loginWithKey} />
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => startLogin(selectedProvider.login.oauth ? 'oauth' : 'api_key')}
+                        >
+                            <FormattedMessage {...messages.providerLogin} />
+                        </button>
+                    )
+                ) : null}
+                {!modelControlsDisabled && offersLogin && selectedProvider.configured ? (
+                    <button type="button" onClick={logoutProvider}>
+                        <FormattedMessage {...messages.providerLogout} />
+                    </button>
+                ) : null}
+                {logoutError ? (
+                    <small role="alert">
+                        {typeof logoutError === 'string' ? logoutError : <FormattedMessage {...messages.requestFailed} />}
+                    </small>
+                ) : null}
                 {modelControlsDisabled || providerId === 'default' ? (
                     modelControlsDisabled ? (
                         <label>
@@ -510,6 +760,25 @@ const AssistantSettings = ({user, onClose, onUpdated}) => {
                 <button type="submit"><FormattedMessage {...messages.saveSettings} /></button>
                 <button type="button" onClick={onClose}><FormattedMessage {...messages.close} /></button>
             </form>
+            {login ? (
+                <div style={{display: 'grid', gap: '0.5rem', marginTop: '0.75rem'}}>
+                    <strong><FormattedMessage {...messages.providerLoginHeading} /></strong>
+                    <LoginEventList events={login.events} copiedUrl={copiedUrl} onCopy={copyUrl} />
+                    {login.prompt ? (
+                        <LoginPromptForm
+                            answer={login.answer}
+                            prompt={login.prompt.prompt}
+                            promptId={login.prompt.promptId}
+                            onAnswer={(value) => setLogin((current) => current && {...current, answer: value})}
+                            onSubmit={submitLoginPrompt}
+                        />
+                    ) : null}
+                    {login.error ? <small role="alert">{login.error}</small> : null}
+                    <button type="button" onClick={cancelLogin}>
+                        <FormattedMessage {...messages.cancel} />
+                    </button>
+                </div>
+            ) : null}
         </div>
     );
 };
