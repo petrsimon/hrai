@@ -6,6 +6,7 @@
  */
 import { createServer } from "node:http";
 import { Server } from "socket.io";
+import { onAgentLog, recentAgentLog } from "./agent-log.ts";
 import { handleApiRequest } from "./api.ts";
 import { parseCookies, HraiStore, SESSION_COOKIE, type AssistantPreferences } from "./store.ts";
 import { EVAL_MODEL, chat, chatJson, defaultBackend, defaultModelFor, type BackendId } from "./model-client.ts";
@@ -225,7 +226,14 @@ async function resolveModelChoice(
         };
         void announceVoiceCapabilities();
         const voiceReadinessTimer = setInterval(() => void announceVoiceCapabilities(), 5_000);
-        socket.on("disconnect", () => clearInterval(voiceReadinessTimer));
+
+        // The buffer first, so a log tab opened during a run does not start blank.
+        socket.emit("agent:log", recentAgentLog());
+        const stopAgentLog = onAgentLog((event) => socket.emit("agent:log", [event]));
+        socket.on("disconnect", () => {
+            clearInterval(voiceReadinessTimer);
+            stopAgentLog();
+        });
 
         const emitLessonProgress = (): void => {
             const progress = session.lessonProgress;

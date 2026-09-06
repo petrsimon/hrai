@@ -368,8 +368,8 @@ describe("agent CLI runner", () => {
         expect(trace).toContain(`prompt=${"system".length + "a secret game about a dragon".length} chars`);
         expect(trace).not.toContain("a secret game about a dragon");
         expect(trace).toContain("! pi: warming up");
-        expect(trace).toContain("< not json at all");
-        expect(trace).toContain("< {\"type\":\"message_end\"");
+        expect(trace).toContain("! not json at all");
+        expect(trace).toContain(". message_end");
         expect(trace).toMatch(/= exit 0 after [\d.]+s, 4 chars/);
     });
 

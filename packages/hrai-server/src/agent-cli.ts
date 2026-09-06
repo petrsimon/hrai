@@ -1,9 +1,9 @@
 import {execFile, spawn} from "node:child_process";
-import {randomUUID} from "node:crypto";
-import {appendFileSync, mkdtempSync} from "node:fs";
+import {mkdtempSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {promisify} from "node:util";
+import {startAgentRun} from "./agent-log.ts";
 import type {Reply} from "./model-client.ts";
 
 const execFileAsync = promisify(execFile);
@@ -187,45 +187,6 @@ function dataToBytes(data: Buffer | string): Buffer {
     return Buffer.isBuffer(data) ? data : Buffer.from(data);
 }
 
-/** Writes one traced line: `<` a stdout event, `!` stderr, `=` a run boundary. */
-type Tracer = (kind: "out" | "err" | "note", text: string) => void;
-
-const traceMarks = {out: "<", err: "!", note: "="} as const;
-
-/**
- * Opens a trace of one agent run for an operator watching the server log.
- *
- * The CLIs differ in what they stream — codex reports only a finished message, and a JSON call
- * passes no delta callback at all — so the child's own event stream is the only place a run is
- * visible while it is still going.
- * @param command CLI being run, to label the lines.
- * @returns A tracer, or null when tracing is off.
- */
-function createTracer(command: string): Tracer | null {
-    const configured = process.env.HRAI_AGENT_TRACE;
-    if (!configured || configured === "0" || configured === "off") return null;
-
-    const label = `[hrai agent ${command} ${randomUUID().slice(0, 8)}]`;
-    const toStderr = configured === "1" || configured === "stderr";
-    let writable = true;
-
-    return (kind, text) => {
-        if (!writable) return;
-        const line = `${label} ${traceMarks[kind]} ${text}\n`;
-        if (toStderr) {
-            process.stderr.write(line);
-            return;
-        }
-        try {
-            appendFileSync(configured, line);
-        } catch (error) {
-            // A bad path must not take the run down with it; say so once and carry on untraced.
-            writable = false;
-            console.warn(`hrai: agent trace to ${configured} stopped: ${String(error)}`);
-        }
-    };
-}
-
 /**
  * Runs a chat completion through a locally installed agent CLI.
  * @param backend Agent CLI to run.
@@ -245,10 +206,9 @@ export async function runAgent(
     const started = performance.now();
     const spec = agentSpecs[backend];
     const cwd = getSandboxDir();
-    const trace = createTracer(spec.command);
-    // The start line records the prompt size rather than the prompt. The traced events still carry
-    // the child's text where a CLI echoes the turn back, which the README states plainly.
-    trace?.("note", `start model=${options.model ?? "default"} cwd=${cwd} ` +
+    // The opening line sizes the prompt rather than quoting it. The logged events still carry the
+    // child's text where a CLI echoes the turn back, which the README states plainly.
+    const run = startAgentRun(spec.command, `start model=${options.model ?? "default"} cwd=${cwd} ` +
         `json=${options.json ?? false} prompt=${options.system.length + options.user.length} chars`);
     const child = spawn(spec.command, spec.args({...options, json: options.json ?? false, cwd}), {
         cwd,
@@ -285,14 +245,14 @@ export async function runAgent(
 
         const timeoutMs = getTimeoutMs();
         const timeout = setTimeout(() => {
-            trace?.("note", `timed out after ${timeoutMs} ms`);
+            run.event("end", `timed out after ${timeoutMs} ms`);
             settleReject(new Error(`${spec.command} timed out after ${timeoutMs} ms`));
             child.kill("SIGTERM");
             // A CLI that ignores SIGTERM would otherwise outlive the rejected call.
             setTimeout(() => child.kill("SIGKILL"), sigkillGraceMs).unref();
         }, timeoutMs);
 
-        const processEvent = (event: unknown): void => {
+        const processEvent = (event: unknown, raw: string): void => {
             if (settled) return;
 
             const error = spec.error(event);
@@ -302,8 +262,12 @@ export async function runAgent(
                 return;
             }
 
+            const phase = asRecord(event)?.type;
+            if (typeof phase === "string") run.event("phase", phase, raw);
+
             const delta = spec.delta(event);
             if (delta !== null) {
+                run.event("delta", delta);
                 accumulated += delta;
                 onDelta?.(delta);
             }
@@ -313,22 +277,23 @@ export async function runAgent(
         };
 
         const processLine = (line: string): void => {
-            // Traced before parsing: a line the runner cannot read, such as an auth banner, is the
-            // one an operator most needs to see.
-            if (line.trim()) trace?.("out", line);
-
             const objectStart = line.indexOf("{");
-            if (objectStart < 0) return;
+            if (objectStart < 0) {
+                // A line the runner cannot read, an auth banner say, is the one worth logging.
+                if (line.trim()) run.event("stderr", line);
+                return;
+            }
 
             let event: unknown;
             try {
                 event = JSON.parse(line.slice(objectStart)) as unknown;
             } catch {
+                if (line.trim()) run.event("stderr", line);
                 return;
             }
 
             try {
-                processEvent(event);
+                processEvent(event, line);
             } catch (error) {
                 settleReject(error instanceof Error ? error : new Error(String(error)));
             }
@@ -351,18 +316,16 @@ export async function runAgent(
         child.stderr.on("data", (data: Buffer | string) => {
             const bytes = dataToBytes(data);
             stderrTail = Buffer.concat([stderrTail, bytes]).subarray(-maxStderrBytes);
-            if (trace) {
-                for (const line of bytes.toString().split("\n")) {
-                    if (line.trim()) trace("err", line);
-                }
+            for (const line of bytes.toString().split("\n")) {
+                if (line.trim()) run.event("stderr", line);
             }
         });
         child.once("error", (error) => {
-            trace?.("note", `could not start: ${error.message}`);
+            run.event("end", `could not start: ${error.message}`);
             settleReject(new Error(`${spec.command} could not be started: ${error.message}`));
         });
         child.once("close", (code) => {
-            trace?.("note", `exit ${code} after ${((performance.now() - started) / 1000).toFixed(1)}s, ` +
+            run.event("end", `exit ${code} after ${((performance.now() - started) / 1000).toFixed(1)}s, ` +
                 `${(finalText ?? accumulated).length} chars`);
             if (settled) return;
 
