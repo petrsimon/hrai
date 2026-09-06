@@ -347,6 +347,88 @@ describe('HraiPanel custom game planning', () => {
         expect(onGamePlanRequest).toHaveBeenCalledWith('Nová závodní hra.');
     });
 
+    test('shows what the agent is doing in the log tab', () => {
+        const run = {
+            command: 'pi',
+            outcome: null,
+            phases: [{name: 'message_update', count: 12, at: '2026-09-06T15:00:00.000Z'}],
+            problems: [{text: 'pi: provider slow', at: '2026-09-06T15:00:01.000Z'}],
+            reply: 'Drak najde poklad.',
+            runId: 'run-1',
+            startedAt: '2026-09-06T15:00:00.000Z',
+            summary: 'start model=gpt-5.4 prompt=42 chars'
+        };
+        const {unmount} = renderWithIntl(
+            <HraiPanel
+                agentRuns={[run]}
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('tab', {name: 'Záznam'}));
+        expect(screen.getByText('pi')).toBeTruthy();
+        expect(screen.getByText('start model=gpt-5.4 prompt=42 chars')).toBeTruthy();
+        expect(screen.getByText('message_update')).toBeTruthy();
+        expect(screen.getByText('×12')).toBeTruthy();
+        expect(screen.getByText('Drak najde poklad.')).toBeTruthy();
+        expect(screen.getByText('pi: provider slow')).toBeTruthy();
+        expect(screen.getByText('Běží…')).toBeTruthy();
+        unmount();
+
+        renderWithIntl(
+            <HraiPanel
+                agentRuns={[{...run, outcome: {text: 'exit 1: not logged in', at: '2026-09-06T15:00:09.000Z'}}]}
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+        fireEvent.click(screen.getByRole('tab', {name: 'Záznam'}));
+        expect(screen.getByText('exit 1: not logged in')).toBeTruthy();
+        expect(screen.queryByText('Běží…')).toBeNull();
+    });
+
+    test('shows the newest run first and says when there is nothing yet', () => {
+        const run = (runId, command) => ({
+            command,
+            outcome: {text: 'exit 0 after 1.0s, 4 chars'},
+            phases: [],
+            problems: [],
+            reply: `reply from ${command}`,
+            runId,
+            startedAt: '2026-09-06T15:00:00.000Z',
+            summary: 'start'
+        });
+        const {unmount} = renderWithIntl(
+            <HraiPanel
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+        fireEvent.click(screen.getByRole('tab', {name: 'Záznam'}));
+        expect(screen.getByText('Zatím nic. Až se draka na něco zeptáš, uvidíš tu, co dělá.')).toBeTruthy();
+        unmount();
+
+        renderWithIntl(
+            <HraiPanel
+                agentRuns={[run('run-1', 'pi'), run('run-2', 'codex')]}
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+        fireEvent.click(screen.getByRole('tab', {name: 'Záznam'}));
+        const replies = screen.getAllByText(/^reply from/);
+        expect(replies.map(node => node.textContent)).toEqual(['reply from codex', 'reply from pi']);
+    });
+
     test('keeps a new idea out of an authored lesson', () => {
         const {unmount} = renderWithIntl(
             <HraiPanel

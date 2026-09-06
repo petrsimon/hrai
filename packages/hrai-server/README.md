@@ -55,14 +55,32 @@ directory, so it cannot reach the source tree and no `AGENTS.md` is pulled into 
 | `HRAI_AGENT_MODEL` | model for the selected agent CLI when it has no per-backend variable |
 | `HRAI_AGENT_TIMEOUT_MS` | per-call timeout, default `120000` |
 | `HRAI_AGENT_CWD` | sandbox working directory, default a fresh empty temp dir |
-| `HRAI_AGENT_TRACE` | watch a run: `1` traces to the server log, any other value is a file to append to; unset, `0` and `off` are off |
+| `HRAI_AGENT_TRACE` | mirror a run to the terminal: `1` writes to the server log, any other value is a file to append to; unset, `0` and `off` are off |
 
 ### Watching a run
 
-A tutor call reaches an agent CLI as one child process, and nothing about it is visible by default:
+A tutor call reaches an agent CLI as one child process. Nothing about it used to be visible:
 `codex` reports only a finished message, and the plan and title calls ask for JSON without a delta
-callback, so a new project is silent until it lands. `HRAI_AGENT_TRACE` writes the child's own event
-stream as it arrives:
+callback, so a new project was silent until it landed. Every run is now logged three ways.
+
+**The Log tab in the editor.** The panel's third tab shows each run as it happens: which CLI, what
+it was asked for, the phases its own event stream reports, the reply as it streams in, anything it
+wrote to stderr, and how it ended. A run still going says *Běží…*; a run that ended badly shows its
+exit line in red. Newest run first, the last 20 kept. Open it while starting a new project and the
+planning call is visible from spawn to exit.
+
+**A file, always.** Every event is appended to `$HRAI_DATA_DIR/agent-log/YYYY-MM-DD.jsonl` (data
+directory default `.hrai-data`), one JSON object per line, no flag to set:
+
+```sh
+tail -f .hrai-data/agent-log/$(date +%F).jsonl | jq -r '"\(.kind)\t\(.text)"'
+```
+
+Each line carries `runId`, `command`, `seq`, `at`, `kind`, `text`, and for a CLI event the raw line
+in `detail`. `kind` is `start`, `phase`, `delta`, `stderr` or `end`. Losing the file never fails a
+run: an unwritable path is reported once and the run carries on.
+
+**The terminal, on request.** `HRAI_AGENT_TRACE` mirrors the same events as readable lines:
 
 ```sh
 HRAI_AGENT_TRACE=1 npm start --workspace=packages/hrai-server
@@ -71,27 +89,39 @@ HRAI_AGENT_TRACE=/tmp/hrai-agent.log npm start --workspace=packages/hrai-server 
 
 ```text
 [hrai agent pi 4f2c9ab1] = start model=openai-codex/gpt-5.4 cwd=/tmp/hrai-agent-x json=true prompt=2841 chars
-[hrai agent pi 4f2c9ab1] < {"type":"message_update","assistantMessageEvent":{"type":"text_delta",…
+[hrai agent pi 4f2c9ab1] . message_start
+[hrai agent pi 4f2c9ab1] > Drak najde poklad
 [hrai agent pi 4f2c9ab1] ! pi: resolving provider
 [hrai agent pi 4f2c9ab1] = exit 0 after 12.4s, 1832 chars
 ```
 
-`<` is a stdout event, `!` is stderr, `=` is a run boundary, and the eight-digit tag separates runs
-that overlap. Lines the runner cannot parse are traced too — an auth banner is usually the answer
-when a run fails.
+`=` is a run boundary, `.` a phase, `>` a chunk of the reply, `!` stderr, and the eight-digit tag
+separates runs that overlap. Lines the runner cannot parse are logged too — an auth banner is
+usually the answer when a run fails.
 
-**A trace holds the child's project text.** The `start` line records only the prompt size, but the
-CLIs echo the turn back in their own events — `pi` emits the user message, and every backend emits
-the reply. Treat a trace file as project data: keep it off shared machines and delete it when the
-run is understood.
+**A log holds the child's project text.** The `start` line records the prompt size rather than the
+prompt, but the CLIs echo the turn back in their own events and every backend emits the reply.
+Treat `agent-log/` and any trace file as project data: keep them off shared machines, and delete
+them when the run is understood.
 
-The per-backend variables exist because one global model name cannot serve five backends: a name
-`ollama` understands is rejected by `cursor-agent`, and the reverse. Unset means the backend picks —
-for an agent CLI that is the CLI's own default, so `--model` is left off entirely.
+### Running it so the agent is visible
 
-`HRAI_MODEL_HOST` and `HRAI_EVAL_HOST` configure whichever backend `HRAI_MODEL_BACKEND` selects.
-A backend picked at runtime uses `HRAI_OLLAMA_HOST` or `HRAI_LLAMA_HOST` instead, because a host
-belonging to one backend is wrong for another.
+Three terminals, with the tutor on an agent backend:
+
+```sh
+# 1. the tutor, on the pi CLI, mirroring each run to this terminal
+HRAI_MODEL_BACKEND=pi HRAI_PI_MODEL=openai-codex/gpt-5.4 HRAI_AGENT_TIMEOUT_MS=300000 \
+HRAI_AGENT_TRACE=1 npm start --workspace=packages/hrai-server
+
+# 2. the editor
+npm start --workspace=packages/scratch-gui
+
+# 3. the log file, if a terminal of its own is wanted
+tail -f .hrai-data/agent-log/$(date +%F).jsonl
+```
+
+Open `http://localhost:8601/`, describe a game, and press the idea button. The planning call
+appears in terminal 1 as it streams, in the editor's Log tab, and in the day's JSONL file.
 
 ## Block labels and argument order
 

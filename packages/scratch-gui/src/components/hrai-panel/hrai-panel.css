@@ -124,6 +124,101 @@
     text-align: center;
 }
 
+.log-panel {
+    display: block;
+    padding: $space;
+    overflow-y: auto;
+}
+
+.agent-run {
+    margin-bottom: $space;
+    padding: calc($space / 2);
+    border: 1px solid var(--hrai-border);
+    border-radius: 0.375rem;
+    background-color: var(--hrai-surface-sunken);
+}
+
+.agent-run-header {
+    display: flex;
+    align-items: baseline;
+    gap: calc($space / 2);
+    flex-wrap: wrap;
+}
+
+.agent-run-command {
+    color: var(--hrai-text);
+    font-weight: bold;
+    font-size: 0.75rem;
+}
+
+.agent-run-time {
+    color: var(--hrai-text-muted);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.agent-run-status,
+.agent-run-failed {
+    margin-left: auto;
+    color: var(--hrai-text-muted);
+    font-size: 0.6875rem;
+}
+
+.agent-run-failed {
+    color: var(--hrai-error);
+    font-weight: bold;
+}
+
+.agent-run-summary {
+    margin: calc($space / 2) 0 0;
+    color: var(--hrai-text-muted);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    /* CLI argument lines are long and unbroken; wrapping keeps the panel narrow. */
+    overflow-wrap: anywhere;
+}
+
+.agent-run-phases {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc($space / 4);
+    margin: calc($space / 2) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.agent-run-phase {
+    padding: 0.0625rem 0.3125rem;
+    border-radius: 0.625rem;
+    background-color: var(--hrai-surface);
+    color: var(--hrai-text-muted);
+    font-size: 0.625rem;
+}
+
+.agent-run-count {
+    margin-left: 0.1875rem;
+    opacity: 0.7;
+}
+
+.agent-run-reply {
+    margin: calc($space / 2) 0 0;
+    max-height: 12rem;
+    overflow-y: auto;
+    color: var(--hrai-text);
+    font-size: 0.75rem;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.agent-run-problem {
+    margin: calc($space / 2) 0 0;
+    color: var(--hrai-error);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
 .lesson-card {
     display: flex;
     flex: 0 0 auto;

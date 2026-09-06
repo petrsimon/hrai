@@ -25,6 +25,7 @@
   --hrai-text: #17313d;
   --hrai-text-muted: #5f7680;
   --hrai-border: #cbdde4;
+  --hrai-error: #a32a1f;
 
   /* Scratch category colours, used only by block chips. */
   --hrai-cat-motion: #4c97ff;
@@ -52,5 +53,6 @@
     --hrai-text: #e9f5fa;
     --hrai-text-muted: #a7c2ce;
     --hrai-border: #315363;
+    --hrai-error: #ff9d94;
   }
 }

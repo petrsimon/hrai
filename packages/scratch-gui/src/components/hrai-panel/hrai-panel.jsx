@@ -64,6 +64,21 @@ const messages = defineMessages({
         defaultMessage: 'Poradit',
         description: 'button to ask hrai for a more direct hint'
     },
+    logTab: {
+        id: 'gui.hrai.logTab',
+        defaultMessage: 'Záznam',
+        description: 'tab showing what the agent behind the tutor is doing'
+    },
+    logEmpty: {
+        id: 'gui.hrai.logEmpty',
+        defaultMessage: 'Zatím nic. Až se draka na něco zeptáš, uvidíš tu, co dělá.',
+        description: 'empty state of the agent log tab'
+    },
+    logRunning: {
+        id: 'gui.hrai.logRunning',
+        defaultMessage: 'Běží…',
+        description: 'status of an agent run that has not finished'
+    },
     newGameIdea: {
         id: 'gui.hrai.newGameIdea',
         defaultMessage: 'Nový nápad',
@@ -584,6 +599,77 @@ const gamePlanShape = PropTypes.shape({
     title: PropTypes.string.isRequired
 });
 
+const AgentRunCard = ({run, runningLabel}) => {
+    const startedAt = run.startedAt ? new Date(run.startedAt) : null;
+    const finished = Boolean(run.outcome);
+    // A failed run says so in its closing line; the child's own words never reach this tab.
+    const failed = finished && !/^exit 0/.test(run.outcome.text);
+
+    return (
+        <section className={styles.agentRun}>
+            <header className={styles.agentRunHeader}>
+                <span className={styles.agentRunCommand}>{run.command}</span>
+                {startedAt ? (
+                    <time
+                        className={styles.agentRunTime}
+                        dateTime={run.startedAt}
+                    >
+                        {startedAt.toLocaleTimeString()}
+                    </time>
+                ) : null}
+                <span
+                    className={failed ? styles.agentRunFailed : styles.agentRunStatus}
+                    role="status"
+                >
+                    {finished ? run.outcome.text : runningLabel}
+                </span>
+            </header>
+            {run.summary ? <p className={styles.agentRunSummary}>{run.summary}</p> : null}
+            {run.phases.length > 0 ? (
+                <ul className={styles.agentRunPhases}>
+                    {run.phases.map((phase, index) => (
+                        <li
+                            key={`${phase.name}-${index}`}
+                            className={styles.agentRunPhase}
+                        >
+                            {phase.name}
+                            {phase.count > 1 ? <span className={styles.agentRunCount}>{`×${phase.count}`}</span> : null}
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
+            {run.reply ? <p className={styles.agentRunReply}>{run.reply}</p> : null}
+            {run.problems.map((problem, index) => (
+                <p
+                    key={`${problem.at}-${index}`}
+                    className={styles.agentRunProblem}
+                >
+                    {problem.text}
+                </p>
+            ))}
+        </section>
+    );
+};
+
+AgentRunCard.propTypes = {
+    run: PropTypes.shape({
+        command: PropTypes.string.isRequired,
+        outcome: PropTypes.shape({text: PropTypes.string.isRequired}),
+        phases: PropTypes.arrayOf(PropTypes.shape({
+            count: PropTypes.number.isRequired,
+            name: PropTypes.string.isRequired
+        })).isRequired,
+        problems: PropTypes.arrayOf(PropTypes.shape({
+            at: PropTypes.string,
+            text: PropTypes.string.isRequired
+        })).isRequired,
+        reply: PropTypes.string.isRequired,
+        startedAt: PropTypes.string,
+        summary: PropTypes.string
+    }).isRequired,
+    runningLabel: PropTypes.string.isRequired
+};
+
 const GameStartCard = ({hasProjectContent, isBusy, idea, onNewProject, onPlan}) => {
     const handleNewProject = useCallback(() => onNewProject(idea), [idea, onNewProject]);
     const handlePlan = useCallback(() => onPlan(idea), [idea, onPlan]);
@@ -822,6 +908,7 @@ GameProgressCard.propTypes = {
 };
 
 const HraiPanel = ({
+    agentRuns,
     gamePlan,
     gamePlaytest,
     gameProgress,
@@ -1145,13 +1232,16 @@ const HraiPanel = ({
 
     const handleHraiTabClick = useCallback(() => setActiveTab('hrai'), []);
     const handlePlanTabClick = useCallback(() => setActiveTab('plan'), []);
+    const handleLogTabClick = useCallback(() => setActiveTab('log'), []);
 
     const handleTabKeyDown = useCallback(event => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
             return;
         }
         event.preventDefault();
-        const nextTab = activeTab === 'hrai' ? 'plan' : 'hrai';
+        const order = ['hrai', 'plan', 'log'];
+        const step = event.key === 'ArrowRight' ? 1 : order.length - 1;
+        const nextTab = order[(order.indexOf(activeTab) + step) % order.length];
         setActiveTab(nextTab);
         event.currentTarget.parentElement.querySelector(`#hrai-${nextTab}-tab`)?.focus();
     }, [activeTab]);
@@ -1305,6 +1395,20 @@ const HraiPanel = ({
                 >
                     <PlanIcon />
                     <FormattedMessage {...messages.planTab} />
+                </button>
+                <button
+                    id="hrai-log-tab"
+                    type="button"
+                    className={styles.tab}
+                    role="tab"
+                    aria-controls="hrai-log-panel"
+                    aria-selected={activeTab === 'log'}
+                    tabIndex={activeTab === 'log' ? 0 : -1}
+                    onClick={handleLogTabClick}
+                    onKeyDown={handleTabKeyDown}
+                >
+                    <span aria-hidden="true">📜</span>
+                    <FormattedMessage {...messages.logTab} />
                 </button>
             </div>
             {activeTab === 'hrai' ? (
@@ -1497,6 +1601,27 @@ const HraiPanel = ({
                         ) : null}
                     </form>
                 </div>
+            ) : activeTab === 'log' ? (
+                <div
+                    id="hrai-log-panel"
+                    className={`${styles.tabPanel} ${styles.logPanel}`}
+                    role="tabpanel"
+                    aria-labelledby="hrai-log-tab"
+                >
+                    {agentRuns.length === 0 ? (
+                        <p className={styles.planEmpty}>
+                            <FormattedMessage {...messages.logEmpty} />
+                        </p>
+                    ) : (
+                        [...agentRuns].reverse().map(run => (
+                            <AgentRunCard
+                                key={run.runId}
+                                run={run}
+                                runningLabel={intl.formatMessage(messages.logRunning)}
+                            />
+                        ))
+                    )}
+                </div>
             ) : (
                 <div
                     id="hrai-plan-panel"
@@ -1534,6 +1659,16 @@ const HraiPanel = ({
 };
 
 HraiPanel.propTypes = {
+    agentRuns: PropTypes.arrayOf(PropTypes.shape({
+        command: PropTypes.string.isRequired,
+        outcome: PropTypes.shape({at: PropTypes.string, text: PropTypes.string}),
+        phases: PropTypes.array.isRequired,
+        problems: PropTypes.array.isRequired,
+        reply: PropTypes.string.isRequired,
+        runId: PropTypes.string.isRequired,
+        startedAt: PropTypes.string,
+        summary: PropTypes.string
+    })),
     gamePlan: gamePlanShape,
     gamePlaytest: PropTypes.shape({
         plan: gamePlanShape.isRequired
@@ -1600,6 +1735,7 @@ HraiPanel.propTypes = {
 };
 
 HraiPanel.defaultProps = {
+    agentRuns: [],
     gamePlan: null,
     gamePlaytest: null,
     gameProgress: null,
