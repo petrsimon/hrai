@@ -93,8 +93,11 @@ const HraiPanel = ({
     const socketRef = useRef(null);
     const messageIdCounter = useRef(0);
     const vmRef = useRef(vm);
+    // The live socket session belongs to the open project, not its display name.
+    const projectTitleRef = useRef(projectTitle);
 
     vmRef.current = vm;
+    projectTitleRef.current = projectTitle;
 
     const emitPendingGamePlan = useCallback(() => {
         const socket = socketRef.current;
@@ -150,13 +153,13 @@ const HraiPanel = ({
             socket.emit('session:open', {projectId: projectId ?? null});
             pushWorkspace();
             if (activeLessonId) {
-                const saved = loadLessonProgress(projectId, activeLessonId, projectTitle);
+                const saved = loadLessonProgress(projectId, activeLessonId, projectTitleRef.current);
                 socket.emit('lessonStart', {
                     lessonId: activeLessonId,
                     stageIndex: saved?.stageIndex || 0
                 });
             } else {
-                const saved = loadGameProgress(projectId, projectTitle);
+                const saved = loadGameProgress(projectId, projectTitleRef.current);
                 if (saved) socket.emit('gameRestore', saved);
             }
             emitPendingGamePlan();
@@ -244,7 +247,7 @@ const HraiPanel = ({
         socket.on('gamePlaytest', playtest => {
             void loadGameStarter(vmRef.current, playtest.starter)
                 .then(() => {
-                    saveGamePlaytest(projectId, playtest, projectTitle);
+                    saveGamePlaytest(projectId, playtest, projectTitleRef.current);
                     setGamePlan(null);
                     setGamePlaytest(playtest);
                     setGameProgress(null);
@@ -261,7 +264,7 @@ const HraiPanel = ({
         });
 
         socket.on('gameProgress', progress => {
-            saveGameProgress(projectId, progress, projectTitle);
+            saveGameProgress(projectId, progress, projectTitleRef.current);
             setGamePlan(null);
             setGamePlaytest(null);
             setGameProgress(progress);
@@ -274,12 +277,12 @@ const HraiPanel = ({
         });
 
         socket.on('lessonProgress', progress => {
-            saveLessonProgress(projectId, progress.lessonId, progress.stageIndex, projectTitle);
+            saveLessonProgress(projectId, progress.lessonId, progress.stageIndex, projectTitleRef.current);
             setLessonProgress(progress);
         });
 
         socket.on('stageComplete', progress => {
-            saveLessonProgress(projectId, progress.lessonId, progress.stageIndex, projectTitle);
+            saveLessonProgress(projectId, progress.lessonId, progress.stageIndex, projectTitleRef.current);
             setLessonProgress(previous => {
                 if (!previous) return previous;
                 return {...previous, ...progress, complete: true};
@@ -331,7 +334,6 @@ const HraiPanel = ({
         helperUnavailableText,
         emitPendingGamePlan,
         projectId,
-        projectTitle,
         pushWorkspace
     ]);
 
@@ -350,10 +352,11 @@ const HraiPanel = ({
         setGamePlaytest(null);
         setGameProgress(null);
         setIsPlanning(false);
-        const saved = activeLessonId ? loadLessonProgress(projectId, activeLessonId, projectTitle) : null;
+        const saved = activeLessonId ?
+            loadLessonProgress(projectId, activeLessonId, projectTitleRef.current) : null;
         setLessonProgress(saved ? {stageIndex: saved.stageIndex, complete: false} : null);
         if (activeLessonId) {
-            clearGameProgress(projectId, projectTitle);
+            clearGameProgress(projectId, projectTitleRef.current);
         }
         if (activeLessonId && socketRef.current?.connected) {
             socketRef.current.emit('lessonStart', {
@@ -361,7 +364,7 @@ const HraiPanel = ({
                 stageIndex: saved?.stageIndex || 0
             });
         }
-    }, [activeLessonId, projectId, projectTitle]);
+    }, [activeLessonId, projectId]);
 
     useEffect(() => {
         const onWorkspaceChange = () => {
