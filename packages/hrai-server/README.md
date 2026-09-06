@@ -11,74 +11,89 @@ and game-planning quality are measured rather than assumed.
 
 ## Running the evals
 
+The evals need a model the operator's pi runtime can reach. With ollama on this machine:
+
 ```sh
 ollama serve
 ollama pull qwen3:14b
-npm test --workspace=packages/hrai-server
+HRAI_OLLAMA_HOST=http://localhost:11434 HRAI_OLLAMA_MODELS=qwen3:14b npm test --workspace=packages/hrai-server
 ```
 
-Point elsewhere with `HRAI_EVAL_MODEL` and `HRAI_EVAL_HOST`. If the model is unavailable the
-suite **skips loudly** with the reason printed — it never passes silently, because a green
-run that tested nothing is worse than a red one.
+Point elsewhere with `HRAI_EVAL_MODEL`, a `provider/model[:thinking]` reference. If the model is
+unavailable the suite **skips loudly** with the reason printed — it never passes silently, because
+a green run that tested nothing is worse than a red one.
 
-## Model backends
+## Models and providers
 
-`HRAI_MODEL_BACKEND` selects how the tutor reaches a model:
+The tutor reaches every model through [pi](https://pi.dev). A hosted subscription (openai-codex,
+Claude Pro/Max, OpenRouter, …) and a local server (ollama, llama.cpp) are both pi providers, and a
+model is a `provider/model[:thinking]` reference such as `openai-codex/gpt-5.6-luna:high` or
+`ollama/qwen3:14b`. Nothing else in the server asks which kind of provider is answering.
 
-| Value | How it runs |
-| - | - |
-| `ollama` (default) | HTTP to `/api/chat` |
-| `llama.cpp` | HTTP to the OpenAI-compatible `/v1/chat/completions` |
-| `cursor` | spawns `cursor-agent -p --mode ask` |
-| `pi` | spawns `pi -p --mode json --no-tools` |
-| `codex` | spawns `codex exec --json -s read-only` |
+**Credentials are per profile.** A signed-in child logs in to a provider from the assistant
+settings in the editor — a subscription through its OAuth flow, a metered provider with a key. The
+credential lands in `$HRAI_DATA_DIR/pi/users/<id>/auth.json` and is used only for that child's
+calls; it never crosses the socket. A socket without a profile gets no model at all: the tutor asks
+the child to sign in. Evals and scripts use the *operator's* runtime, whose credentials live at
+`HRAI_PI_AUTH_PATH` (default `$HRAI_DATA_DIR/pi/auth.json`); copy `~/.pi/agent/auth.json` there to
+run evals on a subscription.
 
-The three agent backends run a locally installed coding-agent CLI in its non-interactive mode and
-parse its JSONL output. They need no model server:
+**A hosted provider sees the child's project.** The rendered project and the chat leave the machine
+and reach whichever provider the profile picked. Local servers keep everything on the host, and the
+Compose deployment serves llama.cpp as provider `llama`.
 
-```sh
-HRAI_MODEL_BACKEND=cursor npm start --workspace=packages/hrai-server
-HRAI_MODEL_BACKEND=codex  npm run eval:game-design --workspace=packages/hrai-server
-```
-
-**These CLIs call hosted APIs.** With an agent backend the child's rendered project and chat leave
-the machine and reach Cursor, OpenAI or the provider `pi` is configured with. The two HTTP backends
-stay local, and the Compose deployment still uses llama.cpp. `pi` can also drive local models — its
-listing shows them under the `local` provider.
-
-Each CLI runs with its tools restricted and with an empty temporary directory as its working
-directory, so it cannot reach the source tree and no `AGENTS.md` is pulled into the prompt.
+Local servers are announced through the environment and registered as providers on every runtime.
+Their models are listed explicitly rather than probed, so the catalogue does not depend on whether
+the server was up when the tutor started.
 
 | Variable | Meaning |
 | - | - |
-| `HRAI_OLLAMA_MODEL`, `HRAI_LLAMA_MODEL`, `HRAI_CURSOR_MODEL`, `HRAI_PI_MODEL`, `HRAI_CODEX_MODEL` | default model for that one backend; wins over everything below |
-| `HRAI_AGENT_MODEL` | model for the selected agent CLI when it has no per-backend variable |
-| `HRAI_AGENT_TIMEOUT_MS` | per-call timeout, default `120000` |
-| `HRAI_AGENT_CWD` | sandbox working directory, default a fresh empty temp dir |
-| `HRAI_AGENT_TRACE` | mirror a run to the terminal: `1` writes to the server log, any other value is a file to append to; unset, `0` and `off` are off |
+| `HRAI_PI_MODEL` | model for profiles that keep *Server default*; default `ollama/qwen3:14b` |
+| `HRAI_EVAL_MODEL` | model the evals measure; default `HRAI_PI_MODEL` |
+| `HRAI_OLLAMA_HOST`, `HRAI_OLLAMA_MODELS` | an ollama server and the comma-separated models it serves, registered as provider `ollama` |
+| `HRAI_LLAMA_HOST`, `HRAI_LLAMA_MODELS` | a llama.cpp server and its models, registered as provider `llama` |
+| `HRAI_PI_MODELS_PATH` | a pi `models.json` with further custom providers; default `$HRAI_DATA_DIR/pi/models.json` |
+| `HRAI_PI_AUTH_PATH` | the operator's credentials, for evals and scripts |
+| `HRAI_AGENT_TRACE` | mirror the transcript to the terminal: `1` writes to the server log, any other value is a file to append to; unset, `0` and `off` are off |
 
-### Watching a run
+### The tutor is an agent session
 
-A tutor call reaches an agent CLI as one child process. Nothing about it used to be visible:
-`codex` reports only a finished message, and the plan and title calls ask for JSON without a delta
-callback, so a new project was silent until it landed. Every run is now logged three ways.
+Each profile has one persistent pi agent session per project, kept under
+`$HRAI_DATA_DIR/pi/sessions/<user>/<project>/` and resumed on reconnect, so the child keeps talking
+to the same tutor across milestones and lessons. The session has four tools:
 
-**The Log tab in the editor.** The panel's third tab shows each run as it happens: which CLI, what
-it was asked for, the steps its own event stream reports, the model's reasoning, the reply as it
-streams in, anything it wrote to stderr, and how it ended. A run still going says *Běží…*; a run that ended badly shows its
-exit line in red. Newest run first, the last 20 kept. Open it while starting a new project and the
-planning call is visible from spawn to exit.
+| Tool | What it does |
+| - | - |
+| `tell_child` | delivers the reply. The only way a word reaches the Hrai tab: the pedagogical policy runs on its arguments, and a reply that breaks a rule is refused with the rule spelled out, so the model tries again and the child never sees the attempt |
+| `read_project` | the current project as pseudo-Scratch text |
+| `step_status` | the active lesson step or game milestone, its evidence, at the current hint rung |
+| `palette` | blocks from the editor's palette — categories only at rung 3, nothing below |
+
+The rendered project still travels inline in each user turn, the shape the evals measured; the
+tools are additive. A game plan, a project title and every eval are one-shot completions in an
+ephemeral session with no tools and no memory.
+
+### Watching the agent
+
+Every turn is visible three ways.
+
+**The Záznam tab in the editor.** The panel's third tab is the session transcript: the child's
+message, the assistant's text as it streams, its reasoning folded away, every tool call with its
+arguments and result — `tell_child` shows what the child was told — and how the turn ended. A one-
+shot run (a plan, a title) appears as a card of its own. The tab reloads the history when the
+editor connects or the project changes.
 
 **A file, always.** Every event is appended to `$HRAI_DATA_DIR/agent-log/YYYY-MM-DD.jsonl` (data
 directory default `.hrai-data`), one JSON object per line, no flag to set:
 
 ```sh
-tail -f .hrai-data/agent-log/$(date +%F).jsonl | jq -r '"\(.kind)\t\(.text)"'
+tail -f .hrai-data/agent-log/$(date +%F).jsonl | jq -r '"\(.kind)\t\(.delta // .text // .name // "")"'
 ```
 
-Each line carries `runId`, `command`, `seq`, `at`, `kind`, `text`, and for a CLI event the raw line
-in `detail`. `kind` is `start`, `phase`, `thinking`, `delta`, `stderr` or `end`. Losing the file never fails a
-run: an unwritable path is reported once and the run carries on.
+Each line carries `owner` (the profile), `seq`, `at`, `kind`, and `runId` for a one-shot run. `kind`
+is `run_start`, `run_end`, `user`, `assistant_delta`, `thinking_delta`, `tool_start`, `tool_end`,
+`turn_end` or `note`. Losing the file never fails a turn: an unwritable path is reported once and
+the turn carries on.
 
 **The terminal, on request.** `HRAI_AGENT_TRACE` mirrors the same events as readable lines:
 
@@ -88,45 +103,32 @@ HRAI_AGENT_TRACE=/tmp/hrai-agent.log npm start --workspace=packages/hrai-server 
 ```
 
 ```text
-[hrai agent pi 604969e8] = plan · pi · openai-codex/gpt-5.4 · prompt 6.9 kB
-[hrai agent pi 604969e8] ~ Designing milestones for gameplay
-[hrai agent pi 604969e8] ~ Planning wall collision and treasure relocation
-[hrai agent pi 604969e8] ~ Choosing dragon maze narrative title
-[hrai agent pi 604969e8] > title: Drak hledá poklad
-[hrai agent pi 604969e8] > coreLoop: Drak projde bludištěm, dotkne se pokladu a získá bod.
-[hrai agent pi 604969e8] > milestones: 4 (Drak najde poklad, Bludiště má zdi, Poklad se stěhuje, Tři poklady)
-[hrai agent pi 604969e8] ! pi: resolving provider
-[hrai agent pi 604969e8] = done in 75.3s, 1520 chars
+[hrai u3f1] < Jak udělám, aby kočka běžela, když zmáčknu šipku?
+[hrai u3f1] ~ The child has a flag script; a key event is missing.
+[hrai u3f1] + tell_child {"text":"Podívej se, čím tvůj skript začíná. Co by mělo kočku spustit místo vlajky?","blocks":[]}
+[hrai u3f1] - Doručeno.
+[hrai u3f1] = stop
+[hrai run 604969e8] = plan · openai-codex/gpt-5.6-luna
+[hrai run 604969e8] > {"title": "Drak hledá poklad", …
+[hrai run 604969e8] = done in 75.3s, 1520 chars
 ```
 
-`=` is a run boundary, `~` the model's reasoning, `>` its reply, `!` stderr, and the eight-digit tag
-separates runs that overlap. The header says what the turn was for — `plan`, `hint`, `answer`,
-`title` — which CLI ran it and on which model.
+`<` is the child's message, `~` the model's reasoning, `>` its prose, `+` a tool call, `-` its
+result, `!` an error or a note, and `=` a turn or run boundary. Reply and reasoning arrive in
+fragments and are logged a line at a time.
 
-Four things keep this readable, because the raw stream is not. A CLI wraps every event in an
-envelope — `pi` sends all of them as `message_update` — so the log names the event *inside* it. An
-event carrying text is logged as that text rather than named beside it. Reply and reasoning arrive
-in fragments, so they are gathered and logged a line at a time, with the markdown emphasis a CLI
-wraps reasoning in stripped. A JSON answer is rendered as its fields once it is whole, rather than
-streamed as a line of braces. One planning call reads as about twenty lines rather than six hundred.
-
-The CLI's own step names are dropped from the terminal, since they are scaffolding around the lines
-worth reading; the log file and the editor's tab keep them. Lines the runner cannot parse are logged
-too — an auth banner is usually the answer when a run fails.
-
-**A log holds the child's project text.** The `start` line records the prompt size rather than the
-prompt, but the CLIs echo the turn back in their own events and every backend emits the reply.
-Treat `agent-log/` and any trace file as project data: keep them off shared machines, and delete
-them when the run is understood.
+**A log holds the child's project text.** The `user` line records what the child typed, but the
+session file and `read_project` results carry the rendered project. Treat `agent-log/`,
+`pi/sessions/` and any trace file as project data: keep them off shared machines, and delete them
+when the run is understood.
 
 ### Running it so the agent is visible
 
-Three terminals, with the tutor on an agent backend:
+Three terminals, with the tutor on a hosted subscription:
 
 ```sh
-# 1. the tutor, on the pi CLI, mirroring each run to this terminal
-HRAI_MODEL_BACKEND=pi HRAI_PI_MODEL=openai-codex/gpt-5.4 HRAI_AGENT_TIMEOUT_MS=300000 \
-HRAI_AGENT_TRACE=1 npm start --workspace=packages/hrai-server
+# 1. the tutor, mirroring each turn to this terminal
+HRAI_PI_MODEL=openai-codex/gpt-5.6-luna HRAI_AGENT_TRACE=1 npm start --workspace=packages/hrai-server
 
 # 2. the editor
 npm start --workspace=packages/scratch-gui
@@ -135,8 +137,9 @@ npm start --workspace=packages/scratch-gui
 tail -f .hrai-data/agent-log/$(date +%F).jsonl
 ```
 
-Open `http://localhost:8601/`, describe a game, and press the idea button. The planning call
-appears in terminal 1 as it streams, in the editor's Log tab, and in the day's JSONL file.
+Open `http://localhost:8601/`, sign in to a profile, open the assistant settings and log in to
+`openai-codex`, then ask the dragon something. The turn appears in terminal 1 as it streams, in the
+editor's Záznam tab, and in the day's JSONL file.
 
 ## Block labels and argument order
 
@@ -154,20 +157,20 @@ Three terminals:
 
 ```sh
 ollama serve                                    # 1. the model
+HRAI_OLLAMA_HOST=http://localhost:11434 HRAI_OLLAMA_MODELS=qwen3:14b \
 npm start --workspace=packages/hrai-server      # 2. the tutor server on :8791
 npm start --workspace=packages/scratch-gui      # 3. the editor on :8601
 ```
 
 Then open the editor at `http://localhost:8601/`. The panel is always on; if the server
-is down it opens and says so calmly — a child should never meet a stack trace.
+is down it opens and says so calmly — a child should never meet a stack trace. The tutor
+answers once the child has a profile; without one it asks them to sign in.
 
-To run the tutor through an agent CLI instead of ollama, replace terminal 1 with the
-backend variables. The `pi` CLI's `local` provider expects an ollama at `:11434`, so on a
-machine without one name a hosted model:
+On a machine without a local model, name a hosted one and log in to it from the editor's
+assistant settings:
 
 ```sh
-HRAI_MODEL_BACKEND=pi HRAI_PI_MODEL=openai-codex/gpt-5.4 HRAI_AGENT_TIMEOUT_MS=300000 \
-npm start --workspace=packages/hrai-server
+HRAI_PI_MODEL=openai-codex/gpt-5.6-luna npm start --workspace=packages/hrai-server
 ```
 
 Override the server location with `HRAI_SERVER_URL` at build time, and the port it
@@ -201,17 +204,12 @@ model) are stored with the profile and applied to future tutor connections. The
 current tutor remains Czech; language selection is intentionally not exposed until
 prompt localization is complete.
 
-`GET /api/models` lists the backends this server can reach and the models each offers, which is
-what fills the provider and model controls in assistant settings. Choosing a provider there
-overrides `HRAI_MODEL_BACKEND` for that profile; leaving it on *Server default* keeps the
-environment's choice. A profile naming a backend that has since become unavailable falls back to
-the default with a warning rather than failing the child's question.
-
-The model is remembered **per provider**, in a `modelByBackend` map on the profile, so switching
-from Cursor to pi and back keeps each one's choice. An absent entry means that backend's own
-default. Both the map's keys and its values are validated on the way in: a key must be a known
-backend id, and a value must be at most 100 characters of `[A-Za-z0-9._:/+-]` and may not start with
-`-`, because it becomes an argv token handed to a spawned CLI.
+`GET /api/models` lists the providers the profile's pi runtime knows, whether the profile has
+credentials for each, which login flows it offers, and its models. That is what fills the provider,
+model and thinking-level controls in assistant settings, and where the login and logout buttons
+live. The profile stores `model` — `default` or a `provider/model` reference, at most 100
+characters of `[A-Za-z0-9._:/+-]` — and `thinkingLevel`. Leaving the model on *Server default*
+keeps `HRAI_PI_MODEL`.
 
 ### Forgotten passwords
 
@@ -281,9 +279,9 @@ scope a playable core before optional features, produce teachable milestones, an
 away scripts:
 
 ```sh
-HRAI_MODEL_BACKEND=llama.cpp \
-HRAI_EVAL_HOST=http://localhost:8080 \
-HRAI_EVAL_MODEL=Qwen3.5-27B \
+HRAI_LLAMA_HOST=http://localhost:8080 \
+HRAI_LLAMA_MODELS=Qwen3.5-27B \
+HRAI_EVAL_MODEL=llama/Qwen3.5-27B \
 npm run eval:game-design --workspace=packages/hrai-server
 ```
 
