@@ -15,13 +15,14 @@ describe('hrai agent log', () => {
         const runs = addAgentLogEvents([], [
             event(),
             event({seq: 1, kind: 'phase', text: 'message_start'}),
-            event({seq: 2, kind: 'delta', text: 'Blue '}),
-            event({seq: 3, kind: 'delta', text: 'sky'}),
+            event({seq: 2, kind: 'thinking', text: '**Planning the core loop**'}),
+            event({seq: 3, kind: 'delta', text: 'Blue sky'}),
             event({seq: 4, kind: 'stderr', text: 'pi: warming up'}),
             event({seq: 5, kind: 'end', text: 'exit 0 after 2.9s, 8 chars'})
         ]);
 
         expect(runs).toHaveLength(1);
+        expect(runs[0].thoughts).toEqual([{text: '**Planning the core loop**', at: '2026-09-06T15:00:00.000Z'}]);
         expect(runs[0]).toMatchObject({
             command: 'pi',
             reply: 'Blue sky',
@@ -55,6 +56,16 @@ describe('hrai agent log', () => {
         expect(runs.map(run => run.runId)).toEqual(['run-1', 'run-2']);
         expect(runs[0].reply).toBe('from pi');
         expect(runs[1].reply).toBe('from codex');
+    });
+
+    test('keeps each reply line on its own line', () => {
+        const runs = addAgentLogEvents([], [
+            event(),
+            event({seq: 1, kind: 'delta', text: 'first line'}),
+            event({seq: 2, kind: 'delta', text: 'second line'})
+        ]);
+
+        expect(runs[0].reply).toBe('first line\nsecond line');
     });
 
     test('is still running until an end event arrives', () => {

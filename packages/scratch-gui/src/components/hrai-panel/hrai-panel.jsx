@@ -638,6 +638,18 @@ const AgentRunCard = ({run, runningLabel}) => {
                     ))}
                 </ul>
             ) : null}
+            {run.thoughts.length > 0 ? (
+                <ul className={styles.agentRunThoughts}>
+                    {run.thoughts.map((thought, index) => (
+                        <li
+                            key={`${thought.at}-${index}`}
+                            className={styles.agentRunThought}
+                        >
+                            {thought.text}
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
             {run.reply ? <p className={styles.agentRunReply}>{run.reply}</p> : null}
             {run.problems.map((problem, index) => (
                 <p
@@ -665,7 +677,11 @@ AgentRunCard.propTypes = {
         })).isRequired,
         reply: PropTypes.string.isRequired,
         startedAt: PropTypes.string,
-        summary: PropTypes.string
+        summary: PropTypes.string,
+        thoughts: PropTypes.arrayOf(PropTypes.shape({
+            at: PropTypes.string,
+            text: PropTypes.string.isRequired
+        })).isRequired
     }).isRequired,
     runningLabel: PropTypes.string.isRequired
 };
@@ -1667,7 +1683,8 @@ HraiPanel.propTypes = {
         reply: PropTypes.string.isRequired,
         runId: PropTypes.string.isRequired,
         startedAt: PropTypes.string,
-        summary: PropTypes.string
+        summary: PropTypes.string,
+        thoughts: PropTypes.array.isRequired
     })),
     gamePlan: gamePlanShape,
     gamePlaytest: PropTypes.shape({

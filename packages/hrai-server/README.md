@@ -64,8 +64,8 @@ A tutor call reaches an agent CLI as one child process. Nothing about it used to
 callback, so a new project was silent until it landed. Every run is now logged three ways.
 
 **The Log tab in the editor.** The panel's third tab shows each run as it happens: which CLI, what
-it was asked for, the phases its own event stream reports, the reply as it streams in, anything it
-wrote to stderr, and how it ended. A run still going says *Běží…*; a run that ended badly shows its
+it was asked for, the steps its own event stream reports, the model's reasoning, the reply as it
+streams in, anything it wrote to stderr, and how it ended. A run still going says *Běží…*; a run that ended badly shows its
 exit line in red. Newest run first, the last 20 kept. Open it while starting a new project and the
 planning call is visible from spawn to exit.
 
@@ -77,7 +77,7 @@ tail -f .hrai-data/agent-log/$(date +%F).jsonl | jq -r '"\(.kind)\t\(.text)"'
 ```
 
 Each line carries `runId`, `command`, `seq`, `at`, `kind`, `text`, and for a CLI event the raw line
-in `detail`. `kind` is `start`, `phase`, `delta`, `stderr` or `end`. Losing the file never fails a
+in `detail`. `kind` is `start`, `phase`, `thinking`, `delta`, `stderr` or `end`. Losing the file never fails a
 run: an unwritable path is reported once and the run carries on.
 
 **The terminal, on request.** `HRAI_AGENT_TRACE` mirrors the same events as readable lines:
@@ -89,15 +89,25 @@ HRAI_AGENT_TRACE=/tmp/hrai-agent.log npm start --workspace=packages/hrai-server 
 
 ```text
 [hrai agent pi 4f2c9ab1] = start model=openai-codex/gpt-5.4 cwd=/tmp/hrai-agent-x json=true prompt=2841 chars
-[hrai agent pi 4f2c9ab1] . message_start
-[hrai agent pi 4f2c9ab1] > Drak najde poklad
+[hrai agent pi 4f2c9ab1] . thinking_start
+[hrai agent pi 4f2c9ab1] ~ **Designing minimal playable maze loop**
+[hrai agent pi 4f2c9ab1] ~ **Planning wall collision scripting**
+[hrai agent pi 4f2c9ab1] . thinking_end
+[hrai agent pi 4f2c9ab1] > {"title":"Drak a poklad","coreLoop":"Drak projde bludištěm…
 [hrai agent pi 4f2c9ab1] ! pi: resolving provider
-[hrai agent pi 4f2c9ab1] = exit 0 after 12.4s, 1832 chars
+[hrai agent pi 4f2c9ab1] = exit 0 after 80.0s, 1275 chars
 ```
 
-`=` is a run boundary, `.` a phase, `>` a chunk of the reply, `!` stderr, and the eight-digit tag
-separates runs that overlap. Lines the runner cannot parse are logged too — an auth banner is
-usually the answer when a run fails.
+`=` is a run boundary, `.` a step the CLI reported, `~` the model's reasoning, `>` its reply, `!`
+stderr, and the eight-digit tag separates runs that overlap.
+
+Two things keep this readable. A CLI wraps every event in an envelope — `pi` sends all of them as
+`message_update` — so the log names the event *inside* it, and an event carrying text is logged as
+that text rather than named beside it. Reply and reasoning arrive in fragments, so they are gathered
+and logged a line at a time. One planning call reads as about fifty lines rather than six hundred.
+
+Lines the runner cannot parse are logged too — an auth banner is usually the answer when a run
+fails.
 
 **A log holds the child's project text.** The `start` line records the prompt size rather than the
 prompt, but the CLIs echo the turn back in their own events and every backend emits the reply.

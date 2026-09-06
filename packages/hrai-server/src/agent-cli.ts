@@ -32,6 +32,13 @@ interface AgentSpec {
      */
     probeArgs: string[];
     args(options: AgentOptions): string[];
+    /**
+     * The name of what the CLI just reported. CLIs wrap their real event in an envelope — pi sends
+     * every one of them as `message_update` — so the log names the event inside it.
+     */
+    phaseName(event: unknown): string | null;
+    /** The model's reasoning, which is worth reading but is not part of the reply. */
+    thinking(event: unknown): string | null;
     delta(event: unknown): string | null;
     final(event: unknown): string | null;
     error(event: unknown): string | null;
@@ -83,6 +90,18 @@ const agentSpecs: Record<AgentBackendId, AgentSpec> = {
             "--",
             promptWithJsonInstruction(user, json),
         ],
+        phaseName: (event) => {
+            const record = asRecord(event);
+            const messageEvent = asRecord(record?.assistantMessageEvent);
+            const name = messageEvent?.type ?? record?.type;
+            return typeof name === "string" ? name : null;
+        },
+        thinking: (event) => {
+            const messageEvent = asRecord(asRecord(event)?.assistantMessageEvent);
+            return messageEvent?.type === "thinking_delta" && typeof messageEvent.delta === "string"
+                ? messageEvent.delta
+                : null;
+        },
         delta: (event) => {
             const record = asRecord(event);
             const messageEvent = asRecord(record?.assistantMessageEvent);
@@ -116,6 +135,15 @@ const agentSpecs: Record<AgentBackendId, AgentSpec> = {
             ...(model === undefined ? [] : ["--model", model]),
             combinedPrompt(system, promptWithJsonInstruction(user, json)),
         ],
+        phaseName: (event) => {
+            const type = asRecord(event)?.type;
+            return typeof type === "string" ? type : null;
+        },
+        thinking: (event) => {
+            const record = asRecord(event);
+            const message = asRecord(record?.message);
+            return record?.type === "thinking" && message ? textContent(message.content) || null : null;
+        },
         delta: (event) => {
             const record = asRecord(event);
             const message = asRecord(record?.message);
@@ -153,6 +181,17 @@ const agentSpecs: Record<AgentBackendId, AgentSpec> = {
             ...(model === undefined ? [] : ["-m", model]),
             combinedPrompt(system, promptWithJsonInstruction(user, json)),
         ],
+        phaseName: (event) => {
+            const record = asRecord(event);
+            const item = asRecord(record?.item);
+            const type = record?.type;
+            if (typeof type !== "string") return null;
+            return typeof item?.type === "string" ? `${type} ${item.type}` : type;
+        },
+        thinking: (event) => {
+            const item = asRecord(asRecord(event)?.item);
+            return item?.type === "reasoning" && typeof item.text === "string" ? item.text : null;
+        },
         delta: () => null,
         final: (event) => {
             const record = asRecord(event);
@@ -226,6 +265,26 @@ export async function runAgent(
 
         const isSettled = (): boolean => settled;
 
+        // A CLI reports its reply and its reasoning in fragments. Logging each fragment gives a
+        // page of unreadable slivers, so text is gathered and logged a line at a time: on a
+        // newline, when the stream turns to something else, and once more when the run ends.
+        const pending: Record<"thinking" | "delta", string> = {thinking: "", delta: ""};
+
+        const logText = (kind: "thinking" | "delta", text: string): void => {
+            pending[kind] += text;
+            const lines = pending[kind].split("\n");
+            pending[kind] = lines.pop() ?? "";
+            for (const line of lines) {
+                if (line.trim()) run.event(kind, line.trim());
+            }
+        };
+
+        const flushText = (kind: "thinking" | "delta"): void => {
+            const rest = pending[kind].trim();
+            pending[kind] = "";
+            if (rest) run.event(kind, rest);
+        };
+
         const settleResolve = (): void => {
             if (settled) return;
             settled = true;
@@ -262,12 +321,18 @@ export async function runAgent(
                 return;
             }
 
-            const phase = asRecord(event)?.type;
-            if (typeof phase === "string") run.event("phase", phase, raw);
+            const thinking = spec.thinking(event);
+            if (thinking === null) flushText("thinking");
 
             const delta = spec.delta(event);
+            // An event that carries text is logged as that text. Naming it as well would put a
+            // line of scaffolding beside every line worth reading.
+            const phase = thinking === null && delta === null ? spec.phaseName(event) : null;
+            if (typeof phase === "string") run.event("phase", phase, raw);
+            if (thinking !== null) logText("thinking", thinking);
+            if (delta === null) flushText("delta");
             if (delta !== null) {
-                run.event("delta", delta);
+                logText("delta", delta);
                 accumulated += delta;
                 onDelta?.(delta);
             }
@@ -325,6 +390,8 @@ export async function runAgent(
             settleReject(new Error(`${spec.command} could not be started: ${error.message}`));
         });
         child.once("close", (code) => {
+            flushText("thinking");
+            flushText("delta");
             run.event("end", `exit ${code} after ${((performance.now() - started) / 1000).toFixed(1)}s, ` +
                 `${(finalText ?? accumulated).length} chars`);
             if (settled) return;

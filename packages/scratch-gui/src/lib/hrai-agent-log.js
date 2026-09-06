@@ -24,6 +24,7 @@ const emptyRun = event => ({
     startedAt: event.at,
     summary: '',
     phases: [],
+    thoughts: [],
     reply: '',
     problems: [],
     outcome: null
@@ -35,8 +36,11 @@ const applyEvent = (run, event) => {
         return {...run, summary: event.text, startedAt: event.at};
     case 'phase':
         return {...run, phases: appendPhase(run.phases, event.text, event.at)};
+    case 'thinking':
+        return {...run, thoughts: [...run.thoughts, {text: event.text, at: event.at}]};
     case 'delta':
-        return {...run, reply: run.reply + event.text};
+        // The server sends whole lines, so a reply reads as the model wrote it.
+        return {...run, reply: run.reply ? `${run.reply}\n${event.text}` : event.text};
     case 'stderr':
         return {...run, problems: [...run.problems, {text: event.text, at: event.at}]};
     case 'end':

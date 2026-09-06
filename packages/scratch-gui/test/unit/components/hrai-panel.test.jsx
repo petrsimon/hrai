@@ -356,7 +356,8 @@ describe('HraiPanel custom game planning', () => {
             reply: 'Drak najde poklad.',
             runId: 'run-1',
             startedAt: '2026-09-06T15:00:00.000Z',
-            summary: 'start model=gpt-5.4 prompt=42 chars'
+            summary: 'start model=gpt-5.4 prompt=42 chars',
+            thoughts: [{text: '**Designing the maze loop**', at: '2026-09-06T15:00:00.500Z'}]
         };
         const {unmount} = renderWithIntl(
             <HraiPanel
@@ -373,6 +374,7 @@ describe('HraiPanel custom game planning', () => {
         expect(screen.getByText('start model=gpt-5.4 prompt=42 chars')).toBeTruthy();
         expect(screen.getByText('message_update')).toBeTruthy();
         expect(screen.getByText('×12')).toBeTruthy();
+        expect(screen.getByText('**Designing the maze loop**')).toBeTruthy();
         expect(screen.getByText('Drak najde poklad.')).toBeTruthy();
         expect(screen.getByText('pi: provider slow')).toBeTruthy();
         expect(screen.getByText('Běží…')).toBeTruthy();
@@ -401,7 +403,8 @@ describe('HraiPanel custom game planning', () => {
             reply: `reply from ${command}`,
             runId,
             startedAt: '2026-09-06T15:00:00.000Z',
-            summary: 'start'
+            summary: 'start',
+            thoughts: []
         });
         const {unmount} = renderWithIntl(
             <HraiPanel

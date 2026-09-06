@@ -351,6 +351,42 @@ describe("agent CLI runner", () => {
         expect(execFileMock).toHaveBeenCalledWith("cursor-agent", ["status"], {timeout: 5000}, expect.any(Function));
     });
 
+    it("logs the event inside pi's envelope, its reasoning, and whole lines of reply", async () => {
+        const tracePath = join(mkdtempSync(join(tmpdir(), "hrai-trace-")), "agent.log");
+        process.env.HRAI_AGENT_TRACE = tracePath;
+        const child = createChild();
+        spawnMock.mockReturnValue(child);
+        const {runAgent} = await loadAgentCli();
+        const update = (assistantMessageEvent: unknown) =>
+            JSON.stringify({type: "message_update", usage: {}, assistantMessageEvent});
+        const replyPromise = runAgent("pi", {system: "system", user: "user"});
+
+        await completeChild(child, [
+            update({type: "thinking_start", contentIndex: 0}),
+            update({type: "thinking_delta", contentIndex: 0, delta: "**Planning the core loop**"}),
+            update({type: "text_delta", contentIndex: 0, delta: "Drak "}),
+            update({type: "text_delta", contentIndex: 0, delta: "najde poklad.\nDruhy radek."}),
+            JSON.stringify({
+                type: "message_end",
+                message: {role: "assistant", content: [{type: "text", text: "Drak najde poklad.\nDruhy radek."}]},
+            }),
+        ]);
+        await replyPromise;
+
+        const lines = readFileSync(tracePath, "utf8").trim().split("\n").map((line) => line.slice(line.indexOf("] ") + 2));
+        // The envelope name never appears: every phase is the event pi reported inside it.
+        expect(lines).not.toContain(". message_update");
+        expect(lines).toContain(". thinking_start");
+        // An event that carried text is logged as that text, not named beside it.
+        expect(lines).not.toContain(". text_delta");
+        expect(lines).not.toContain(". thinking_delta");
+        expect(lines).toContain("~ **Planning the core loop**");
+        // Reply fragments are gathered into the lines a person reads, not logged one by one.
+        expect(lines).toContain("> Drak najde poklad.");
+        expect(lines).toContain("> Druhy radek.");
+        expect(lines).not.toContain("> Drak ");
+    });
+
     it("traces a run to a file, sizing the prompt rather than quoting it", async () => {
         const tracePath = join(mkdtempSync(join(tmpdir(), "hrai-trace-")), "agent.log");
         process.env.HRAI_AGENT_TRACE = tracePath;

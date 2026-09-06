@@ -14,7 +14,7 @@ export interface AgentLogEvent {
     command: string;
     seq: number;
     at: string;
-    kind: "start" | "phase" | "delta" | "stderr" | "end";
+    kind: "start" | "phase" | "thinking" | "delta" | "stderr" | "end";
     text: string;
     /** The CLI's raw line, kept for the log file and the tab's expandable row. */
     detail?: string;
@@ -28,7 +28,7 @@ export interface AgentRunHandle {
 const maxRecentEvents = 400;
 const listeners = new Set<(event: AgentLogEvent) => void>();
 const recent: AgentLogEvent[] = [];
-const marks = {start: "=", phase: ".", delta: ">", stderr: "!", end: "="} as const;
+const marks = {start: "=", phase: ".", thinking: "~", delta: ">", stderr: "!", end: "="} as const;
 
 let fileWritable = true;
 
