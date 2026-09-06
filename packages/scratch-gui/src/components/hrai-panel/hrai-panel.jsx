@@ -79,6 +79,16 @@ const messages = defineMessages({
         defaultMessage: 'Běží…',
         description: 'status of an agent run that has not finished'
     },
+    thinkingLabel: {
+        id: 'gui.hrai.thinkingLabel',
+        defaultMessage: 'Thinking',
+        description: 'collapsible heading for the agent thinking text in the log tab'
+    },
+    abortButton: {
+        id: 'gui.hrai.abortButton',
+        defaultMessage: 'Stop',
+        description: 'button to abort the running agent turn'
+    },
     newGameIdea: {
         id: 'gui.hrai.newGameIdea',
         defaultMessage: 'Nový nápad',
@@ -599,91 +609,153 @@ const gamePlanShape = PropTypes.shape({
     title: PropTypes.string.isRequired
 });
 
+const formatToolArgs = args => {
+    try {
+        return JSON.stringify(args, null, 2);
+    } catch {
+        return String(args);
+    }
+};
+
+const tellChildText = args => (
+    args && typeof args === 'object' && typeof args.text === 'string' ? args.text : null
+);
+
+const ThinkingDetails = ({text}) => {
+    if (!text) return null;
+    return (
+        <details className={styles.agentThinking}>
+            <summary>
+                <FormattedMessage {...messages.thinkingLabel} />
+            </summary>
+            <pre className={styles.agentThinkingText}>{text}</pre>
+        </details>
+    );
+};
+
+ThinkingDetails.propTypes = {
+    text: PropTypes.string
+};
+
+const ToolCallCard = ({tool}) => {
+    const spoken = tool.name === 'tell_child' ? tellChildText(tool.args) : null;
+    return (
+        <section className={styles.agentTool}>
+            {spoken ? <p className={styles.agentTellChild}>{spoken}</p> : null}
+            <details>
+                <summary className={styles.agentToolName}>{tool.name}</summary>
+                <pre className={styles.agentToolArgs}>{formatToolArgs(tool.args)}</pre>
+                {typeof tool.result === 'string' ? (
+                    <p className={tool.isError ? styles.agentRunProblem : styles.agentToolResult}>
+                        {tool.result}
+                    </p>
+                ) : null}
+            </details>
+        </section>
+    );
+};
+
+ToolCallCard.propTypes = {
+    tool: PropTypes.shape({
+        args: PropTypes.oneOfType([
+            PropTypes.object,
+            PropTypes.array,
+            PropTypes.string,
+            PropTypes.number,
+            PropTypes.bool
+        ]),
+        callId: PropTypes.string.isRequired,
+        isError: PropTypes.bool,
+        name: PropTypes.string.isRequired,
+        result: PropTypes.string
+    }).isRequired
+};
+
+const TurnCard = ({turn}) => {
+    const failed = Boolean(turn.errorMessage);
+    const footer = [turn.model, turn.stopReason].filter(Boolean).join(' · ');
+    return (
+        <section className={styles.agentTurn}>
+            {turn.user ? <header className={styles.agentTurnUser}>{turn.user}</header> : null}
+            {turn.assistant ? <p className={styles.agentRunReply}>{turn.assistant}</p> : null}
+            <ThinkingDetails text={turn.thinking} />
+            {turn.tools.map(tool => (
+                <ToolCallCard
+                    key={tool.callId}
+                    tool={tool}
+                />
+            ))}
+            {footer || failed ? (
+                <p
+                    className={failed ? styles.agentTurnError : styles.agentTurnFooter}
+                    role={failed ? 'alert' : 'status'}
+                >
+                    {failed ? turn.errorMessage : footer}
+                    {failed && footer ? ` · ${footer}` : null}
+                </p>
+            ) : null}
+        </section>
+    );
+};
+
+TurnCard.propTypes = {
+    turn: PropTypes.shape({
+        assistant: PropTypes.string.isRequired,
+        errorMessage: PropTypes.string,
+        model: PropTypes.string,
+        stopReason: PropTypes.string,
+        thinking: PropTypes.string.isRequired,
+        tools: PropTypes.arrayOf(PropTypes.shape({
+            callId: PropTypes.string.isRequired,
+            name: PropTypes.string.isRequired
+        })).isRequired,
+        user: PropTypes.string
+    }).isRequired
+};
+
 const AgentRunCard = ({run, runningLabel}) => {
-    const startedAt = run.startedAt ? new Date(run.startedAt) : null;
     const finished = Boolean(run.outcome);
-    // Only a run that finished its work closes with "done"; anything else went wrong.
-    const failed = finished && !run.outcome.text.startsWith('done');
+    const failed = Boolean(run.outcome?.error);
 
     return (
         <section className={styles.agentRun}>
             <header className={styles.agentRunHeader}>
-                <span className={styles.agentRunCommand}>{run.command}</span>
-                {startedAt ? (
-                    <time
-                        className={styles.agentRunTime}
-                        dateTime={run.startedAt}
-                    >
-                        {startedAt.toLocaleTimeString()}
-                    </time>
-                ) : null}
+                <span className={styles.agentRunCommand}>
+                    {[run.purpose, run.model].filter(Boolean).join(' · ')}
+                </span>
                 <span
                     className={failed ? styles.agentRunFailed : styles.agentRunStatus}
                     role={failed ? 'alert' : 'status'}
                 >
-                    {finished ? run.outcome.text : runningLabel}
+                    {finished ? (run.outcome.error || run.outcome.text) : runningLabel}
                 </span>
             </header>
-            {run.summary ? <p className={styles.agentRunSummary}>{run.summary}</p> : null}
-            {run.phases.length > 0 ? (
-                <ul className={styles.agentRunPhases}>
-                    {run.phases.map((phase, index) => (
-                        <li
-                            key={`${phase.name}-${index}`}
-                            className={styles.agentRunPhase}
-                        >
-                            {phase.name}
-                            {phase.count > 1 ? <span className={styles.agentRunCount}>{`×${phase.count}`}</span> : null}
-                        </li>
-                    ))}
-                </ul>
-            ) : null}
-            {run.thoughts.length > 0 ? (
-                <ul className={styles.agentRunThoughts}>
-                    {run.thoughts.map((thought, index) => (
-                        <li
-                            key={`${thought.at}-${index}`}
-                            className={styles.agentRunThought}
-                        >
-                            {thought.text}
-                        </li>
-                    ))}
-                </ul>
-            ) : null}
             {run.reply ? <p className={styles.agentRunReply}>{run.reply}</p> : null}
-            {run.problems.map((problem, index) => (
-                <p
-                    key={`${problem.at}-${index}`}
-                    className={styles.agentRunProblem}
-                >
-                    {problem.text}
-                </p>
-            ))}
+            <ThinkingDetails text={run.thinking} />
         </section>
     );
 };
 
 AgentRunCard.propTypes = {
     run: PropTypes.shape({
-        command: PropTypes.string.isRequired,
-        outcome: PropTypes.shape({text: PropTypes.string.isRequired}),
-        phases: PropTypes.arrayOf(PropTypes.shape({
-            count: PropTypes.number.isRequired,
-            name: PropTypes.string.isRequired
-        })).isRequired,
-        problems: PropTypes.arrayOf(PropTypes.shape({
-            at: PropTypes.string,
+        model: PropTypes.string,
+        outcome: PropTypes.shape({
+            error: PropTypes.string,
             text: PropTypes.string.isRequired
-        })).isRequired,
+        }),
+        purpose: PropTypes.string,
         reply: PropTypes.string.isRequired,
-        startedAt: PropTypes.string,
-        summary: PropTypes.string,
-        thoughts: PropTypes.arrayOf(PropTypes.shape({
-            at: PropTypes.string,
-            text: PropTypes.string.isRequired
-        })).isRequired
+        thinking: PropTypes.string.isRequired
     }).isRequired,
     runningLabel: PropTypes.string.isRequired
+};
+
+const NoteEntry = ({text}) => (
+    <p className={styles.agentNote}>{text}</p>
+);
+
+NoteEntry.propTypes = {
+    text: PropTypes.string.isRequired
 };
 
 const GameStartCard = ({hasProjectContent, isBusy, idea, onNewProject, onPlan}) => {
@@ -924,14 +996,15 @@ GameProgressCard.propTypes = {
 };
 
 const HraiPanel = ({
-    agentRuns,
     gamePlan,
     gamePlaytest,
     gameProgress,
     hasProjectContent,
+    isAgentRunning,
     isPlanning,
     isStartingNewProject,
     messages: chatMessages,
+    onAbort,
     onGamePlanAccept,
     onGamePlanEdit,
     onGamePlanRequest,
@@ -948,6 +1021,7 @@ const HraiPanel = ({
     rung,
     onAliasClick,
     onVoiceSubmit,
+    transcript,
     voiceCapabilities,
     voiceErrorCode,
     voiceTranscript
@@ -965,6 +1039,8 @@ const HraiPanel = ({
     const [voiceLocalError, setVoiceLocalError] = useState(null);
     const resizeState = useRef(null);
     const messagesEndRef = useRef(null);
+    const logPanelRef = useRef(null);
+    const stickToLogBottom = useRef(true);
     const draftInputRef = useRef(null);
     const voiceCursorRef = useRef(null);
     const recorderRef = useRef(null);
@@ -1328,6 +1404,19 @@ const HraiPanel = ({
         messagesEndRef.current?.scrollIntoView({behavior: 'smooth'});
     }, [chatMessages, isThinking]);
 
+    const handleLogScroll = useCallback(() => {
+        const panel = logPanelRef.current;
+        if (!panel) return;
+        const gap = panel.scrollHeight - panel.scrollTop - panel.clientHeight;
+        stickToLogBottom.current = gap < 32;
+    }, []);
+
+    useLayoutEffect(() => {
+        if (!isAgentRunning || !stickToLogBottom.current) return;
+        const panel = logPanelRef.current;
+        if (panel) panel.scrollTop = panel.scrollHeight;
+    }, [isAgentRunning, transcript]);
+
     const canSend = draft.trim().length > 0;
     const hintMaxReached = rung >= MAX_HINT_RUNG;
     const lessonStageIndex = lessonProgress?.stageIndex ?? 0;
@@ -1623,19 +1712,58 @@ const HraiPanel = ({
                     className={`${styles.tabPanel} ${styles.logPanel}`}
                     role="tabpanel"
                     aria-labelledby="hrai-log-tab"
+                    ref={logPanelRef}
+                    onScroll={handleLogScroll}
                 >
-                    {agentRuns.length === 0 ? (
+                    {transcript.length === 0 ? (
                         <p className={styles.planEmpty}>
                             <FormattedMessage {...messages.logEmpty} />
                         </p>
                     ) : (
-                        [...agentRuns].reverse().map(run => (
-                            <AgentRunCard
-                                key={run.runId}
-                                run={run}
-                                runningLabel={intl.formatMessage(messages.logRunning)}
-                            />
-                        ))
+                        <>
+                            {isAgentRunning ? (
+                                <div className={styles.logToolbar}>
+                                    <span
+                                        className={styles.logRunning}
+                                        role="status"
+                                    >
+                                        <FormattedMessage {...messages.logRunning} />
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        className={styles.logAbort}
+                                        onClick={onAbort}
+                                    >
+                                        <FormattedMessage {...messages.abortButton} />
+                                    </Button>
+                                </div>
+                            ) : null}
+                            {transcript.map((entry, index) => {
+                                if (entry.kind === 'turn') {
+                                    return (
+                                        <TurnCard
+                                            key={entry.turnId}
+                                            turn={entry}
+                                        />
+                                    );
+                                }
+                                if (entry.kind === 'run') {
+                                    return (
+                                        <AgentRunCard
+                                            key={entry.runId}
+                                            run={entry}
+                                            runningLabel={intl.formatMessage(messages.logRunning)}
+                                        />
+                                    );
+                                }
+                                return (
+                                    <NoteEntry
+                                        key={`note-${index}`}
+                                        text={entry.text}
+                                    />
+                                );
+                            })}
+                        </>
                     )}
                 </div>
             ) : (
@@ -1675,17 +1803,6 @@ const HraiPanel = ({
 };
 
 HraiPanel.propTypes = {
-    agentRuns: PropTypes.arrayOf(PropTypes.shape({
-        command: PropTypes.string.isRequired,
-        outcome: PropTypes.shape({at: PropTypes.string, text: PropTypes.string}),
-        phases: PropTypes.array.isRequired,
-        problems: PropTypes.array.isRequired,
-        reply: PropTypes.string.isRequired,
-        runId: PropTypes.string.isRequired,
-        startedAt: PropTypes.string,
-        summary: PropTypes.string,
-        thoughts: PropTypes.array.isRequired
-    })),
     gamePlan: gamePlanShape,
     gamePlaytest: PropTypes.shape({
         plan: gamePlanShape.isRequired
@@ -1697,6 +1814,7 @@ HraiPanel.propTypes = {
         plan: gamePlanShape.isRequired
     }),
     hasProjectContent: PropTypes.bool,
+    isAgentRunning: PropTypes.bool,
     isPlanning: PropTypes.bool,
     isStartingNewProject: PropTypes.bool,
     isThinking: PropTypes.bool,
@@ -1731,11 +1849,15 @@ HraiPanel.propTypes = {
     onGameIdea: PropTypes.func,
     onStartNewProject: PropTypes.func,
     onHint: PropTypes.func.isRequired,
+    onAbort: PropTypes.func,
     onNextGameMilestone: PropTypes.func,
     onNextStage: PropTypes.func.isRequired,
     onSend: PropTypes.func.isRequired,
     onVoiceSubmit: PropTypes.func,
     rung: PropTypes.number,
+    transcript: PropTypes.arrayOf(PropTypes.shape({
+        kind: PropTypes.oneOf(['turn', 'run', 'note']).isRequired
+    })),
     voiceCapabilities: PropTypes.shape({
         available: PropTypes.bool,
         languages: PropTypes.arrayOf(PropTypes.string)
@@ -1752,14 +1874,15 @@ HraiPanel.propTypes = {
 };
 
 HraiPanel.defaultProps = {
-    agentRuns: [],
     gamePlan: null,
     gamePlaytest: null,
     gameProgress: null,
     hasProjectContent: false,
+    isAgentRunning: false,
     isPlanning: false,
     isStartingNewProject: false,
     isThinking: false,
+    onAbort: () => {},
     onAliasClick: null,
     lesson: null,
     lessonProgress: null,
@@ -1772,6 +1895,7 @@ HraiPanel.defaultProps = {
     onNextGameMilestone: () => {},
     onVoiceSubmit: () => {},
     rung: 0,
+    transcript: [],
     voiceCapabilities: {available: false, languages: []},
     voiceErrorCode: null,
     voiceTranscript: null

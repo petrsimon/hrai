@@ -348,63 +348,89 @@ describe('HraiPanel custom game planning', () => {
     });
 
     test('shows what the agent is doing in the log tab', () => {
-        const run = {
-            command: 'pi',
-            outcome: null,
-            phases: [{name: 'message_update', count: 12, at: '2026-09-06T15:00:00.000Z'}],
-            problems: [{text: 'pi: provider slow', at: '2026-09-06T15:00:01.000Z'}],
-            reply: 'Drak najde poklad.',
-            runId: 'run-1',
-            startedAt: '2026-09-06T15:00:00.000Z',
-            summary: 'start model=gpt-5.4 prompt=42 chars',
-            thoughts: [{text: '**Designing the maze loop**', at: '2026-09-06T15:00:00.500Z'}]
+        const turn = {
+            kind: 'turn',
+            turnId: 't1',
+            user: 'Přidej draka',
+            assistant: 'Volám nástroj.',
+            thinking: 'Plánuji pohyb.',
+            tools: [{
+                callId: 'c1',
+                name: 'tell_child',
+                args: {text: 'Zkus zelenou vlajku.'},
+                result: 'shown',
+                isError: false
+            }],
+            stopReason: 'stop',
+            model: 'openai-codex/gpt-5.4',
+            running: false
         };
+        const run = {
+            kind: 'run',
+            runId: 'r1',
+            purpose: 'plan',
+            model: 'openai-codex/gpt-5.4',
+            reply: 'Dračí bludiště',
+            thinking: 'osnova',
+            running: true
+        };
+        const onAbort = jest.fn();
         const {unmount} = renderWithIntl(
             <HraiPanel
-                agentRuns={[run]}
+                isAgentRunning
                 messages={[]}
+                onAbort={onAbort}
                 onHint={jest.fn()}
                 onNextStage={jest.fn()}
                 onSend={jest.fn()}
+                transcript={[turn, run, {kind: 'note', text: 'session compacted'}]}
             />
         );
 
         fireEvent.click(screen.getByRole('tab', {name: 'Záznam'}));
-        expect(screen.getByText('pi')).toBeTruthy();
-        expect(screen.getByText('start model=gpt-5.4 prompt=42 chars')).toBeTruthy();
-        expect(screen.getByText('message_update')).toBeTruthy();
-        expect(screen.getByText('×12')).toBeTruthy();
-        expect(screen.getByText('**Designing the maze loop**')).toBeTruthy();
-        expect(screen.getByText('Drak najde poklad.')).toBeTruthy();
-        expect(screen.getByText('pi: provider slow')).toBeTruthy();
-        expect(screen.getByText('Běží…')).toBeTruthy();
+        expect(screen.getByText('Přidej draka')).toBeTruthy();
+        expect(screen.getByText('Volám nástroj.')).toBeTruthy();
+        expect(screen.getByText('Zkus zelenou vlajku.')).toBeTruthy();
+        expect(screen.getByText('plan · openai-codex/gpt-5.4')).toBeTruthy();
+        expect(screen.getByText('Dračí bludiště')).toBeTruthy();
+        expect(screen.getByText('session compacted')).toBeTruthy();
+        expect(screen.getAllByText('Běží…').length).toBeGreaterThan(0);
+        expect(screen.getByRole('button', {name: 'Stop'})).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', {name: 'Stop'}));
+        expect(onAbort).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getAllByText('Thinking')[0]);
+        expect(screen.getByText('Plánuji pohyb.')).toBeTruthy();
         unmount();
 
         renderWithIntl(
             <HraiPanel
-                agentRuns={[{...run, outcome: {text: 'failed in 1.5s: exited 0 without a reply', at: '2026-09-06T15:00:09.000Z'}}]}
                 messages={[]}
                 onHint={jest.fn()}
                 onNextStage={jest.fn()}
                 onSend={jest.fn()}
+                transcript={[{
+                    ...run,
+                    running: false,
+                    outcome: {text: 'failed in 1.5s', error: 'exited without a reply'}
+                }]}
             />
         );
         fireEvent.click(screen.getByRole('tab', {name: 'Záznam'}));
-        expect(screen.getByRole('alert').textContent).toBe('failed in 1.5s: exited 0 without a reply');
+        expect(screen.getByRole('alert').textContent).toBe('exited without a reply');
         expect(screen.queryByText('Běží…')).toBeNull();
+        expect(screen.queryByRole('button', {name: 'Stop'})).toBeNull();
     });
 
-    test('shows the newest run first and says when there is nothing yet', () => {
-        const run = (runId, command) => ({
-            command,
+    test('shows the oldest entry first and says when there is nothing yet', () => {
+        const run = (runId, purpose) => ({
+            kind: 'run',
+            model: 'openai-codex/gpt-5.4',
             outcome: {text: 'done in 1.0s, 4 chars'},
-            phases: [],
-            problems: [],
-            reply: `reply from ${command}`,
+            purpose,
+            reply: `reply from ${purpose}`,
             runId,
-            startedAt: '2026-09-06T15:00:00.000Z',
-            summary: 'start',
-            thoughts: []
+            running: false,
+            thinking: ''
         });
         const {unmount} = renderWithIntl(
             <HraiPanel
@@ -420,18 +446,17 @@ describe('HraiPanel custom game planning', () => {
 
         renderWithIntl(
             <HraiPanel
-                agentRuns={[run('run-1', 'pi'), run('run-2', 'codex')]}
                 messages={[]}
                 onHint={jest.fn()}
                 onNextStage={jest.fn()}
                 onSend={jest.fn()}
+                transcript={[run('run-1', 'plan'), run('run-2', 'title')]}
             />
         );
         fireEvent.click(screen.getByRole('tab', {name: 'Záznam'}));
-        // A finished run is not a failed one, so nothing about it is raised as an alert.
         expect(screen.queryByRole('alert')).toBeNull();
         const replies = screen.getAllByText(/^reply from/);
-        expect(replies.map(node => node.textContent)).toEqual(['reply from codex', 'reply from pi']);
+        expect(replies.map(node => node.textContent)).toEqual(['reply from plan', 'reply from title']);
     });
 
     test('keeps a new idea out of an authored lesson', () => {
