@@ -570,6 +570,32 @@
     gap: 0.25rem;
 }
 
+.new-game-button {
+    width: 2rem;
+    height: 2rem;
+    min-height: 2rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    background-color: transparent;
+    color: var(--hrai-text-muted);
+    font-size: 1rem;
+}
+
+.new-game-button > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.new-game-button:hover:not(:disabled),
+.new-game-button[aria-pressed="true"] {
+    background-color: var(--hrai-surface-sunken);
+    color: var(--hrai-brand);
+}
+
 .voice-button,
 .send-button {
     width: 2rem;

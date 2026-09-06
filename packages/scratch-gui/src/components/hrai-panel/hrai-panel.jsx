@@ -64,6 +64,11 @@ const messages = defineMessages({
         defaultMessage: 'Poradit',
         description: 'button to ask hrai for a more direct hint'
     },
+    newGameIdea: {
+        id: 'gui.hrai.newGameIdea',
+        defaultMessage: 'Nový nápad',
+        description: 'button to toggle entering a new game idea instead of a chat message'
+    },
     hintMaxReached: {
         id: 'gui.hrai.hintMaxReached',
         defaultMessage: 'To je ta nejpřímější rada, jakou ti můžu dát.',
@@ -850,6 +855,7 @@ const HraiPanel = ({
     const [draft, setDraft] = useState('');
     const [gameIdea, setGameIdea] = useState(null);
     const [gameStartPending, setGameStartPending] = useState(false);
+    const [isEnteringGameIdea, setIsEnteringGameIdea] = useState(false);
     const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT_WIDTH);
     const [voicePhase, setVoicePhase] = useState('idle');
     const [voiceRequestId, setVoiceRequestId] = useState(null);
@@ -868,6 +874,10 @@ const HraiPanel = ({
     const hadGameGuideRef = useRef(hasGameGuide);
 
     useEffect(() => {
+        if (isEnteringGameIdea) draftInputRef.current?.focus();
+    }, [isEnteringGameIdea]);
+
+    useEffect(() => {
         if (hasGameGuide && !hadGameGuideRef.current) {
             setActiveTab('plan');
         } else if (!hasGameGuide && hadGameGuideRef.current) {
@@ -884,6 +894,7 @@ const HraiPanel = ({
 
     useEffect(() => {
         if (lesson) {
+            setIsEnteringGameIdea(false);
             setGameIdea(null);
             setGameStartPending(false);
         }
@@ -1081,19 +1092,27 @@ const HraiPanel = ({
             return;
         }
 
-        const isGameStart = !lesson && !gamePlan && !gamePlaytest && !gameProgress && chatMessages.length === 0;
+        const isGameStart = isEnteringGameIdea ||
+            (!lesson && !gamePlan && !gamePlaytest && !gameProgress && chatMessages.length === 0);
         if (isGameStart && onGameIdea) {
             onGameIdea(trimmed);
         } else {
             onSend(trimmed);
         }
         if (isGameStart) {
+            setIsEnteringGameIdea(false);
             setGameIdea(trimmed);
             setGameStartPending(true);
         }
         setDraft('');
         resetVoice();
-    }, [chatMessages.length, draft, gamePlan, gameProgress, isThinking, lesson, onSend, resetVoice]);
+    }, [chatMessages.length, draft, gamePlan, gamePlaytest, gameProgress, isEnteringGameIdea,
+        isThinking, lesson, onGameIdea, onSend, resetVoice]);
+
+    const handleNewGameIdea = useCallback(() => {
+        setIsEnteringGameIdea(entering => !entering);
+        setGameStartPending(false);
+    }, []);
 
     const handleInputChange = useCallback(event => {
         setDraft(event.target.value);
@@ -1205,7 +1224,8 @@ const HraiPanel = ({
     const lessonStageComplete = Boolean(lessonProgress?.complete);
     const hasNextStage = Boolean(lesson && lessonStageIndex < lesson.stages.length - 1);
     const hintDisabled = isThinking || hintMaxReached || Boolean(gamePlaytest);
-    const sendDisabled = !canSend || Boolean(gamePlaytest) || isThinking;
+    const composerLocked = Boolean(gamePlaytest) && !isEnteringGameIdea;
+    const sendDisabled = !canSend || composerLocked || isThinking;
     const hintExplanation = hintMaxReached ?
         intl.formatMessage(messages.hintMaxReached) :
         null;
@@ -1222,7 +1242,7 @@ const HraiPanel = ({
         stt_failed: messages.voiceFailed,
         empty_transcript: messages.voiceFailed
     }[voiceLocalError || voiceErrorCode?.code];
-    const voiceButtonDisabled = Boolean(gamePlaytest) || !voiceCapabilities.available || isThinking ||
+    const voiceButtonDisabled = composerLocked || !voiceCapabilities.available || isThinking ||
         voicePhase === 'transcribing';
 
     return (
@@ -1372,13 +1392,24 @@ const HraiPanel = ({
                         className={styles.inputArea}
                         onSubmit={handleSubmit}
                     >
+                        {isEnteringGameIdea ? (
+                            <p
+                                id="hrai-game-idea-prompt"
+                                className={styles.gameHelp}
+                                role="status"
+                            >
+                                <FormattedMessage {...messages.gameStartPrompt} />
+                            </p>
+                        ) : null}
                         <textarea
                             ref={draftInputRef}
                             className={styles.messageInput}
                             aria-label={intl.formatMessage(messages.inputLabel)}
-                            maxLength={!lesson && chatMessages.length === 0 ? MAX_GAME_IDEA_LENGTH : null}
+                            aria-describedby={isEnteringGameIdea ? 'hrai-game-idea-prompt' : null}
+                            maxLength={isEnteringGameIdea || (!lesson && chatMessages.length === 0) ?
+                                MAX_GAME_IDEA_LENGTH : null}
                             rows="3"
-                            disabled={Boolean(gamePlaytest)}
+                            disabled={composerLocked}
                             value={draft}
                             onChange={handleInputChange}
                             onKeyDown={handleInputKeyDown}
@@ -1412,6 +1443,18 @@ const HraiPanel = ({
                                     onClick={handleHintClick}
                                 >
                                     <span aria-hidden="true">🙏</span>
+                                </Button>
+                                <Button
+                                    type="button"
+                                    className={styles.newGameButton}
+                                    aria-label={intl.formatMessage(messages.newGameIdea)}
+                                    title={intl.formatMessage(messages.newGameIdea)}
+                                    aria-pressed={isEnteringGameIdea}
+                                    disabled={isThinking || isPlanning || isStartingNewProject ||
+                                        voicePhase === 'recording' || voicePhase === 'transcribing'}
+                                    onClick={handleNewGameIdea}
+                                >
+                                    <span aria-hidden="true">💡</span>
                                 </Button>
                             </div>
                             <Button

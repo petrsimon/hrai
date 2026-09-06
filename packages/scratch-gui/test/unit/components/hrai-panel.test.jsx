@@ -284,6 +284,88 @@ describe('HraiPanel custom game planning', () => {
         window.HTMLElement.prototype.scrollIntoView = jest.fn();
     });
 
+    test.each([null, GAME_PLAN])('starts a new idea mid-conversation with plan %p', gamePlan => {
+        const onGameIdea = jest.fn();
+        const onSend = jest.fn();
+        const onGamePlanRequest = jest.fn();
+        const onStartNewProject = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                gamePlan={gamePlan}
+                hasProjectContent
+                messages={[{id: 'old', role: 'learner', text: 'Moje původní hra.'}]}
+                onGameIdea={onGameIdea}
+                onGamePlanRequest={onGamePlanRequest}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={onSend}
+                onStartNewProject={onStartNewProject}
+            />
+        );
+        fireEvent.click(screen.getByRole('tab', {name: 'Hrai'}));
+        const input = screen.getByLabelText('Zpráva pro HRAI');
+        fireEvent.change(input, {target: {value: 'Nová závodní hra.'}});
+        const button = screen.getByRole('button', {name: 'Nový nápad'});
+        fireEvent.click(button);
+        expect(button.getAttribute('aria-pressed')).toBe('true');
+        expect(input.value).toBe('Nová závodní hra.');
+        expect(document.activeElement).toBe(input);
+        expect(onGamePlanRequest).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+        expect(onGameIdea).toHaveBeenCalledWith('Nová závodní hra.');
+        expect(onSend).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', {name: 'Začít nový projekt'}));
+        expect(onStartNewProject).toHaveBeenCalledWith('Nová závodní hra.');
+        fireEvent.click(screen.getByRole('button', {name: 'Pokračovat v tomto projektu'}));
+        expect(onGamePlanRequest).toHaveBeenCalledWith('Nová závodní hra.');
+    });
+
+    test('cancels idea entry without losing the ordinary chat draft', () => {
+        const onSend = jest.fn();
+        const onGameIdea = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                messages={[{id: 'old', role: 'learner', text: 'Moje hra.'}]}
+                onGameIdea={onGameIdea}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={onSend}
+            />
+        );
+        const button = screen.getByRole('button', {name: 'Nový nápad'});
+        fireEvent.click(button);
+        fireEvent.change(screen.getByLabelText('Zpráva pro HRAI'), {target: {value: 'Jak dál?'}});
+        fireEvent.click(button);
+        expect(button.getAttribute('aria-pressed')).toBe('false');
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+        expect(onSend).toHaveBeenCalledWith('Jak dál?');
+        expect(onGameIdea).not.toHaveBeenCalled();
+    });
+
+    test('allows a new idea during playtesting without ending the playtest', () => {
+        const onGameIdea = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                gamePlaytest={{plan: GAME_PLAN}}
+                messages={[]}
+                onGameIdea={onGameIdea}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+        fireEvent.click(screen.getByRole('tab', {name: 'Hrai'}));
+        const input = screen.getByLabelText('Zpráva pro HRAI');
+        expect(input.disabled).toBe(true);
+        fireEvent.click(screen.getByRole('button', {name: 'Nový nápad'}));
+        expect(input.disabled).toBe(false);
+        fireEvent.change(input, {target: {value: 'Vesmírná hra.'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+        expect(onGameIdea).toHaveBeenCalledWith('Vesmírná hra.');
+        fireEvent.click(screen.getByRole('tab', {name: 'Plan'}));
+        expect(screen.getByText('Teď si hru vyzkoušej')).toBeTruthy();
+    });
+
     test('submits the child game idea', () => {
         const onGamePlanRequest = jest.fn();
         const onSend = jest.fn();
