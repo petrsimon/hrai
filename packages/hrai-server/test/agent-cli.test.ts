@@ -3,7 +3,7 @@ import {mkdtempSync, readFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {Readable} from "node:stream";
-import {afterEach, describe, expect, it, vi} from "vitest";
+import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 
 const {execFileMock, spawnMock} = vi.hoisted(() => ({
     execFileMock: vi.fn(),
@@ -15,7 +15,13 @@ vi.mock("node:child_process", () => ({
     spawn: spawnMock,
 }));
 
-const ENV_KEYS = ["HRAI_AGENT_CWD", "HRAI_AGENT_TIMEOUT_MS", "HRAI_AGENT_TRACE"] as const;
+const ENV_KEYS = ["HRAI_AGENT_CWD", "HRAI_AGENT_TIMEOUT_MS", "HRAI_AGENT_TRACE", "HRAI_DATA_DIR"] as const;
+
+// Every run writes to the agent log, whose default sits in the package directory. Without a data
+// directory of its own the suite would leave a real log behind on each run.
+beforeEach(() => {
+    process.env.HRAI_DATA_DIR = mkdtempSync(join(tmpdir(), "hrai-cli-log-"));
+});
 
 interface FakeChild extends EventEmitter {
     stdout: Readable;
