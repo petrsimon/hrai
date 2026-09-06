@@ -6,11 +6,11 @@
  */
 import { createServer } from "node:http";
 import { Server } from "socket.io";
-import { onAgentLog, recentAgentLog } from "./agent-log.ts";
 import { handleApiRequest } from "./api.ts";
 import { parseCookies, HraiStore, SESSION_COOKIE, type AssistantPreferences } from "./store.ts";
-import { EVAL_MODEL, chat, chatJson, defaultBackend, defaultModelFor, type BackendId } from "./model-client.ts";
-import { listBackends } from "./model-catalog.ts";
+import { EVAL_MODEL, chat, chatJson, type ChatOptions } from "./model-client.ts";
+import { defaultModelRef, formatModelRef, parseModelRef, runtimeFor } from "./pi-runtime.ts";
+import { recentRuns, subscribe as subscribeTranscript } from "./transcript.ts";
 import { planGame } from "./game-planner.ts";
 import { MAX_GAME_IDEA_LENGTH } from "./game-plan.ts";
 import { parseGameRestore } from "./game-restore.ts";
@@ -120,6 +120,8 @@ export function isCompletionClaim(text: string): boolean {
 }
 
 const COMPLETION_FOLLOW_UP = /^(?:co|a)\s+(?:dál|teď)/iu;
+/** What a socket without a profile hears from anything that would need a model. */
+const SIGN_IN_PROMPT = "Přihlas se, ať ti můžu pomáhat.";
 const COMPLETED_STEP_CONTEXT =
     "KROK JE HOTOVÝ (editor to ověřil). Odpověz na otázku dítěte, nezadávej nový úkol.";
 
@@ -183,31 +185,26 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
     const gamePlanner = options.gamePlanner ?? planGame;
 
 /**
- * Resolves which backend and model a profile's tutor calls should use.
+ * Resolves whose credentials and which model a profile's tutor calls use.
  *
- * An unavailable choice falls back to the configured default rather than failing: a child should
- * not lose the tutor because a CLI was logged out since they picked it.
- * @param preferences The profile's assistant preferences, if the socket is signed in.
- * @returns The backend to call and the model name to pass it.
+ * A socket without a profile has no credentials, so it gets no model at all: the tutor answers
+ * with a sign-in prompt instead of borrowing anyone's account.
+ * @param user The signed-in profile, if any.
+ * @returns The model reference and the options every completion call takes.
+ * @throws {Error} When there is no profile.
  */
 async function resolveModelChoice(
-    preferences?: AssistantPreferences,
-): Promise<{ backend: BackendId; model: string }> {
-    // defaultModelFor lets HRAI_PI_MODEL and its siblings win, which EVAL_MODEL alone does not:
-    // a per-backend model name would otherwise be ignored whenever the child keeps the default.
-    const fallback = { backend: defaultBackend(), model: defaultModelFor(defaultBackend()) };
-    if (preferences === undefined || preferences.modelBackend === "default") return fallback;
-
-    const backend = preferences.modelBackend;
-    const info = (await listBackends()).find((entry) => entry.id === backend);
-    if (info?.available !== true) {
-        console.warn(`hrai: model backend "${backend}" is unavailable; falling back to "${fallback.backend}"`);
-        return fallback;
-    }
-    return {
-        backend,
-        model: preferences.modelByBackend[backend] ?? defaultModelFor(backend),
-    };
+    user: { id: string; assistantPreferences: AssistantPreferences } | null,
+): Promise<{ model: string; options: ChatOptions }> {
+    if (!user) throw new Error("profile required");
+    const preferences = user.assistantPreferences;
+    const chosen = preferences.model === "default" ? parseModelRef(defaultModelRef()) : parseModelRef(preferences.model);
+    if (!chosen) throw new Error(`model reference "${preferences.model}" is unusable`);
+    const model = formatModelRef({
+        ...chosen,
+        ...(preferences.thinkingLevel === "default" ? {} : { thinkingLevel: preferences.thinkingLevel }),
+    });
+    return { model, options: { runtime: await runtimeFor(user.id), owner: user.id } };
 }
 
     io.of("/hrai").on("connection", async (socket) => {
@@ -229,13 +226,13 @@ async function resolveModelChoice(
         void announceVoiceCapabilities();
         const voiceReadinessTimer = setInterval(() => void announceVoiceCapabilities(), 5_000);
 
-        // What this server has seen, sent under its own event so the editor replaces whatever it
-        // still holds rather than adding to it: after a restart those runs are another process's.
-        socket.emit("agent:log:recent", recentAgentLog());
-        const stopAgentLog = onAgentLog((event) => socket.emit("agent:log", [event]));
+        // What this server has seen of this child's runs, sent under its own event so the editor
+        // replaces whatever it still holds: after a restart those runs are another process's.
+        socket.emit("agent:log:recent", user ? recentRuns(user.id) : []);
+        const stopTranscript = user ? subscribeTranscript(user.id, (event) => socket.emit("agent:log", [event])) : () => undefined;
         socket.on("disconnect", () => {
             clearInterval(voiceReadinessTimer);
-            stopAgentLog();
+            stopTranscript();
         });
 
         const emitLessonProgress = (): void => {
@@ -264,16 +261,20 @@ async function resolveModelChoice(
         socket.on("gamePlan", (payload: unknown) => {
             const idea = parseGameIdea(payload);
             if (!idea) return;
+            if (!user) {
+                socket.emit("error", { message: SIGN_IN_PROMPT });
+                return;
+            }
             if (modelCallPending) {
                 console.warn("hrai: ignored game-plan request while a model call is pending");
                 return;
             }
             modelCallPending = true;
             socket.emit("thinking", { thinking: true });
-            void resolveModelChoice(session.assistantPreferences)
-                .then(({ backend, model }) => gamePlanner(
+            void resolveModelChoice(user)
+                .then(({ model, options }) => gamePlanner(
                     idea,
-                    (system, user) => chatJson(system, user, model, backend, "plan"),
+                    (system, prompt) => chatJson(system, prompt, model, "plan", options),
                 ))
                 .then((plan) => {
                     session.proposeGamePlan(plan);
@@ -295,16 +296,16 @@ async function resolveModelChoice(
         socket.on("projectTitle", () => {
             const workspace = session.render();
             // Naming an empty stage would only produce a guess about nothing.
-            if (!session.hasWorkspace) return;
+            if (!session.hasWorkspace || !user) return;
             if (modelCallPending) {
                 console.warn("hrai: ignored project-title request while a model call is pending");
                 return;
             }
             modelCallPending = true;
-            void resolveModelChoice(session.assistantPreferences)
-                .then(({ backend, model }) => suggestProjectTitle(
+            void resolveModelChoice(user)
+                .then(({ model, options }) => suggestProjectTitle(
                     workspace,
-                    (system, user) => chat(system, user, model, backend, "title"),
+                    (system, prompt) => chat(system, prompt, model, "title", options),
                 ))
                 .then((title) => socket.emit("projectTitleSuggested", { title }))
                 .catch((error: unknown) => {
@@ -433,22 +434,27 @@ async function resolveModelChoice(
                 return;
             }
 
+            if (!user) {
+                emitCanned(SIGN_IN_PROMPT);
+                return;
+            }
+
             modelCallPending = true;
             socket.emit("thinking", {thinking: true});
 
             // Buffer the model response so pedagogical constraints can be enforced
             // before any prose reaches the child. Streaming raw tokens would make a
             // post-generation safety check cosmetic rather than real.
-            void resolveModelChoice(session.assistantPreferences)
-                .then(({backend, model}) => chat(
+            void resolveModelChoice(user)
+                .then(({model, options}) => chat(
                     [
                         systemPrompt(rung, context, session.assistantPreferences),
                         ...(stepComplete ? [COMPLETED_STEP_CONTEXT] : []),
                     ].join("\n"),
                     userPrompt(render, question, history),
                     model,
-                    backend,
                     stepComplete ? "hint" : "answer",
+                    options,
                 ))
                 .then((reply) => {
                     const policed = enforceTutorPolicy(reply.text, {

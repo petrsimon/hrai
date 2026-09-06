@@ -1,8 +1,12 @@
 import type {Server as HttpServer} from "node:http";
+import {mkdtempSync, rmSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
 import {io, type Socket} from "socket.io-client";
 import {afterAll, beforeAll, describe, expect, it, vi} from "vitest";
 import type {GamePlan} from "../src/game-plan.ts";
 import {startServer} from "../src/server.ts";
+import {HraiStore, SESSION_COOKIE} from "../src/store.ts";
 
 const PORT = 8701;
 const PLAN: GamePlan = {
@@ -87,16 +91,30 @@ const COMPLETING_WORKSPACE = {
 const gamePlanner = vi.fn().mockResolvedValue(PLAN);
 let server: HttpServer | undefined;
 let socket: Socket | undefined;
+let dataDir: string;
+/** A signed-in child: planning needs a profile, since the model is called with its credentials. */
+let cookie: string;
+
+function connect(): Socket {
+    return io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"], extraHeaders: {Cookie: cookie}});
+}
 
 beforeAll(async () => {
+    dataDir = mkdtempSync(join(tmpdir(), "hrai-game-server-"));
+    process.env.HRAI_DATA_DIR = dataDir;
+    const store = new HraiStore(dataDir);
+    await store.load();
+    const child = await store.createUser("kid", "correct horse", "Kid");
+    cookie = `${SESSION_COOKIE}=${child.sessionToken}`;
     server = startServer(PORT, {
         gamePlanner,
+        store,
         speechToText: {
             isAvailable: () => Promise.resolve(false),
             transcribe: () => Promise.resolve({text: ""}),
         },
     });
-    const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+    const connected = connect();
     socket = connected;
     await new Promise<void>((resolve, reject) => {
         connected.on("connect", resolve);
@@ -107,9 +125,27 @@ beforeAll(async () => {
 afterAll(() => {
     socket?.close();
     server?.close();
+    delete process.env.HRAI_DATA_DIR;
+    rmSync(dataDir, {recursive: true, force: true});
 });
 
 describe("goal-driven game protocol", () => {
+    it("asks a socket without a profile to sign in instead of planning", async () => {
+        const anonymous = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+        await new Promise<void>((resolve, reject) => {
+            anonymous.on("connect", resolve);
+            anonymous.on("connect_error", reject);
+        });
+        const failure = new Promise<{message: string}>((resolve) => anonymous.once("error", resolve));
+        const calls = gamePlanner.mock.calls.length;
+
+        anonymous.emit("gamePlan", {text: "Drak hledá poklad v bludišti."});
+
+        expect((await failure).message).toMatch(/Přihlas se/);
+        expect(gamePlanner.mock.calls).toHaveLength(calls);
+        anonymous.close();
+    });
+
     it("requires child acceptance before activating a proposed plan", async () => {
         if (!socket) throw new Error("socket was never connected");
 
@@ -150,7 +186,7 @@ describe("goal-driven game protocol", () => {
     });
 
     it("emits completion again when a completed milestone is broken and repaired", async () => {
-        const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+        const connected = connect();
         await new Promise<void>((resolve, reject) => {
             connected.on("connect", resolve);
             connected.on("connect_error", reject);
@@ -180,7 +216,7 @@ describe("goal-driven game protocol", () => {
     });
 
     it("restores an unfinished playtest without activating tutor guidance", async () => {
-        const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+        const connected = connect();
         await new Promise<void>((resolve, reject) => {
             connected.on("connect", resolve);
             connected.on("connect_error", reject);
@@ -204,7 +240,7 @@ describe("goal-driven game protocol", () => {
     });
 
     it("restores accepted progress without trusting persisted completion", async () => {
-        const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+        const connected = connect();
         await new Promise<void>((resolve, reject) => {
             connected.on("connect", resolve);
             connected.on("connect_error", reject);
@@ -231,7 +267,7 @@ describe("goal-driven game protocol", () => {
     });
 
     it("evaluates cached workspace evidence as soon as a plan is accepted", async () => {
-        const connected = io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"]});
+        const connected = connect();
         await new Promise<void>((resolve, reject) => {
             connected.on("connect", resolve);
             connected.on("connect_error", reject);

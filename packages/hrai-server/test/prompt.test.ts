@@ -8,8 +8,8 @@ const preferences: AssistantPreferences = {
     verbosity: "balanced",
     language: "cs",
     encouragement: false,
-    modelBackend: "default",
-    modelByBackend: {},
+    model: "default",
+    thinkingLevel: "default",
 };
 
 const context: TutorPromptContext = {

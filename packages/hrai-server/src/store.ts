@@ -2,7 +2,7 @@ import { createHash, randomBytes, scrypt as nodeScrypt, timingSafeEqual } from "
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
-import type { BackendId } from "./model-client.ts";
+import { parseModelRef, THINKING_LEVELS, type ThinkingLevel } from "./pi-runtime.ts";
 
 const scrypt = promisify(nodeScrypt);
 
@@ -19,7 +19,6 @@ const MAX_EMAIL_LENGTH = 254;
 export type AssistantPersona = "patient" | "socratic" | "coach";
 export type AssistantVerbosity = "concise" | "balanced" | "detailed";
 
-const KNOWN_BACKENDS: BackendId[] = ["ollama", "llama.cpp", "cursor", "pi", "codex"];
 const MODEL_NAME_PATTERN = /^[A-Za-z0-9._:/+-]+$/;
 
 export interface AssistantPreferences {
@@ -28,8 +27,9 @@ export interface AssistantPreferences {
     verbosity: AssistantVerbosity;
     language: "cs";
     encouragement: boolean;
-    modelBackend: BackendId | "default";
-    modelByBackend: Partial<Record<BackendId, string>>;
+    /** A `provider/model` reference, or `default` for the server's model. */
+    model: string;
+    thinkingLevel: ThinkingLevel | "default";
 }
 
 export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
@@ -38,8 +38,8 @@ export const DEFAULT_ASSISTANT_PREFERENCES: AssistantPreferences = {
     verbosity: "concise",
     language: "cs",
     encouragement: true,
-    modelBackend: "default",
-    modelByBackend: {},
+    model: "default",
+    thinkingLevel: "default",
 };
 
 interface UserRecord {
@@ -112,18 +112,13 @@ function sessionKey(token: string): string {
     return createHash("sha256").update(token).digest("hex");
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-    const prototype: unknown = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
-}
-
-function isValidModelName(value: unknown): value is string {
-    return value === "" ||
+function isValidModelRef(value: unknown): value is string {
+    return value === "default" ||
         (typeof value === "string" &&
             value.length <= 100 &&
             !value.startsWith("-") &&
-            MODEL_NAME_PATTERN.test(value));
+            MODEL_NAME_PATTERN.test(value) &&
+            parseModelRef(value)?.modelId.startsWith("-") === false);
 }
 
 function publicUser(user: UserRecord): PublicUser {
@@ -132,10 +127,7 @@ function publicUser(user: UserRecord): PublicUser {
         username: user.username,
         displayName: user.displayName,
         ...(user.email ? { email: user.email } : {}),
-        assistantPreferences: {
-            ...user.assistantPreferences,
-            modelByBackend: { ...user.assistantPreferences.modelByBackend },
-        },
+        assistantPreferences: { ...user.assistantPreferences },
     };
 }
 
@@ -173,17 +165,11 @@ export function sanitizeAssistantPreferences(input: unknown): AssistantPreferenc
     const verbosity = value.verbosity;
     const language = value.language;
     const encouragement = value.encouragement;
-    const modelBackend = value.modelBackend === undefined ? DEFAULT_ASSISTANT_PREFERENCES.modelBackend : value.modelBackend;
-    const modelByBackendValue = value.modelByBackend === undefined
-        ? DEFAULT_ASSISTANT_PREFERENCES.modelByBackend
-        : value.modelByBackend;
-    // These model fields cross security boundaries into backend and CLI selection.
-    if (!isPlainObject(modelByBackendValue)) return null;
-    const modelByBackend: Partial<Record<BackendId, string>> = {};
-    for (const [backend, model] of Object.entries(modelByBackendValue)) {
-        if (!KNOWN_BACKENDS.includes(backend as BackendId) || !isValidModelName(model)) return null;
-        if (model !== "") modelByBackend[backend as BackendId] = model;
-    }
+    const model = value.model === undefined ? DEFAULT_ASSISTANT_PREFERENCES.model : value.model;
+    const thinkingLevel = value.thinkingLevel === undefined ? DEFAULT_ASSISTANT_PREFERENCES.thinkingLevel : value.thinkingLevel;
+    // The model reference crosses a security boundary into provider selection.
+    if (!isValidModelRef(model)) return null;
+    if (thinkingLevel !== "default" && !THINKING_LEVELS.includes(thinkingLevel as ThinkingLevel)) return null;
     if (
         assistantName.length < 1 ||
         assistantName.length > 40 ||
@@ -191,8 +177,7 @@ export function sanitizeAssistantPreferences(input: unknown): AssistantPreferenc
         !["patient", "socratic", "coach"].includes(persona as string) ||
         !["concise", "balanced", "detailed"].includes(verbosity as string) ||
         language !== "cs" ||
-        typeof encouragement !== "boolean" ||
-        (modelBackend !== "default" && !KNOWN_BACKENDS.includes(modelBackend as BackendId))
+        typeof encouragement !== "boolean"
     ) return null;
     return {
         assistantName,
@@ -200,8 +185,8 @@ export function sanitizeAssistantPreferences(input: unknown): AssistantPreferenc
         verbosity: verbosity as AssistantVerbosity,
         language: "cs",
         encouragement,
-        modelBackend: modelBackend as BackendId | "default",
-        modelByBackend,
+        model,
+        thinkingLevel: thinkingLevel as ThinkingLevel | "default",
     };
 }
 
@@ -235,9 +220,18 @@ export class HraiStore {
             // Stores written before password reset existed have no resets map at all.
             this.data.resets = (this.data as Partial<StoreData>).resets ?? {};
             for (const user of this.data.users) {
+                // A profile saved before pi was the only backend carried a backend name and a
+                // model per backend; only a model chosen for pi still means anything.
+                const legacy = user.assistantPreferences as Partial<AssistantPreferences> & {
+                    modelBackend?: string; modelByBackend?: Record<string, string>;
+                };
+                const { modelBackend, modelByBackend, ...kept } = legacy;
+                const piModel = modelByBackend?.pi;
+                const carried = modelBackend === "pi" && isValidModelRef(piModel) ? { model: piModel } : {};
                 user.assistantPreferences = {
                     ...DEFAULT_ASSISTANT_PREFERENCES,
-                    ...user.assistantPreferences,
+                    ...carried,
+                    ...kept,
                 };
             }
         } catch (error: unknown) {
