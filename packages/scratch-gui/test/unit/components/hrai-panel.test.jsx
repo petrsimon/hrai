@@ -103,6 +103,33 @@ describe('HraiPanel lesson guidance', () => {
         expect(input.value).toBe(expected);
     });
 
+    test('appends a transcript dictated while the plan is open', () => {
+        const panel = voiceTranscript => (
+            <IntlProvider
+                locale="cs"
+                messages={{}}
+            >
+                <HraiPanel
+                    gamePlan={GAME_PLAN}
+                    messages={[]}
+                    onHint={jest.fn()}
+                    onNextStage={jest.fn()}
+                    onSend={jest.fn()}
+                    voiceTranscript={voiceTranscript}
+                />
+            </IntlProvider>
+        );
+        const {rerender} = render(panel(null));
+        expect(screen.queryByLabelText('Zpráva pro HRAI')).toBeNull();
+        rerender(panel({requestId: 'voice-on-plan', text: 'Přidej draka'}));
+
+        fireEvent.click(screen.getByRole('tab', {name: 'Hrai'}));
+        const input = screen.getByLabelText('Zpráva pro HRAI');
+        expect(input.value).toBe('Přidej draka');
+        expect(input.selectionStart).toBe('Přidej draka'.length);
+        expect(input.selectionEnd).toBe('Přidej draka'.length);
+    });
+
     test('starts transcription as soon as recording stops', async () => {
         const onVoiceSubmit = jest.fn();
         const stream = {getTracks: () => [{stop: jest.fn()}]};

@@ -961,15 +961,21 @@ const HraiPanel = ({
         const end = input ? input.selectionEnd : null;
         setDraft(currentDraft => currentDraft.slice(0, start ?? currentDraft.length) +
             voiceTranscript.text + currentDraft.slice(end ?? currentDraft.length));
-        voiceCursorRef.current = (start ?? 0) + voiceTranscript.text.length;
+        voiceCursorRef.current = start === null ?
+            Number.MAX_SAFE_INTEGER :
+            start + voiceTranscript.text.length;
         setVoicePhase('transcript');
         setVoiceLocalError(null);
     }, [voiceRequestId, voiceTranscript]);
 
     useLayoutEffect(() => {
-        if (voiceCursorRef.current !== null && draftInputRef.current) {
-            draftInputRef.current.focus();
-            draftInputRef.current.setSelectionRange(voiceCursorRef.current, voiceCursorRef.current);
+        const input = draftInputRef.current;
+        if (voiceCursorRef.current !== null && input) {
+            // The composer is only mounted on the Hrai tab, so a transcript that arrives while the
+            // plan is open is appended with no selection to read; the caret then belongs at the end.
+            const cursor = Math.min(voiceCursorRef.current, input.value.length);
+            input.focus();
+            input.setSelectionRange(cursor, cursor);
             voiceCursorRef.current = null;
         }
     });
