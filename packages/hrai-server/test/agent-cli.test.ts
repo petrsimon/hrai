@@ -442,6 +442,51 @@ describe("agent CLI runner", () => {
         expect(lines.every((line) => !line.includes("{\"title\""))).toBe(true);
     });
 
+    it("reports the provider error pi hides in a message it exits 0 on", async () => {
+        const tracePath = join(mkdtempSync(join(tmpdir(), "hrai-trace-")), "agent.log");
+        process.env.HRAI_AGENT_TRACE = tracePath;
+        const child = createChild();
+        spawnMock.mockReturnValue(child);
+        const {runAgent} = await loadAgentCli();
+        const replyPromise = runAgent("pi", {system: "s", user: "u"});
+
+        await completeChild(child, [
+            JSON.stringify({
+                type: "message_end",
+                message: {
+                    role: "assistant",
+                    content: [],
+                    stopReason: "error",
+                    errorMessage: "Codex error: The 'gpt-5.4' model is not supported with a ChatGPT account.",
+                },
+            }),
+        ]);
+
+        await expect(replyPromise).rejects.toThrow("not supported with a ChatGPT account");
+        // The run has to close, or the editor shows it running for ever.
+        expect(readFileSync(tracePath, "utf8")).toContain("= failed: Codex error:");
+    });
+
+    it("closes a run that produced nothing as failed, not as done", async () => {
+        const tracePath = join(mkdtempSync(join(tmpdir(), "hrai-trace-")), "agent.log");
+        process.env.HRAI_AGENT_TRACE = tracePath;
+        const child = createChild();
+        spawnMock.mockReturnValue(child);
+        const {runAgent} = await loadAgentCli();
+        const replyPromise = runAgent("pi", {system: "s", user: "u", purpose: "plan"});
+
+        // pi answering an exhausted quota: the envelope arrives, the assistant message is empty.
+        await completeChild(child, [
+            JSON.stringify({type: "turn_start"}),
+            JSON.stringify({type: "turn_end"}),
+        ]);
+        await expect(replyPromise).rejects.toThrow("without a reply");
+
+        const trace = readFileSync(tracePath, "utf8");
+        expect(trace).toMatch(/= failed in [\d.]+s: exited 0 without a reply/);
+        expect(trace).not.toContain("= done");
+    });
+
     it("writes no trace unless HRAI_AGENT_TRACE asks for one", async () => {
         const stderrWrite = vi.spyOn(process.stderr, "write").mockReturnValue(true);
         try {

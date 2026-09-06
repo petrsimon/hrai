@@ -129,7 +129,14 @@ const agentSpecs: Record<AgentBackendId, AgentSpec> = {
                 ? textContent(message.content)
                 : null;
         },
-        error: () => null,
+        error: (event) => {
+            // pi reports a provider refusal inside the message and still exits 0, so a rejected
+            // model or an exhausted quota arrives as an empty answer unless this is read.
+            const message = asRecord(asRecord(event)?.message);
+            return message?.stopReason === "error" && typeof message.errorMessage === "string"
+                ? message.errorMessage
+                : null;
+        },
         loginHint: "pi auth",
     },
     cursor: {
