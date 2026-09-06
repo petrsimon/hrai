@@ -225,6 +225,7 @@ function streamDelta(line: string): string | null {
  * @param onDelta Called with each token chunk in order.
  * @param model Model name.
  * @param backend Model backend to use; defaults to the configured one.
+ * @param purpose What the call is for, which heads the run in the agent log.
  * @returns The complete text and elapsed seconds.
  */
 export async function chatStream(
@@ -233,9 +234,10 @@ export async function chatStream(
     onDelta: (delta: string) => void,
     model = EVAL_MODEL,
     backend: BackendId = defaultBackend(),
+    purpose = "chat",
 ): Promise<Reply> {
     if (isAgentBackend(backend)) {
-        return runAgent(backend, {system, user, model: agentModel(model)}, onDelta);
+        return runAgent(backend, {system, user, model: agentModel(model), purpose}, onDelta);
     }
 
     const started = performance.now();
@@ -306,8 +308,9 @@ export async function chat(
     user: string,
     model = EVAL_MODEL,
     backend: BackendId = defaultBackend(),
+    purpose = "chat",
 ): Promise<Reply> {
-    if (isAgentBackend(backend)) return runAgent(backend, {system, user, model: agentModel(model)});
+    if (isAgentBackend(backend)) return runAgent(backend, {system, user, model: agentModel(model), purpose});
     return complete(system, user, model, backend, false);
 }
 
@@ -317,6 +320,7 @@ export async function chat(
  * @param user User turn.
  * @param model Model name.
  * @param backend Model backend to use; defaults to the configured one.
+ * @param purpose What the call is for, which heads the run in the agent log.
  * @returns JSON text and elapsed seconds.
  */
 export async function chatJson(
@@ -324,8 +328,11 @@ export async function chatJson(
     user: string,
     model = EVAL_MODEL,
     backend: BackendId = defaultBackend(),
+    purpose = "chat",
 ): Promise<Reply> {
-    if (isAgentBackend(backend)) return runAgent(backend, {system, user, model: agentModel(model), json: true});
+    if (isAgentBackend(backend)) {
+        return runAgent(backend, {system, user, model: agentModel(model), json: true, purpose});
+    }
     return complete(system, user, model, backend, true);
 }
 

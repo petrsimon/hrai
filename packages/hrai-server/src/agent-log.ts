@@ -56,6 +56,9 @@ function appendToFile(event: AgentLogEvent): void {
 function mirrorToTrace(event: AgentLogEvent): void {
     const configured = process.env.HRAI_AGENT_TRACE;
     if (!configured || configured === "0" || configured === "off") return;
+    // The CLI's own step names are scaffolding around the lines worth reading. The log file and the
+    // editor's tab keep them; a terminal someone is watching does not.
+    if (event.kind === "phase") return;
 
     const line = `[hrai agent ${event.command} ${event.runId}] ${marks[event.kind]} ${event.text}\n`;
     if (configured === "1" || configured === "stderr") {

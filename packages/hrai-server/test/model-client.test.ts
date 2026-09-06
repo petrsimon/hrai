@@ -134,11 +134,13 @@ describe("llama.cpp model client", () => {
             system: "system",
             user: "user",
             model: "model",
+            purpose: "chat",
         });
         expect(runAgentMock).toHaveBeenNthCalledWith(2, "cursor", {
             system: "system",
             user: "user",
             model: "model",
+            purpose: "chat",
             json: true,
         });
         expect(fetchMock).not.toHaveBeenCalled();
@@ -212,7 +214,7 @@ describe("llama.cpp model client", () => {
         // A server-side model name means nothing to cursor-agent; the flag must be left off.
         expect(runAgentMock).toHaveBeenCalledWith(
             "cursor",
-            {system: "system", user: "user", model: undefined},
+            {system: "system", user: "user", model: undefined, purpose: "chat"},
         );
     });
 
@@ -224,7 +226,7 @@ describe("llama.cpp model client", () => {
 
         expect(runAgentMock).toHaveBeenCalledWith(
             "cursor",
-            {system: "system", user: "user", model: "gpt-5.2"},
+            {system: "system", user: "user", model: "gpt-5.2", purpose: "chat"},
         );
     });
 

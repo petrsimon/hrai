@@ -376,11 +376,10 @@ describe("agent CLI runner", () => {
         const lines = readFileSync(tracePath, "utf8").trim().split("\n").map((line) => line.slice(line.indexOf("] ") + 2));
         // The envelope name never appears: every phase is the event pi reported inside it.
         expect(lines).not.toContain(". message_update");
-        expect(lines).toContain(". thinking_start");
-        // An event that carried text is logged as that text, not named beside it.
-        expect(lines).not.toContain(". text_delta");
-        expect(lines).not.toContain(". thinking_delta");
-        expect(lines).toContain("~ **Planning the core loop**");
+        // Step names are scaffolding: the file and the tab keep them, a watched terminal does not.
+        expect(lines.every((line) => !line.startsWith(". "))).toBe(true);
+        // Reasoning reads as a sentence, without the markdown emphasis a CLI wraps it in.
+        expect(lines).toContain("~ Planning the core loop");
         // Reply fragments are gathered into the lines a person reads, not logged one by one.
         expect(lines).toContain("> Drak najde poklad.");
         expect(lines).toContain("> Druhy radek.");
@@ -406,13 +405,41 @@ describe("agent CLI runner", () => {
         await replyPromise;
 
         const trace = readFileSync(tracePath, "utf8");
-        expect(trace).toMatch(/\[hrai agent pi [0-9a-f]{8}] = start model=default/);
-        expect(trace).toContain(`prompt=${"system".length + "a secret game about a dragon".length} chars`);
+        expect(trace).toMatch(/\[hrai agent pi [0-9a-f]{8}] = chat · pi · default model · prompt 34 B/);
         expect(trace).not.toContain("a secret game about a dragon");
         expect(trace).toContain("! pi: warming up");
         expect(trace).toContain("! not json at all");
-        expect(trace).toContain(". message_end");
-        expect(trace).toMatch(/= exit 0 after [\d.]+s, 4 chars/);
+        expect(trace).toMatch(/= done in [\d.]+s, 4 chars/);
+    });
+
+    it("renders a JSON reply as fields instead of one line of braces", async () => {
+        const tracePath = join(mkdtempSync(join(tmpdir(), "hrai-trace-")), "agent.log");
+        process.env.HRAI_AGENT_TRACE = tracePath;
+        const child = createChild();
+        spawnMock.mockReturnValue(child);
+        const {runAgent} = await loadAgentCli();
+        const plan = {
+            title: "Drak a poklad",
+            coreLoop: "Drak projde bludištěm.",
+            milestones: [{title: "Pohyb draka"}, {title: "Sběr pokladu"}],
+        };
+        const replyPromise = runAgent("pi", {system: "s", user: "u", json: true, purpose: "plan"});
+
+        await completeChild(child, [
+            JSON.stringify({
+                type: "message_end",
+                message: {role: "assistant", content: [{type: "text", text: JSON.stringify(plan)}]},
+            }),
+        ]);
+        await expect(replyPromise).resolves.toMatchObject({text: JSON.stringify(plan)});
+
+        const lines = readFileSync(tracePath, "utf8").trim().split("\n").map((line) => line.slice(line.indexOf("] ") + 2));
+        expect(lines[0]).toContain("= plan · pi ·");
+        expect(lines).toContain("> title: Drak a poklad");
+        expect(lines).toContain("> coreLoop: Drak projde bludištěm.");
+        expect(lines).toContain("> milestones: 2 (Pohyb draka, Sběr pokladu)");
+        // The braces never reach the reader, though the reply itself is untouched.
+        expect(lines.every((line) => !line.includes("{\"title\""))).toBe(true);
     });
 
     it("writes no trace unless HRAI_AGENT_TRACE asks for one", async () => {

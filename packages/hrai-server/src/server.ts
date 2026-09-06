@@ -270,7 +270,7 @@ async function resolveModelChoice(
             void resolveModelChoice(session.assistantPreferences)
                 .then(({ backend, model }) => gamePlanner(
                     idea,
-                    (system, user) => chatJson(system, user, model, backend),
+                    (system, user) => chatJson(system, user, model, backend, "plan"),
                 ))
                 .then((plan) => {
                     session.proposeGamePlan(plan);
@@ -301,7 +301,7 @@ async function resolveModelChoice(
             void resolveModelChoice(session.assistantPreferences)
                 .then(({ backend, model }) => suggestProjectTitle(
                     workspace,
-                    (system, user) => chat(system, user, model, backend),
+                    (system, user) => chat(system, user, model, backend, "title"),
                 ))
                 .then((title) => socket.emit("projectTitleSuggested", { title }))
                 .catch((error: unknown) => {
@@ -445,6 +445,7 @@ async function resolveModelChoice(
                     userPrompt(render, question, history),
                     model,
                     backend,
+                    stepComplete ? "hint" : "answer",
                 ))
                 .then((reply) => {
                     const policed = enforceTutorPolicy(reply.text, {

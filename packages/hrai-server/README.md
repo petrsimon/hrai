@@ -88,26 +88,31 @@ HRAI_AGENT_TRACE=/tmp/hrai-agent.log npm start --workspace=packages/hrai-server 
 ```
 
 ```text
-[hrai agent pi 4f2c9ab1] = start model=openai-codex/gpt-5.4 cwd=/tmp/hrai-agent-x json=true prompt=2841 chars
-[hrai agent pi 4f2c9ab1] . thinking_start
-[hrai agent pi 4f2c9ab1] ~ **Designing minimal playable maze loop**
-[hrai agent pi 4f2c9ab1] ~ **Planning wall collision scripting**
-[hrai agent pi 4f2c9ab1] . thinking_end
-[hrai agent pi 4f2c9ab1] > {"title":"Drak a poklad","coreLoop":"Drak projde bludištěm…
-[hrai agent pi 4f2c9ab1] ! pi: resolving provider
-[hrai agent pi 4f2c9ab1] = exit 0 after 80.0s, 1275 chars
+[hrai agent pi 604969e8] = plan · pi · openai-codex/gpt-5.4 · prompt 6.9 kB
+[hrai agent pi 604969e8] ~ Designing milestones for gameplay
+[hrai agent pi 604969e8] ~ Planning wall collision and treasure relocation
+[hrai agent pi 604969e8] ~ Choosing dragon maze narrative title
+[hrai agent pi 604969e8] > title: Drak hledá poklad
+[hrai agent pi 604969e8] > coreLoop: Drak projde bludištěm, dotkne se pokladu a získá bod.
+[hrai agent pi 604969e8] > milestones: 4 (Drak najde poklad, Bludiště má zdi, Poklad se stěhuje, Tři poklady)
+[hrai agent pi 604969e8] ! pi: resolving provider
+[hrai agent pi 604969e8] = done in 75.3s, 1520 chars
 ```
 
-`=` is a run boundary, `.` a step the CLI reported, `~` the model's reasoning, `>` its reply, `!`
-stderr, and the eight-digit tag separates runs that overlap.
+`=` is a run boundary, `~` the model's reasoning, `>` its reply, `!` stderr, and the eight-digit tag
+separates runs that overlap. The header says what the turn was for — `plan`, `hint`, `answer`,
+`title` — which CLI ran it and on which model.
 
-Two things keep this readable. A CLI wraps every event in an envelope — `pi` sends all of them as
-`message_update` — so the log names the event *inside* it, and an event carrying text is logged as
-that text rather than named beside it. Reply and reasoning arrive in fragments, so they are gathered
-and logged a line at a time. One planning call reads as about fifty lines rather than six hundred.
+Four things keep this readable, because the raw stream is not. A CLI wraps every event in an
+envelope — `pi` sends all of them as `message_update` — so the log names the event *inside* it. An
+event carrying text is logged as that text rather than named beside it. Reply and reasoning arrive
+in fragments, so they are gathered and logged a line at a time, with the markdown emphasis a CLI
+wraps reasoning in stripped. A JSON answer is rendered as its fields once it is whole, rather than
+streamed as a line of braces. One planning call reads as about twenty lines rather than six hundred.
 
-Lines the runner cannot parse are logged too — an auth banner is usually the answer when a run
-fails.
+The CLI's own step names are dropped from the terminal, since they are scaffolding around the lines
+worth reading; the log file and the editor's tab keep them. Lines the runner cannot parse are logged
+too — an auth banner is usually the answer when a run fails.
 
 **A log holds the child's project text.** The `start` line records the prompt size rather than the
 prompt, but the CLIs echo the turn back in their own events and every backend emits the reply.

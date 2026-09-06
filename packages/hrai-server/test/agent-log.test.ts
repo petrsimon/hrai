@@ -15,10 +15,9 @@ function useDataDir(): string {
 
 function readLog(dir: string): Record<string, unknown>[] {
     const logDir = join(dir, "agent-log");
-    const files = readdirSync(logDir);
-    expect(files).toHaveLength(1);
-    expect(files[0]).toMatch(/^\d{4}-\d{2}-\d{2}\.jsonl$/);
-    return readFileSync(join(logDir, files[0] as string), "utf8")
+    const [file = ""] = readdirSync(logDir);
+    expect(file).toMatch(/^\d{4}-\d{2}-\d{2}\.jsonl$/);
+    return readFileSync(join(logDir, file), "utf8")
         .split("\n")
         .filter(Boolean)
         .map((line) => JSON.parse(line) as Record<string, unknown>);

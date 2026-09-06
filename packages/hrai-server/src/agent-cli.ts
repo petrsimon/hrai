@@ -23,6 +23,17 @@ interface AgentOptions {
     cwd: string;
 }
 
+/**
+ * Sizes a prompt for the log header, rounded so the line stays short.
+ * @param system The instructions the tutor sends ahead of the turn.
+ * @param user The turn itself, carrying the rendered project.
+ * @returns A size in bytes or kilobytes.
+ */
+function promptSize(system: string, user: string): string {
+    const bytes = system.length + user.length;
+    return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} kB`;
+}
+
 interface AgentSpec {
     command: string;
     /**
@@ -222,6 +233,49 @@ function getTimeoutMs(): number {
     return Number.isFinite(configured) && configured > 0 ? configured : defaultAgentTimeoutMs;
 }
 
+const maxFieldLength = 160;
+
+function fieldValue(value: unknown): string {
+    if (Array.isArray(value)) {
+        const named = value.map((entry) => {
+            const record = asRecord(entry);
+            const name = record?.title ?? record?.name ?? record?.id;
+            return typeof name === "string" ? name : null;
+        });
+        return named.every((name) => name !== null)
+            ? `${value.length} (${named.join(", ")})`
+            : `${value.length} items`;
+    }
+    const record = asRecord(value);
+    if (record) return `{${Object.keys(record).join(", ")}}`;
+    return String(value);
+}
+
+/**
+ * Renders a reply as the lines a person reads.
+ *
+ * A JSON answer — a game plan, a project title — is one long line of braces that tells a reader
+ * nothing, so each field is given its own line and long values are cut.
+ * @param text The reply as the CLI produced it.
+ * @returns Lines to log in place of the raw reply.
+ */
+function replyLines(text: string): string[] {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(text) as unknown;
+    } catch {
+        return text.split("\n").map((line) => line.trim()).filter(Boolean);
+    }
+
+    const record = asRecord(parsed);
+    if (!record) return [fieldValue(parsed)];
+
+    return Object.entries(record).map(([key, value]) => {
+        const rendered = fieldValue(value);
+        return `${key}: ${rendered.length > maxFieldLength ? `${rendered.slice(0, maxFieldLength)}…` : rendered}`;
+    });
+}
+
 function dataToBytes(data: Buffer | string): Buffer {
     return Buffer.isBuffer(data) ? data : Buffer.from(data);
 }
@@ -234,21 +288,22 @@ function dataToBytes(data: Buffer | string): Buffer {
  * @param options.user User turn.
  * @param options.model Model name passed to the CLI; omitted uses the CLI's own default.
  * @param options.json Whether to ask for a bare JSON object.
+ * @param options.purpose What the call is for, which heads the run in the log.
  * @param onDelta Called with each incremental text chunk in order.
  * @returns The complete text and elapsed seconds.
  */
 export async function runAgent(
     backend: AgentBackendId,
-    options: {system: string; user: string; model?: string; json?: boolean},
+    options: {system: string; user: string; model?: string; json?: boolean; purpose?: string},
     onDelta?: (delta: string) => void,
 ): Promise<Reply> {
     const started = performance.now();
     const spec = agentSpecs[backend];
     const cwd = getSandboxDir();
-    // The opening line sizes the prompt rather than quoting it. The logged events still carry the
-    // child's text where a CLI echoes the turn back, which the README states plainly.
-    const run = startAgentRun(spec.command, `start model=${options.model ?? "default"} cwd=${cwd} ` +
-        `json=${options.json ?? false} prompt=${options.system.length + options.user.length} chars`);
+    // The header sizes the prompt rather than quoting it. The logged events still carry the child's
+    // text where a CLI echoes the turn back, which the README states plainly.
+    const run = startAgentRun(spec.command, `${options.purpose ?? "chat"} · ${spec.command} · ` +
+        `${options.model ?? "default model"} · prompt ${promptSize(options.system, options.user)}`);
     const child = spawn(spec.command, spec.args({...options, json: options.json ?? false, cwd}), {
         cwd,
         stdio: ["ignore", "pipe", "pipe"],
@@ -275,12 +330,13 @@ export async function runAgent(
             const lines = pending[kind].split("\n");
             pending[kind] = lines.pop() ?? "";
             for (const line of lines) {
-                if (line.trim()) run.event(kind, line.trim());
+                const trimmed = kind === "thinking" ? line.replaceAll("**", "").trim() : line.trim();
+                if (trimmed) run.event(kind, trimmed);
             }
         };
 
         const flushText = (kind: "thinking" | "delta"): void => {
-            const rest = pending[kind].trim();
+            const rest = kind === "thinking" ? pending[kind].replaceAll("**", "").trim() : pending[kind].trim();
             pending[kind] = "";
             if (rest) run.event(kind, rest);
         };
@@ -330,9 +386,10 @@ export async function runAgent(
             const phase = thinking === null && delta === null ? spec.phaseName(event) : null;
             if (typeof phase === "string") run.event("phase", phase, raw);
             if (thinking !== null) logText("thinking", thinking);
-            if (delta === null) flushText("delta");
+            if (delta === null && !options.json) flushText("delta");
             if (delta !== null) {
-                logText("delta", delta);
+                // A JSON answer is unreadable in fragments, so it is rendered whole at the end.
+                if (!options.json) logText("delta", delta);
                 accumulated += delta;
                 onDelta?.(delta);
             }
@@ -392,8 +449,13 @@ export async function runAgent(
         child.once("close", (code) => {
             flushText("thinking");
             flushText("delta");
-            run.event("end", `exit ${code} after ${((performance.now() - started) / 1000).toFixed(1)}s, ` +
-                `${(finalText ?? accumulated).length} chars`);
+            if (options.json) {
+                for (const line of replyLines((finalText ?? accumulated).trim())) run.event("delta", line);
+            }
+            const seconds = ((performance.now() - started) / 1000).toFixed(1);
+            run.event("end", code === 0
+                ? `done in ${seconds}s, ${(finalText ?? accumulated).length} chars`
+                : `exit ${code} after ${seconds}s`);
             if (settled) return;
 
             processStdoutText(stdoutDecoder.decode());
