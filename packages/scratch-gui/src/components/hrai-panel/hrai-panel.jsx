@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {defineMessages, FormattedMessage, useIntl} from 'react-intl';
 
 import Box from '../box/box.jsx';
@@ -856,6 +856,8 @@ const HraiPanel = ({
     const [voiceLocalError, setVoiceLocalError] = useState(null);
     const resizeState = useRef(null);
     const messagesEndRef = useRef(null);
+    const draftInputRef = useRef(null);
+    const voiceCursorRef = useRef(null);
     const recorderRef = useRef(null);
     const streamRef = useRef(null);
     const chunksRef = useRef([]);
@@ -943,10 +945,23 @@ const HraiPanel = ({
         if (!voiceRequestId) {
             setVoiceRequestId(voiceTranscript.requestId);
         }
-        setDraft(voiceTranscript.text);
+        const input = draftInputRef.current;
+        const start = input ? input.selectionStart : null;
+        const end = input ? input.selectionEnd : null;
+        setDraft(currentDraft => currentDraft.slice(0, start ?? currentDraft.length) +
+            voiceTranscript.text + currentDraft.slice(end ?? currentDraft.length));
+        voiceCursorRef.current = (start ?? 0) + voiceTranscript.text.length;
         setVoicePhase('transcript');
         setVoiceLocalError(null);
     }, [voiceRequestId, voiceTranscript]);
+
+    useLayoutEffect(() => {
+        if (voiceCursorRef.current !== null && draftInputRef.current) {
+            draftInputRef.current.focus();
+            draftInputRef.current.setSelectionRange(voiceCursorRef.current, voiceCursorRef.current);
+            voiceCursorRef.current = null;
+        }
+    });
 
     useEffect(() => {
         if (voiceErrorCode && (!voiceErrorCode.requestId || voiceErrorCode.requestId === voiceRequestId)) {
@@ -1358,6 +1373,7 @@ const HraiPanel = ({
                         onSubmit={handleSubmit}
                     >
                         <textarea
+                            ref={draftInputRef}
                             className={styles.messageInput}
                             aria-label={intl.formatMessage(messages.inputLabel)}
                             maxLength={!lesson && chatMessages.length === 0 ? MAX_GAME_IDEA_LENGTH : null}

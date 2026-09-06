@@ -65,6 +65,44 @@ describe('HraiPanel lesson guidance', () => {
         expect(input.value).toBe('');
     });
 
+    test.each([
+        ['append', 'Build a ', 8, 8, 'maze', 'Build a maze', 12],
+        ['insert', 'Build a game', 8, 8, 'maze ', 'Build a maze game', 13],
+        ['replace selection', 'Build a racing game', 8, 14, 'maze', 'Build a maze game', 12],
+        ['prepend', 'game', 0, 0, 'Maze ', 'Maze game', 5],
+        ['replace identical selection', 'Maze game', 0, 4, 'Maze', 'Maze game', 4]
+    ])('inserts voice text into the draft: %s', (name, draft, start, end, text, expected, cursor) => {
+        const panel = voiceTranscript => (
+            <IntlProvider
+                locale="cs"
+                messages={{}}
+            >
+                <HraiPanel
+                    messages={[]}
+                    onHint={jest.fn()}
+                    onNextStage={jest.fn()}
+                    onSend={jest.fn()}
+                    voiceTranscript={voiceTranscript}
+                />
+            </IntlProvider>
+        );
+        const {rerender} = render(panel(null));
+        const input = screen.getByLabelText('Zpráva pro HRAI');
+        fireEvent.change(input, {target: {value: draft}});
+        input.focus();
+        input.setSelectionRange(start, end);
+        input.blur();
+        rerender(panel({requestId: 'voice-insert', text}));
+
+        expect(input.value).toBe(expected);
+        expect(input.selectionStart).toBe(cursor);
+        expect(input.selectionEnd).toBe(cursor);
+        expect(document.activeElement).toBe(input);
+
+        rerender(panel({requestId: 'voice-insert', text}));
+        expect(input.value).toBe(expected);
+    });
+
     test('starts transcription as soon as recording stops', async () => {
         const onVoiceSubmit = jest.fn();
         const stream = {getTracks: () => [{stop: jest.fn()}]};
