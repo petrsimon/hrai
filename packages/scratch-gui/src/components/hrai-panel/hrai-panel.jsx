@@ -1231,6 +1231,9 @@ const HraiPanel = ({
     const hasNextStage = Boolean(lesson && lessonStageIndex < lesson.stages.length - 1);
     const hintDisabled = isThinking || hintMaxReached || Boolean(gamePlaytest);
     const composerLocked = Boolean(gamePlaytest) && !isEnteringGameIdea;
+    // An authored lesson owns the conversation: starting a game idea there would abandon it.
+    const newGameDisabled = Boolean(lesson) || isThinking || isPlanning || isStartingNewProject ||
+        voicePhase === 'recording' || voicePhase === 'transcribing';
     const sendDisabled = !canSend || composerLocked || isThinking;
     const hintExplanation = hintMaxReached ?
         intl.formatMessage(messages.hintMaxReached) :
@@ -1456,8 +1459,8 @@ const HraiPanel = ({
                                     aria-label={intl.formatMessage(messages.newGameIdea)}
                                     title={intl.formatMessage(messages.newGameIdea)}
                                     aria-pressed={isEnteringGameIdea}
-                                    disabled={isThinking || isPlanning || isStartingNewProject ||
-                                        voicePhase === 'recording' || voicePhase === 'transcribing'}
+                                    aria-disabled={newGameDisabled}
+                                    disabled={newGameDisabled}
                                     onClick={handleNewGameIdea}
                                 >
                                     <span aria-hidden="true">💡</span>

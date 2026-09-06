@@ -347,6 +347,38 @@ describe('HraiPanel custom game planning', () => {
         expect(onGamePlanRequest).toHaveBeenCalledWith('Nová závodní hra.');
     });
 
+    test('keeps a new idea out of an authored lesson', () => {
+        const {unmount} = renderWithIntl(
+            <HraiPanel
+                lesson={{title: 'Bitva vojáků', stages: ['Bojiště', 'Kliknutí']}}
+                lessonProgress={{complete: false, stageIndex: 0, stage: {title: 'Bojiště'}}}
+                messages={[]}
+                onGameIdea={jest.fn()}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+        const button = screen.getByRole('button', {name: 'Nový nápad'});
+        expect(button.getAttribute('aria-disabled')).toBe('true');
+        fireEvent.click(button);
+        expect(button.getAttribute('aria-pressed')).toBe('false');
+        unmount();
+
+        renderWithIntl(
+            <HraiPanel
+                lesson={null}
+                lessonProgress={null}
+                messages={[]}
+                onGameIdea={jest.fn()}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+            />
+        );
+        expect(screen.getByRole('button', {name: 'Nový nápad'}).getAttribute('aria-disabled')).toBe('false');
+    });
+
     test('cancels idea entry without losing the ordinary chat draft', () => {
         const onSend = jest.fn();
         const onGameIdea = jest.fn();
