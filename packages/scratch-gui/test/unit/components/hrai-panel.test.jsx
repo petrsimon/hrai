@@ -382,7 +382,7 @@ describe('HraiPanel custom game planning', () => {
 
         renderWithIntl(
             <HraiPanel
-                agentRuns={[{...run, outcome: {text: 'exit 1: not logged in', at: '2026-09-06T15:00:09.000Z'}}]}
+                agentRuns={[{...run, outcome: {text: 'failed in 1.5s: exited 0 without a reply', at: '2026-09-06T15:00:09.000Z'}}]}
                 messages={[]}
                 onHint={jest.fn()}
                 onNextStage={jest.fn()}
@@ -390,14 +390,14 @@ describe('HraiPanel custom game planning', () => {
             />
         );
         fireEvent.click(screen.getByRole('tab', {name: 'Záznam'}));
-        expect(screen.getByText('exit 1: not logged in')).toBeTruthy();
+        expect(screen.getByRole('alert').textContent).toBe('failed in 1.5s: exited 0 without a reply');
         expect(screen.queryByText('Běží…')).toBeNull();
     });
 
     test('shows the newest run first and says when there is nothing yet', () => {
         const run = (runId, command) => ({
             command,
-            outcome: {text: 'exit 0 after 1.0s, 4 chars'},
+            outcome: {text: 'done in 1.0s, 4 chars'},
             phases: [],
             problems: [],
             reply: `reply from ${command}`,
@@ -428,6 +428,8 @@ describe('HraiPanel custom game planning', () => {
             />
         );
         fireEvent.click(screen.getByRole('tab', {name: 'Záznam'}));
+        // A finished run is not a failed one, so nothing about it is raised as an alert.
+        expect(screen.queryByRole('alert')).toBeNull();
         const replies = screen.getAllByText(/^reply from/);
         expect(replies.map(node => node.textContent)).toEqual(['reply from codex', 'reply from pi']);
     });

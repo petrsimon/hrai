@@ -602,8 +602,8 @@ const gamePlanShape = PropTypes.shape({
 const AgentRunCard = ({run, runningLabel}) => {
     const startedAt = run.startedAt ? new Date(run.startedAt) : null;
     const finished = Boolean(run.outcome);
-    // A failed run says so in its closing line; the child's own words never reach this tab.
-    const failed = finished && !/^exit 0/.test(run.outcome.text);
+    // Only a run that finished its work closes with "done"; anything else went wrong.
+    const failed = finished && !run.outcome.text.startsWith('done');
 
     return (
         <section className={styles.agentRun}>
@@ -619,7 +619,7 @@ const AgentRunCard = ({run, runningLabel}) => {
                 ) : null}
                 <span
                     className={failed ? styles.agentRunFailed : styles.agentRunStatus}
-                    role="status"
+                    role={failed ? 'alert' : 'status'}
                 >
                     {finished ? run.outcome.text : runningLabel}
                 </span>

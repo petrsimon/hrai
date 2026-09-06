@@ -360,7 +360,7 @@ export async function runAgent(
 
         const timeoutMs = getTimeoutMs();
         const timeout = setTimeout(() => {
-            run.event("end", `timed out after ${timeoutMs} ms`);
+            run.event("end", `failed: timed out after ${timeoutMs} ms`);
             settleReject(new Error(`${spec.command} timed out after ${timeoutMs} ms`));
             child.kill("SIGTERM");
             // A CLI that ignores SIGTERM would otherwise outlive the rejected call.
@@ -372,6 +372,9 @@ export async function runAgent(
 
             const error = spec.error(event);
             if (error !== null) {
+                // Closing the run here as well: the child is killed below, so its close handler
+                // returns early and would otherwise leave the run reading as still going.
+                run.event("end", `failed: ${error}`);
                 settleReject(new Error(error));
                 child.kill("SIGTERM");
                 return;
@@ -443,19 +446,11 @@ export async function runAgent(
             }
         });
         child.once("error", (error) => {
-            run.event("end", `could not start: ${error.message}`);
+            run.event("end", `failed to start: ${error.message}`);
             settleReject(new Error(`${spec.command} could not be started: ${error.message}`));
         });
         child.once("close", (code) => {
-            flushText("thinking");
-            flushText("delta");
-            if (options.json) {
-                for (const line of replyLines((finalText ?? accumulated).trim())) run.event("delta", line);
-            }
-            const seconds = ((performance.now() - started) / 1000).toFixed(1);
-            run.event("end", code === 0
-                ? `done in ${seconds}s, ${(finalText ?? accumulated).length} chars`
-                : `exit ${code} after ${seconds}s`);
+            // A run settled by the timeout or a spawn failure has closed its own log line already.
             if (settled) return;
 
             processStdoutText(stdoutDecoder.decode());
@@ -463,20 +458,33 @@ export async function runAgent(
             // Parsing the flushed tail can surface an error event that settles the promise.
             if (isSettled()) return;
 
+            flushText("thinking");
+            flushText("delta");
+            const reply = (finalText ?? accumulated).trim();
+            const seconds = ((performance.now() - started) / 1000).toFixed(1);
+
             if (code !== 0) {
+                run.event("end", `failed in ${seconds}s: exit ${code}`);
                 settleReject(new Error(`${spec.command} exited ${code}: ${stderrTail.toString()}`));
                 return;
             }
 
-            if (finalText === undefined && accumulated === "") {
-                // Exiting 0 having emitted no reply means the CLI failed in a way it did not report
-                // as an event — an auth banner, say. Resolving here would hand the child an empty
-                // answer and look like the model had nothing to say.
+            if (reply === "") {
+                // Exiting 0 having said nothing means the CLI failed in a way it did not report as
+                // an event — an auth banner, an exhausted quota. That includes answering with an
+                // empty assistant message, which pi does: resolving would hand the child silence
+                // and look like the model had nothing to say.
+                run.event("end", `failed in ${seconds}s: exited 0 without a reply`);
                 settleReject(new Error(
                     `${spec.command} exited ${code} without a reply: ${stderrTail.toString()}`,
                 ));
                 return;
             }
+
+            if (options.json) {
+                for (const line of replyLines(reply)) run.event("delta", line);
+            }
+            run.event("end", `done in ${seconds}s, ${reply.length} chars`);
             settleResolve();
         });
     });
