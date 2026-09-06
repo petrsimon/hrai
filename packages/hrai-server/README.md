@@ -55,6 +55,35 @@ directory, so it cannot reach the source tree and no `AGENTS.md` is pulled into 
 | `HRAI_AGENT_MODEL` | model for the selected agent CLI when it has no per-backend variable |
 | `HRAI_AGENT_TIMEOUT_MS` | per-call timeout, default `120000` |
 | `HRAI_AGENT_CWD` | sandbox working directory, default a fresh empty temp dir |
+| `HRAI_AGENT_TRACE` | watch a run: `1` traces to the server log, any other value is a file to append to; unset, `0` and `off` are off |
+
+### Watching a run
+
+A tutor call reaches an agent CLI as one child process, and nothing about it is visible by default:
+`codex` reports only a finished message, and the plan and title calls ask for JSON without a delta
+callback, so a new project is silent until it lands. `HRAI_AGENT_TRACE` writes the child's own event
+stream as it arrives:
+
+```sh
+HRAI_AGENT_TRACE=1 npm start --workspace=packages/hrai-server
+HRAI_AGENT_TRACE=/tmp/hrai-agent.log npm start --workspace=packages/hrai-server  # then: tail -f
+```
+
+```text
+[hrai agent pi 4f2c9ab1] = start model=openai-codex/gpt-5.4 cwd=/tmp/hrai-agent-x json=true prompt=2841 chars
+[hrai agent pi 4f2c9ab1] < {"type":"message_update","assistantMessageEvent":{"type":"text_delta",…
+[hrai agent pi 4f2c9ab1] ! pi: resolving provider
+[hrai agent pi 4f2c9ab1] = exit 0 after 12.4s, 1832 chars
+```
+
+`<` is a stdout event, `!` is stderr, `=` is a run boundary, and the eight-digit tag separates runs
+that overlap. Lines the runner cannot parse are traced too — an auth banner is usually the answer
+when a run fails.
+
+**A trace holds the child's project text.** The `start` line records only the prompt size, but the
+CLIs echo the turn back in their own events — `pi` emits the user message, and every backend emits
+the reply. Treat a trace file as project data: keep it off shared machines and delete it when the
+run is understood.
 
 The per-backend variables exist because one global model name cannot serve five backends: a name
 `ollama` understands is rejected by `cursor-agent`, and the reverse. Unset means the backend picks —

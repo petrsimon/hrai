@@ -1,4 +1,7 @@
 import {EventEmitter, once} from "node:events";
+import {mkdtempSync, readFileSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
 import {Readable} from "node:stream";
 import {afterEach, describe, expect, it, vi} from "vitest";
 
@@ -12,7 +15,7 @@ vi.mock("node:child_process", () => ({
     spawn: spawnMock,
 }));
 
-const ENV_KEYS = ["HRAI_AGENT_CWD", "HRAI_AGENT_TIMEOUT_MS"] as const;
+const ENV_KEYS = ["HRAI_AGENT_CWD", "HRAI_AGENT_TIMEOUT_MS", "HRAI_AGENT_TRACE"] as const;
 
 interface FakeChild extends EventEmitter {
     stdout: Readable;
@@ -340,6 +343,55 @@ describe("agent CLI runner", () => {
         // A logged-out CLI answers --version happily, so availability must ask about the account.
         expect(execFileMock).toHaveBeenCalledWith("codex", ["login", "status"], {timeout: 5000}, expect.any(Function));
         expect(execFileMock).toHaveBeenCalledWith("cursor-agent", ["status"], {timeout: 5000}, expect.any(Function));
+    });
+
+    it("traces a run to a file, sizing the prompt rather than quoting it", async () => {
+        const tracePath = join(mkdtempSync(join(tmpdir(), "hrai-trace-")), "agent.log");
+        process.env.HRAI_AGENT_TRACE = tracePath;
+        const child = createChild();
+        spawnMock.mockReturnValue(child);
+        const {runAgent} = await loadAgentCli();
+        const replyPromise = runAgent("pi", {system: "system", user: "a secret game about a dragon"});
+
+        child.stderr.push("pi: warming up\n");
+        await completeChild(child, [
+            "not json at all",
+            JSON.stringify({
+                type: "message_end",
+                message: {role: "assistant", content: [{type: "text", text: "Blue"}]},
+            }),
+        ]);
+        await replyPromise;
+
+        const trace = readFileSync(tracePath, "utf8");
+        expect(trace).toMatch(/\[hrai agent pi [0-9a-f]{8}] = start model=default/);
+        expect(trace).toContain(`prompt=${"system".length + "a secret game about a dragon".length} chars`);
+        expect(trace).not.toContain("a secret game about a dragon");
+        expect(trace).toContain("! pi: warming up");
+        expect(trace).toContain("< not json at all");
+        expect(trace).toContain("< {\"type\":\"message_end\"");
+        expect(trace).toMatch(/= exit 0 after [\d.]+s, 4 chars/);
+    });
+
+    it("writes no trace unless HRAI_AGENT_TRACE asks for one", async () => {
+        const stderrWrite = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+        try {
+            const child = createChild();
+            spawnMock.mockReturnValue(child);
+            const {runAgent} = await loadAgentCli();
+            const replyPromise = runAgent("pi", {system: "system", user: "user"});
+
+            await completeChild(child, [
+                JSON.stringify({
+                    type: "message_end",
+                    message: {role: "assistant", content: [{type: "text", text: "Blue"}]},
+                }),
+            ]);
+            await expect(replyPromise).resolves.toMatchObject({text: "Blue"});
+            expect(stderrWrite).not.toHaveBeenCalled();
+        } finally {
+            stderrWrite.mockRestore();
+        }
     });
 
     it("adds a bare JSON object instruction in JSON mode", async () => {

@@ -133,6 +133,8 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 - `HRAI_MODEL_BACKEND` also accepts `cursor`, `pi`, and `codex`. Those spawn a locally installed
   agent CLI instead of calling a model server, and they reach hosted APIs — the child's project
   text leaves the machine. The Compose deployment still uses `llama.cpp`. See the package README.
+- An agent-CLI run is invisible by default. `HRAI_AGENT_TRACE=1` traces the child's event stream to
+  the server log, or set it to a path to append there instead.
 
 ### scratch-vm specifics
 
