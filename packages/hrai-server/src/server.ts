@@ -9,8 +9,10 @@ import { Server } from "socket.io";
 import { handleApiRequest } from "./api.ts";
 import { parseCookies, HraiStore, SESSION_COOKIE, type AssistantPreferences } from "./store.ts";
 import { EVAL_MODEL, chat, chatJson, type ChatOptions } from "./model-client.ts";
-import { defaultModelRef, formatModelRef, parseModelRef, runtimeFor } from "./pi-runtime.ts";
-import { recentRuns, subscribe as subscribeTranscript } from "./transcript.ts";
+import { defaultModelRef, formatModelRef, parseModelRef, resolveModel, runtimeFor, type ResolvedModel } from "./pi-runtime.ts";
+import { publish, recentRuns, subscribe as subscribeTranscript } from "./transcript.ts";
+import { TOOL_RULES } from "./tutor-tools.ts";
+import { tutorSessionFor, type TutorSession } from "./tutor-session.ts";
 import { planGame } from "./game-planner.ts";
 import { MAX_GAME_IDEA_LENGTH } from "./game-plan.ts";
 import { parseGameRestore } from "./game-restore.ts";
@@ -18,7 +20,6 @@ import { suggestProjectTitle } from "./project-title.ts";
 import { PALETTE, labelText, opcodesNamedByLabel } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
-import { enforceTutorPolicy, stripUnknownAliases } from "./tutor-policy.ts";
 import type { RenderTarget } from "./render.ts";
 import {
     MAX_VOICE_BYTES,
@@ -195,7 +196,7 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
  */
 async function resolveModelChoice(
     user: { id: string; assistantPreferences: AssistantPreferences } | null,
-): Promise<{ model: string; options: ChatOptions }> {
+): Promise<{ model: string; resolved: ResolvedModel; options: ChatOptions }> {
     if (!user) throw new Error("profile required");
     const preferences = user.assistantPreferences;
     const chosen = preferences.model === "default" ? parseModelRef(defaultModelRef()) : parseModelRef(preferences.model);
@@ -204,7 +205,24 @@ async function resolveModelChoice(
         ...chosen,
         ...(preferences.thinkingLevel === "default" ? {} : { thinkingLevel: preferences.thinkingLevel }),
     });
-    return { model, options: { runtime: await runtimeFor(user.id), owner: user.id } };
+    const runtime = await runtimeFor(user.id);
+    return { model, resolved: resolveModel(runtime, model), options: { runtime, owner: user.id } };
+}
+
+/** What the child hears when the agent ended a turn without delivering anything. */
+const NOTHING_DELIVERED = "Teď jsem se zamotal. Zkus mi to říct ještě jednou, prosím.";
+
+/**
+ * The project id under which a session file is kept.
+ * @param payload Whatever the socket delivered.
+ * @returns A safe directory name, or null when the payload is unusable.
+ */
+function parseProjectId(payload: unknown): string | null {
+    if (typeof payload !== "object" || payload === null) return null;
+    const { projectId } = payload as Record<string, unknown>;
+    if (projectId === null || projectId === undefined || projectId === "") return "unsaved";
+    const id = typeof projectId === "number" ? String(projectId) : projectId;
+    return typeof id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(id) ? id : null;
 }
 
     io.of("/hrai").on("connection", async (socket) => {
@@ -226,13 +244,57 @@ async function resolveModelChoice(
         void announceVoiceCapabilities();
         const voiceReadinessTimer = setInterval(() => void announceVoiceCapabilities(), 5_000);
 
-        // What this server has seen of this child's runs, sent under its own event so the editor
-        // replaces whatever it still holds: after a restart those runs are another process's.
-        socket.emit("agent:log:recent", user ? recentRuns(user.id) : []);
-        const stopTranscript = user ? subscribeTranscript(user.id, (event) => socket.emit("agent:log", [event])) : () => undefined;
+        // Live transcript events for this child; the history arrives once the project is known.
+        const stopTranscript = user ? subscribeTranscript(user.id, (event) => socket.emit("session:event", event)) : () => undefined;
+
+        let projectId = "unsaved";
+        let tutor: TutorSession | null = null;
+        let tutorOpening: Promise<TutorSession> | null = null;
+
+        /**
+         * The agent for this profile and project, opened on first use and reopened when the
+         * project changes. Sends the transcript so far once it is open.
+         * @returns The shared instance for this socket's project.
+         */
+        const openTutor = async (): Promise<TutorSession> => {
+            if (!user) throw new Error("profile required");
+            if (tutor?.key === `${user.id}:${projectId}`) return tutor;
+            if (tutorOpening) return tutorOpening;
+            tutorOpening = (async () => {
+                const { resolved, options } = await resolveModelChoice(user);
+                const opened = await tutorSessionFor({
+                    userId: user.id, projectId, runtime: options.runtime ?? await runtimeFor(user.id), resolved,
+                });
+                tutor?.detach();
+                tutor = opened;
+                socket.emit("session:history", {
+                    projectId,
+                    events: [...opened.history(), ...recentRuns(user.id)],
+                });
+                return opened;
+            })().finally(() => { tutorOpening = null; });
+            return tutorOpening;
+        };
+
+        socket.on("session:open", (payload: unknown) => {
+            const id = parseProjectId(payload);
+            if (!id || !user) return;
+            projectId = id;
+            openTutor().catch((error: unknown) => {
+                console.error("hrai: could not open the tutor session", error);
+                socket.emit("session:history", { projectId, events: recentRuns(user.id) });
+            });
+        });
+
+        socket.on("session:abort", () => {
+            void tutor?.abort();
+        });
+
         socket.on("disconnect", () => {
             clearInterval(voiceReadinessTimer);
             stopTranscript();
+            tutor?.detach();
+            tutor = null;
         });
 
         const emitLessonProgress = (): void => {
@@ -389,7 +451,6 @@ async function resolveModelChoice(
             if (rememberLearner) session.remember("learner", question);
             const render = session.render();
             const rung = session.rung;
-            const history = rememberLearner ? session.history.slice(0, -1) : session.history.slice();
             const context = session.tutorContextFor(rung);
             const progress = session.lessonProgress;
             const gameProgress = session.gameProgress;
@@ -442,35 +503,35 @@ async function resolveModelChoice(
             modelCallPending = true;
             socket.emit("thinking", {thinking: true});
 
-            // Buffer the model response so pedagogical constraints can be enforced
-            // before any prose reaches the child. Streaming raw tokens would make a
-            // post-generation safety check cosmetic rather than real.
-            void resolveModelChoice(user)
-                .then(({model, options}) => chat(
-                    [
+            // The child's message is whatever `tell_child` delivered, policed inside the tool,
+            // so nothing streams to the Hrai tab before the pedagogical check has run.
+            void (async () => {
+                const { resolved } = await resolveModelChoice(user);
+                const agent = await openTutor();
+                if (agent.isBusy) throw new Error("hrai: tutor turn already running for this project");
+                await agent.useModel(resolved);
+                const result = await agent.ask({
+                    session,
+                    rung,
+                    question,
+                    systemPrompt: [
                         systemPrompt(rung, context, session.assistantPreferences),
                         ...(stepComplete ? [COMPLETED_STEP_CONTEXT] : []),
+                        TOOL_RULES,
                     ].join("\n"),
-                    userPrompt(render, question, history),
-                    model,
-                    stepComplete ? "hint" : "answer",
-                    options,
-                ))
-                .then((reply) => {
-                    const policed = enforceTutorPolicy(reply.text, {
-                        rung,
-                        hasGoalContext: Boolean(context),
-                    });
-                    const {text, removed} = stripUnknownAliases(
-                        policed,
-                        (alias) => session.resolveAlias(alias) !== undefined,
-                    );
-                    if (removed.length > 0) {
-                        console.warn(`hrai: answer at rung ${rung} cited unknown block aliases ${removed.join(", ")}`);
-                    }
-                    session.remember("tutor", text);
-                    socket.emit("token", {id, delta: text});
-                    socket.emit("blocks", {id, blocks: blocksNamedIn(text)});
+                    userPrompt: userPrompt(render, question),
+                });
+                if (result.error) throw new Error(result.error);
+                if (!result.message) {
+                    console.warn(`hrai: the tutor ended a turn without tell_child (rung ${rung}); prose: ${result.prose.slice(0, 200)}`);
+                    publish(user.id, { kind: "note", text: "Tah skončil bez tell_child; dítě dostalo náhradní větu." });
+                }
+                return result.message ?? { text: NOTHING_DELIVERED, blocks: [] };
+            })()
+                .then((message) => {
+                    session.remember("tutor", message.text);
+                    socket.emit("token", {id, delta: message.text});
+                    socket.emit("blocks", {id, blocks: blocksNamedIn([message.text, ...message.blocks].join(" "))});
                     socket.emit("done", {id, rung});
                 })
                 .catch((error: unknown) => {

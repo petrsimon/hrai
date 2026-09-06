@@ -7,6 +7,7 @@ import {afterAll, beforeAll, describe, expect, it, vi} from "vitest";
 import type {GamePlan} from "../src/game-plan.ts";
 import {startServer} from "../src/server.ts";
 import {HraiStore, SESSION_COOKIE} from "../src/store.ts";
+import {startStubProvider, type StubProvider} from "./helpers/stub-provider.ts";
 
 const PORT = 8701;
 const PLAN: GamePlan = {
@@ -94,6 +95,8 @@ let socket: Socket | undefined;
 let dataDir: string;
 /** A signed-in child: planning needs a profile, since the model is called with its credentials. */
 let cookie: string;
+/** The planner is mocked, but choosing a model for it still needs one the runtime knows. */
+let stub: StubProvider;
 
 function connect(): Socket {
     return io(`http://localhost:${PORT}/hrai`, {transports: ["websocket"], extraHeaders: {Cookie: cookie}});
@@ -102,6 +105,10 @@ function connect(): Socket {
 beforeAll(async () => {
     dataDir = mkdtempSync(join(tmpdir(), "hrai-game-server-"));
     process.env.HRAI_DATA_DIR = dataDir;
+    stub = await startStubProvider();
+    process.env.HRAI_OLLAMA_HOST = stub.baseUrl;
+    process.env.HRAI_OLLAMA_MODELS = "stub";
+    process.env.HRAI_PI_MODEL = "ollama/stub";
     const store = new HraiStore(dataDir);
     await store.load();
     const child = await store.createUser("kid", "correct horse", "Kid");
@@ -122,10 +129,11 @@ beforeAll(async () => {
     });
 });
 
-afterAll(() => {
+afterAll(async () => {
     socket?.close();
     server?.close();
-    delete process.env.HRAI_DATA_DIR;
+    await stub.close();
+    for (const key of ["HRAI_DATA_DIR", "HRAI_OLLAMA_HOST", "HRAI_OLLAMA_MODELS", "HRAI_PI_MODEL"]) delete process.env[key];
     rmSync(dataDir, {recursive: true, force: true});
 });
 
