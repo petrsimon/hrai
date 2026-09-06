@@ -11,6 +11,7 @@ import { parseCookies, HraiStore, SESSION_COOKIE, type AssistantPreferences } fr
 import { EVAL_MODEL, chat, chatJson, type ChatOptions } from "./model-client.ts";
 import { defaultModelRef, formatModelRef, parseModelRef, resolveModel, runtimeFor, type ResolvedModel } from "./pi-runtime.ts";
 import { publish, recentRuns, subscribe as subscribeTranscript } from "./transcript.ts";
+import { startLogin, type LoginFlow } from "./provider-login.ts";
 import { TOOL_RULES } from "./tutor-tools.ts";
 import { tutorSessionFor, type TutorSession } from "./tutor-session.ts";
 import { planGame } from "./game-planner.ts";
@@ -209,6 +210,19 @@ async function resolveModelChoice(
     return { model, resolved: resolveModel(runtime, model), options: { runtime, owner: user.id } };
 }
 
+/**
+ * Narrows a login request.
+ * @param payload Whatever the socket delivered.
+ * @returns The provider and flow, or null when the payload is unusable.
+ */
+function parseLoginRequest(payload: unknown): { providerId: string; type: "oauth" | "api_key" } | null {
+    if (typeof payload !== "object" || payload === null) return null;
+    const { providerId, type } = payload as Record<string, unknown>;
+    if (typeof providerId !== "string" || !/^[a-z0-9-]{1,64}$/.test(providerId)) return null;
+    if (type !== "oauth" && type !== "api_key") return null;
+    return { providerId, type };
+}
+
 /** What the child hears when the agent ended a turn without delivering anything. */
 const NOTHING_DELIVERED = "Teď jsem se zamotal. Zkus mi to říct ještě jednou, prosím.";
 
@@ -290,11 +304,77 @@ function parseProjectId(payload: unknown): string | null {
             void tutor?.abort();
         });
 
+        // One login flow at a time per socket. The credential goes to the profile's own
+        // auth.json; only announcements and questions travel over the socket.
+        let login: LoginFlow | null = null;
+
+        socket.on("provider:login", (payload: unknown) => {
+            const request = parseLoginRequest(payload);
+            if (!request) return;
+            const { providerId, type } = request;
+            if (!user) {
+                socket.emit("provider:login:done", { providerId, ok: false, error: "profile required" });
+                return;
+            }
+            if (login) {
+                socket.emit("provider:login:done", { providerId, ok: false, error: "another login is running" });
+                return;
+            }
+            void runtimeFor(user.id).then((runtime) => {
+                if (!runtime.getProvider(providerId)) {
+                    socket.emit("provider:login:done", { providerId, ok: false, error: `unknown provider ${providerId}` });
+                    return;
+                }
+                const flow = startLogin(runtime, providerId, type, {
+                    notify: (event) => socket.emit("provider:login:event", { providerId, event }),
+                    prompt: (promptId, prompt) => socket.emit("provider:login:prompt", { providerId, promptId, prompt }),
+                    withdraw: (promptId) => socket.emit("provider:login:withdraw", { providerId, promptId }),
+                });
+                login = flow;
+                flow.done
+                    .then(() => socket.emit("provider:login:done", { providerId, ok: true }))
+                    .catch((error: unknown) => {
+                        const message = error instanceof Error ? error.message : String(error);
+                        console.warn(`hrai: login to ${providerId} for ${user.id} failed: ${message}`);
+                        socket.emit("provider:login:done", { providerId, ok: false, error: message });
+                    })
+                    .finally(() => {
+                        if (login === flow) login = null;
+                    });
+            });
+        });
+
+        socket.on("provider:login:answer", (payload: unknown) => {
+            if (typeof payload !== "object" || payload === null || !login) return;
+            const { promptId, value, cancelled } = payload as Record<string, unknown>;
+            if (typeof promptId !== "string") return;
+            if (cancelled === true) login.cancel(promptId);
+            else if (typeof value === "string") login.answer(promptId, value);
+        });
+
+        socket.on("provider:login:cancel", () => {
+            login?.cancel();
+        });
+
+        socket.on("provider:logout", (payload: unknown) => {
+            if (typeof payload !== "object" || payload === null || !user) return;
+            const { providerId } = payload as Record<string, unknown>;
+            if (typeof providerId !== "string" || !/^[a-z0-9-]{1,64}$/.test(providerId)) return;
+            void runtimeFor(user.id)
+                .then((runtime) => runtime.logout(providerId))
+                .then(() => socket.emit("provider:logout:done", { providerId, ok: true }))
+                .catch((error: unknown) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    socket.emit("provider:logout:done", { providerId, ok: false, error: message });
+                });
+        });
+
         socket.on("disconnect", () => {
             clearInterval(voiceReadinessTimer);
             stopTranscript();
             tutor?.detach();
             tutor = null;
+            login?.cancel();
         });
 
         const emitLessonProgress = (): void => {
