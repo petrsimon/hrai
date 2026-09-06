@@ -151,6 +151,11 @@ machine on the network reaches it at `http://<host>:8080/`. `HRAI_SERVER_URL` st
 unset, so the editor calls the API on whatever origin it was opened from and nginx
 proxies `/api/` and `/socket.io/` to the tutor.
 
+nginx resolves the tutor per request through Docker's embedded DNS, so the editor
+starts and keeps serving whether or not the tutor is up: its routes answer 502 while
+the tutor is away, and a tutor that comes back is picked up without a restart. Rebuild
+the editor image to pick this up on a stack built before it.
+
 Log in on the host before starting, and check the container sees the same login:
 
 ```sh
