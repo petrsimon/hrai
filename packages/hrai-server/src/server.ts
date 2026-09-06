@@ -229,8 +229,9 @@ async function resolveModelChoice(
         void announceVoiceCapabilities();
         const voiceReadinessTimer = setInterval(() => void announceVoiceCapabilities(), 5_000);
 
-        // The buffer first, so a log tab opened during a run does not start blank.
-        socket.emit("agent:log", recentAgentLog());
+        // What this server has seen, sent under its own event so the editor replaces whatever it
+        // still holds rather than adding to it: after a restart those runs are another process's.
+        socket.emit("agent:log:recent", recentAgentLog());
         const stopAgentLog = onAgentLog((event) => socket.emit("agent:log", [event]));
         socket.on("disconnect", () => {
             clearInterval(voiceReadinessTimer);

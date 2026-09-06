@@ -185,6 +185,11 @@ const HraiPanel = ({
             });
         });
 
+        socket.on('agent:log:recent', events => {
+            // A reconnected server is possibly a restarted one, whose runs are the only real ones.
+            setAgentRuns(addAgentLogEvents([], Array.isArray(events) ? events : []));
+        });
+
         socket.on('agent:log', events => {
             setAgentRuns(prev => addAgentLogEvents(prev, Array.isArray(events) ? events : [events]));
         });
