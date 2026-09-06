@@ -10,6 +10,7 @@ import HraiPanelComponent from '../components/hrai-panel/hrai-panel.jsx';
 import log from '../lib/log.js';
 import {clearGameProgress, loadGameProgress, saveGamePlaytest, saveGameProgress} from '../lib/hrai-game-progress';
 import {loadGameStarter} from '../lib/hrai-game-starter';
+import {addAgentLogEvents} from '../lib/hrai-agent-log.js';
 import lessons from '../lib/hrai-lessons';
 import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
@@ -25,11 +26,6 @@ const messages = defineMessages({
         id: 'gui.hrai.helperUnavailable',
         defaultMessage: 'Pomocník teď není k dispozici.',
         description: 'calm message shown when the hrai tutor server cannot be reached'
-    },
-    defaultProjectTitle: {
-        id: 'gui.gui.defaultProjectTitle',
-        defaultMessage: 'Scratch Project',
-        description: 'default project title, used to tell an unnamed project from a named one'
     },
     newProjectConfirmation: {
         id: 'gui.hrai.newProjectConfirmation',
@@ -79,6 +75,7 @@ const HraiPanel = ({
     const intl = useIntl();
     const [chatMessages, setChatMessages] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
+    const [agentRuns, setAgentRuns] = useState([]);
     const [isServerAvailable, setIsServerAvailable] = useState(false);
     const [rung, setRung] = useState(0);
     const [lessonProgress, setLessonProgress] = useState(null);
@@ -186,6 +183,10 @@ const HraiPanel = ({
                 requestId: failure?.requestId,
                 code: failure?.code || 'stt_failed'
             });
+        });
+
+        socket.on('agent:log', events => {
+            setAgentRuns(prev => addAgentLogEvents(prev, Array.isArray(events) ? events : [events]));
         });
 
         socket.on('thinking', ({thinking}) => {
@@ -417,7 +418,9 @@ const HraiPanel = ({
     // A project saved for the first time without a plan behind it has nothing but the
     // default title. Ask the tutor to name it from what the child actually built.
     const hadProjectIdRef = useRef(false);
-    const defaultProjectTitle = intl.formatMessage(messages.defaultProjectTitle);
+    // titled-hoc declares this message; declaring it here too makes the extractor reject the pair
+    // as a duplicate id, so the title is formatted from the id the HOC already owns.
+    const defaultProjectTitle = intl.formatMessage({id: 'gui.gui.defaultProjectTitle'});
     useEffect(() => {
         const isNamed = projectTitle && projectTitle !== defaultProjectTitle;
         if (isShowingWithId && !hadProjectIdRef.current &&
@@ -491,6 +494,7 @@ const HraiPanel = ({
     return (
         <HraiPanelComponent
             gamePlan={gamePlan}
+            agentRuns={agentRuns}
             gamePlaytest={gamePlaytest}
             gameProgress={gameProgress}
             hasProjectContent={hasMeaningfulWorkspace(vm)}
