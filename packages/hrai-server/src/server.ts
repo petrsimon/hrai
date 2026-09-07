@@ -5,9 +5,12 @@
  * changes; the server answers questions against the state it already holds.
  */
 import { createServer } from "node:http";
-import { Server } from "socket.io";
+import { Server, type DefaultEventsMap } from "socket.io";
 import { handleApiRequest } from "./api.ts";
-import { parseCookies, HraiStore, SESSION_COOKIE, type AssistantPreferences } from "./store.ts";
+import {
+    parseCookies, HraiStore, SESSION_COOKIE,
+    type AssistantPreferences, type AuthenticatedUser,
+} from "./store.ts";
 import { EVAL_MODEL, chat, chatJson, type ChatOptions } from "./model-client.ts";
 import { defaultModelRef, formatModelRef, parseModelRef, resolveModel, runtimeFor, type ResolvedModel } from "./pi-runtime.ts";
 import { publish, recentRuns, subscribe as subscribeTranscript } from "./transcript.ts";
@@ -109,6 +112,11 @@ interface ServerOptions {
     store?: HraiStore;
 }
 
+/** What the handshake middleware hands the connection handler. */
+interface HraiSocketData {
+    user: AuthenticatedUser | null;
+}
+
 /**
  * A whole message that only asserts completion. Anything with more content — a bare
  * "ano" answering the tutor's own question, "mám otázku", a real question — goes to
@@ -178,10 +186,25 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
     const http = createServer((request, response) => {
         if (request.url?.startsWith("/api/")) void handleApiRequest(request, response, store);
     });
-    const io = new Server(http, {
+    const io = new Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, HraiSocketData>(http, {
         // The editor is served from a different origin during development.
         cors: { origin: true },
         maxHttpBufferSize: SOCKET_BUFFER_BYTES,
+    });
+    const hrai = io.of("/hrai");
+
+    // The profile is resolved here rather than in the connection handler. An await in that
+    // handler registers the event listeners a tick late, and socket.io drops packets that
+    // arrive before a listener exists — the editor's first "session:open" or "workspace"
+    // would vanish. Middleware finishes before the client is told it is connected.
+    hrai.use((socket, next) => {
+        store.load()
+            .then(() => store.userForSession(parseCookies(socket.handshake.headers.cookie)[SESSION_COOKIE]))
+            .then((user) => {
+                socket.data.user = user;
+                next();
+            })
+            .catch((error: unknown) => next(error as Error));
     });
     const speechToText = options.speechToText ?? new WhisperSpeechToText();
     const gamePlanner = options.gamePlanner ?? planGame;
@@ -239,9 +262,8 @@ function parseProjectId(payload: unknown): string | null {
     return typeof id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(id) ? id : null;
 }
 
-    io.of("/hrai").on("connection", async (socket) => {
-        await store.load();
-        const user = await store.userForSession(parseCookies(socket.handshake.headers.cookie)[SESSION_COOKIE]);
+    hrai.on("connection", (socket) => {
+        const user = socket.data.user;
         const session = new Session(user?.assistantPreferences);
         let pendingVoiceRequestId: string | null = null;
         let modelCallPending = false;
