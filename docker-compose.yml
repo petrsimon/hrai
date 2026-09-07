@@ -64,9 +64,9 @@ services:
       context: .
       dockerfile: docker/hrai.Dockerfile
     environment:
-      HRAI_MODEL_BACKEND: llama.cpp
-      HRAI_MODEL_HOST: http://llama:8080
-      HRAI_EVAL_MODEL: ${HRAI_MODEL_NAME:-Qwen3.5-27B}
+      HRAI_LLAMA_HOST: http://llama:8080
+      HRAI_LLAMA_MODELS: ${HRAI_MODEL_NAME:-Qwen3.5-27B}
+      HRAI_PI_MODEL: llama/${HRAI_MODEL_NAME:-Qwen3.5-27B}
       HRAI_STT_HOST: http://whisper:8080
       HRAI_PORT: "8791"
       HRAI_DATA_DIR: /data
@@ -85,9 +85,9 @@ services:
       context: .
       dockerfile: docker/hrai-eval.Dockerfile
     environment:
-      HRAI_MODEL_BACKEND: llama.cpp
-      HRAI_EVAL_HOST: http://llama:8080
-      HRAI_EVAL_MODEL: ${HRAI_MODEL_NAME:-Qwen3.5-27B}
+      HRAI_LLAMA_HOST: http://llama:8080
+      HRAI_LLAMA_MODELS: ${HRAI_MODEL_NAME:-Qwen3.5-27B}
+      HRAI_EVAL_MODEL: llama/${HRAI_MODEL_NAME:-Qwen3.5-27B}
     depends_on:
       llama:
         condition: service_healthy

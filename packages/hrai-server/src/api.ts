@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { listBackends } from "./model-catalog.ts";
-import { defaultBackend, EVAL_MODEL } from "./model-client.ts";
+import { listProviders } from "./model-catalog.ts";
+import { runtimeFor } from "./pi-runtime.ts";
 import { sendPasswordReset } from "./mailer.ts";
 import { parseCookies, HraiStore, SESSION_COOKIE, type AuthenticatedUser } from "./store.ts";
 
@@ -218,10 +218,7 @@ export async function handleApiRequest(
         }
 
         if (request.method === "GET" && url.pathname === "/api/models") {
-            sendJson(response, 200, {
-                default: { backend: defaultBackend(), model: EVAL_MODEL },
-                backends: await listBackends(),
-            });
+            sendJson(response, 200, await listProviders(await runtimeFor(user.id)));
             return;
         }
 

@@ -122,19 +122,24 @@ Prettier (currently `task-herder`), run `npm run format` in addition to lint.
 
 - Not published; `private: true`. It is the only package outside the `@scratch/` scope, because hrai
   is a distinct product name and the `TRADEMARK` file reserves the Scratch marks.
-- Its tests call a **local model server** (ollama) and are therefore slow and environment-dependent.
+- Its tests call a **model** through pi and are therefore slow and environment-dependent.
   They skip loudly, printing the reason, when the model is unavailable — never silently green.
-- `npm test --workspace=packages/hrai-server` needs `ollama serve` and `ollama pull qwen3:14b`.
-  Override with `HRAI_EVAL_MODEL` / `HRAI_EVAL_HOST`.
+- `npm test --workspace=packages/hrai-server` needs `ollama serve`, `ollama pull qwen3:14b` and
+  `HRAI_OLLAMA_HOST=http://localhost:11434 HRAI_OLLAMA_MODELS=qwen3:14b`. Override the model with
+  `HRAI_EVAL_MODEL`, a `provider/model[:thinking]` reference.
 - Password recovery is email-based and optional: `HRAI_SMTP_URL` / `HRAI_MAIL_FROM` /
   `HRAI_EDITOR_URL`. With no SMTP relay configured the reset link is written to the server
   log rather than sent, and `npm run reset-password --workspace=packages/hrai-server`
   resets a password from the machine itself.
-- `HRAI_MODEL_BACKEND` also accepts `cursor`, `pi`, and `codex`. Those spawn a locally installed
-  agent CLI instead of calling a model server, and they reach hosted APIs — the child's project
-  text leaves the machine. The Compose deployment still uses `llama.cpp`. See the package README.
-- Every agent-CLI run is logged to `$HRAI_DATA_DIR/agent-log/YYYY-MM-DD.jsonl` with no flag set, is
-  shown live in the editor panel's Log tab, and is mirrored to the terminal when `HRAI_AGENT_TRACE`
+- Every model is reached through the pi SDK (`@earendil-works/pi-coding-agent`, pinned exactly).
+  A hosted subscription and a local server are both pi providers; a hosted one sees the child's
+  project text. Credentials are per profile under `$HRAI_DATA_DIR/pi/users/<id>/auth.json`, and a
+  socket without a profile gets no model. The Compose deployment serves llama.cpp as provider
+  `llama`. See the package README.
+- The tutor is a persistent pi agent session per profile and project with a `tell_child` tool
+  that is the only path to the child; the pedagogical policy runs on its arguments.
+- Every turn is logged to `$HRAI_DATA_DIR/agent-log/YYYY-MM-DD.jsonl` with no flag set, is shown
+  live in the editor panel's Záznam tab, and is mirrored to the terminal when `HRAI_AGENT_TRACE`
   is `1` or a file path. A log holds the child's project text — treat it as project data.
 
 ### scratch-vm specifics

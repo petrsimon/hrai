@@ -115,60 +115,27 @@ docker compose -f docker-compose.yml up --build
 
 The llama.cpp server uses its OpenAI-compatible API with one request slot. The tutor
 is text-only, so the multimodal projector is disabled; reasoning is also disabled so
-replies stay concise. HRAI selects it with `HRAI_MODEL_BACKEND=llama.cpp`; Ollama
-remains the default for non-Compose development and evaluation commands.
+replies stay concise. HRAI registers it as pi provider `llama` through
+`HRAI_LLAMA_HOST` / `HRAI_LLAMA_MODELS`, and `HRAI_PI_MODEL=llama/<model>` makes it
+the model for every profile that keeps *Server default*.
 
-## Run without a model server, using a host agent CLI
+## Hosted subscriptions from the deployed stack
 
-`docker-compose.agent.yml` is a second, self-contained stack: editor, tutor, and
-whisper, with no llama.cpp. The tutor spawns the host's `codex` CLI instead of
-calling a model server, so the answers come from the host's own login and no GPU
-or GGUF download is involved.
+A child can pick a hosted provider (openai-codex, OpenRouter, …) in the editor's
+assistant settings and log in there; the credential is stored under
+`/data/pi/users/<profile>/auth.json` on the `hrai-data` volume and used only for that
+profile. No host CLI, binary or login is mounted into the container.
 
-**The child's rendered project and chat leave the machine** and reach the agent
-CLI's provider. Use this stack only where that is acceptable.
+**The child's rendered project and chat leave the machine** and reach that provider.
+Local `llama` keeps everything on the host.
 
-Prepare the environment file once:
+Inside the container the browser cannot reach the loopback callback a subscription's
+OAuth flow normally listens on, so pick the *device code* method when the dialog
+offers it, or paste the redirect URL the browser lands on into the dialog's field.
+Both are pi's own flows; the tutor only relays them.
 
-```sh
-cp docker/agent.env.example docker/agent.env
-```
-
-Set `CODEX_BIN` to `command -v codex`, `CODEX_HOME_HOST_DIR` to the host `~/.codex`,
-and `HOST_UID`/`HOST_GID` to `id -u` / `id -g`. The container runs as that user, so
-files it writes into the mounted agent home and data directory stay host-owned.
-`codex` is a static binary, so the host executable runs unchanged inside the image.
-
-Create the data directory and start:
-
-```sh
-mkdir -p .hrai-data
-docker compose --env-file docker/agent.env -f docker-compose.agent.yml up -d --build
-```
-
-The editor is published on `0.0.0.0:${EDITOR_PORT}` (8080 by default), so another
-machine on the network reaches it at `http://<host>:8080/`. `HRAI_SERVER_URL` stays
-unset, so the editor calls the API on whatever origin it was opened from and nginx
-proxies `/api/` and `/socket.io/` to the tutor.
-
-nginx resolves the tutor per request through Docker's embedded DNS, so the editor
-starts and keeps serving whether or not the tutor is up: its routes answer 502 while
-the tutor is away, and a tutor that comes back is picked up without a restart. Rebuild
-the editor image to pick this up on a stack built before it.
-
-Log in on the host before starting, and check the container sees the same login:
-
-```sh
-codex login status
-docker compose --env-file docker/agent.env -f docker-compose.agent.yml exec hrai codex login status
-```
-
-To use `pi` instead, set `HRAI_AGENT_BACKEND=pi` and mount the host `pi`
-installation directory and `~/.pi` in place of the codex mounts; `pi` is
-dynamically linked, so mount its whole install directory, not just the binary.
-
-Stop it with `docker compose --env-file docker/agent.env -f docker-compose.agent.yml down`.
-Profiles and projects live in the `.hrai-data` host directory, not in a volume.
+Back up `/data/pi/users/` with the rest of the volume: it holds refresh tokens for
+paid subscriptions.
 
 ## Run the game-design eval on Ubuntu
 

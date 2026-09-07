@@ -6,11 +6,14 @@
  */
 import { createServer } from "node:http";
 import { Server } from "socket.io";
-import { onAgentLog, recentAgentLog } from "./agent-log.ts";
 import { handleApiRequest } from "./api.ts";
 import { parseCookies, HraiStore, SESSION_COOKIE, type AssistantPreferences } from "./store.ts";
-import { EVAL_MODEL, chat, chatJson, defaultBackend, defaultModelFor, type BackendId } from "./model-client.ts";
-import { listBackends } from "./model-catalog.ts";
+import { EVAL_MODEL, chat, chatJson, type ChatOptions } from "./model-client.ts";
+import { defaultModelRef, formatModelRef, parseModelRef, resolveModel, runtimeFor, type ResolvedModel } from "./pi-runtime.ts";
+import { publish, recentRuns, subscribe as subscribeTranscript } from "./transcript.ts";
+import { startLogin, type LoginFlow } from "./provider-login.ts";
+import { TOOL_RULES } from "./tutor-tools.ts";
+import { tutorSessionFor, type TutorSession } from "./tutor-session.ts";
 import { planGame } from "./game-planner.ts";
 import { MAX_GAME_IDEA_LENGTH } from "./game-plan.ts";
 import { parseGameRestore } from "./game-restore.ts";
@@ -18,7 +21,6 @@ import { suggestProjectTitle } from "./project-title.ts";
 import { PALETTE, labelText, opcodesNamedByLabel } from "./palette.ts";
 import { systemPrompt, userPrompt } from "./prompt.ts";
 import { Session } from "./session.ts";
-import { enforceTutorPolicy, stripUnknownAliases } from "./tutor-policy.ts";
 import type { RenderTarget } from "./render.ts";
 import {
     MAX_VOICE_BYTES,
@@ -120,6 +122,8 @@ export function isCompletionClaim(text: string): boolean {
 }
 
 const COMPLETION_FOLLOW_UP = /^(?:co|a)\s+(?:dál|teď)/iu;
+/** What a socket without a profile hears from anything that would need a model. */
+const SIGN_IN_PROMPT = "Přihlas se, ať ti můžu pomáhat.";
 const COMPLETED_STEP_CONTEXT =
     "KROK JE HOTOVÝ (editor to ověřil). Odpověz na otázku dítěte, nezadávej nový úkol.";
 
@@ -183,31 +187,56 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
     const gamePlanner = options.gamePlanner ?? planGame;
 
 /**
- * Resolves which backend and model a profile's tutor calls should use.
+ * Resolves whose credentials and which model a profile's tutor calls use.
  *
- * An unavailable choice falls back to the configured default rather than failing: a child should
- * not lose the tutor because a CLI was logged out since they picked it.
- * @param preferences The profile's assistant preferences, if the socket is signed in.
- * @returns The backend to call and the model name to pass it.
+ * A socket without a profile has no credentials, so it gets no model at all: the tutor answers
+ * with a sign-in prompt instead of borrowing anyone's account.
+ * @param user The signed-in profile, if any.
+ * @returns The model reference and the options every completion call takes.
+ * @throws {Error} When there is no profile.
  */
 async function resolveModelChoice(
-    preferences?: AssistantPreferences,
-): Promise<{ backend: BackendId; model: string }> {
-    // defaultModelFor lets HRAI_PI_MODEL and its siblings win, which EVAL_MODEL alone does not:
-    // a per-backend model name would otherwise be ignored whenever the child keeps the default.
-    const fallback = { backend: defaultBackend(), model: defaultModelFor(defaultBackend()) };
-    if (preferences === undefined || preferences.modelBackend === "default") return fallback;
+    user: { id: string; assistantPreferences: AssistantPreferences } | null,
+): Promise<{ model: string; resolved: ResolvedModel; options: ChatOptions }> {
+    if (!user) throw new Error("profile required");
+    const preferences = user.assistantPreferences;
+    const chosen = preferences.model === "default" ? parseModelRef(defaultModelRef()) : parseModelRef(preferences.model);
+    if (!chosen) throw new Error(`model reference "${preferences.model}" is unusable`);
+    const model = formatModelRef({
+        ...chosen,
+        ...(preferences.thinkingLevel === "default" ? {} : { thinkingLevel: preferences.thinkingLevel }),
+    });
+    const runtime = await runtimeFor(user.id);
+    return { model, resolved: resolveModel(runtime, model), options: { runtime, owner: user.id } };
+}
 
-    const backend = preferences.modelBackend;
-    const info = (await listBackends()).find((entry) => entry.id === backend);
-    if (info?.available !== true) {
-        console.warn(`hrai: model backend "${backend}" is unavailable; falling back to "${fallback.backend}"`);
-        return fallback;
-    }
-    return {
-        backend,
-        model: preferences.modelByBackend[backend] ?? defaultModelFor(backend),
-    };
+/**
+ * Narrows a login request.
+ * @param payload Whatever the socket delivered.
+ * @returns The provider and flow, or null when the payload is unusable.
+ */
+function parseLoginRequest(payload: unknown): { providerId: string; type: "oauth" | "api_key" } | null {
+    if (typeof payload !== "object" || payload === null) return null;
+    const { providerId, type } = payload as Record<string, unknown>;
+    if (typeof providerId !== "string" || !/^[a-z0-9-]{1,64}$/.test(providerId)) return null;
+    if (type !== "oauth" && type !== "api_key") return null;
+    return { providerId, type };
+}
+
+/** What the child hears when the agent ended a turn without delivering anything. */
+const NOTHING_DELIVERED = "Teď jsem se zamotal. Zkus mi to říct ještě jednou, prosím.";
+
+/**
+ * The project id under which a session file is kept.
+ * @param payload Whatever the socket delivered.
+ * @returns A safe directory name, or null when the payload is unusable.
+ */
+function parseProjectId(payload: unknown): string | null {
+    if (typeof payload !== "object" || payload === null) return null;
+    const { projectId } = payload as Record<string, unknown>;
+    if (projectId === null || projectId === undefined || projectId === "") return "unsaved";
+    const id = typeof projectId === "number" ? String(projectId) : projectId;
+    return typeof id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(id) ? id : null;
 }
 
     io.of("/hrai").on("connection", async (socket) => {
@@ -229,13 +258,123 @@ async function resolveModelChoice(
         void announceVoiceCapabilities();
         const voiceReadinessTimer = setInterval(() => void announceVoiceCapabilities(), 5_000);
 
-        // What this server has seen, sent under its own event so the editor replaces whatever it
-        // still holds rather than adding to it: after a restart those runs are another process's.
-        socket.emit("agent:log:recent", recentAgentLog());
-        const stopAgentLog = onAgentLog((event) => socket.emit("agent:log", [event]));
+        // Live transcript events for this child; the history arrives once the project is known.
+        const stopTranscript = user ? subscribeTranscript(user.id, (event) => socket.emit("session:event", event)) : () => undefined;
+
+        let projectId = "unsaved";
+        let tutor: TutorSession | null = null;
+        let tutorOpening: Promise<TutorSession> | null = null;
+
+        /**
+         * The agent for this profile and project, opened on first use and reopened when the
+         * project changes. Sends the transcript so far once it is open.
+         * @returns The shared instance for this socket's project.
+         */
+        const openTutor = async (): Promise<TutorSession> => {
+            if (!user) throw new Error("profile required");
+            if (tutor?.key === `${user.id}:${projectId}`) return tutor;
+            if (tutorOpening) return tutorOpening;
+            tutorOpening = (async () => {
+                const { resolved, options } = await resolveModelChoice(user);
+                const opened = await tutorSessionFor({
+                    userId: user.id, projectId, runtime: options.runtime ?? await runtimeFor(user.id), resolved,
+                });
+                tutor?.detach();
+                tutor = opened;
+                socket.emit("session:history", {
+                    projectId,
+                    events: [...opened.history(), ...recentRuns(user.id)],
+                });
+                return opened;
+            })().finally(() => { tutorOpening = null; });
+            return tutorOpening;
+        };
+
+        socket.on("session:open", (payload: unknown) => {
+            const id = parseProjectId(payload);
+            if (!id || !user) return;
+            projectId = id;
+            openTutor().catch((error: unknown) => {
+                console.error("hrai: could not open the tutor session", error);
+                socket.emit("session:history", { projectId, events: recentRuns(user.id) });
+            });
+        });
+
+        socket.on("session:abort", () => {
+            void tutor?.abort();
+        });
+
+        // One login flow at a time per socket. The credential goes to the profile's own
+        // auth.json; only announcements and questions travel over the socket.
+        let login: LoginFlow | null = null;
+
+        socket.on("provider:login", (payload: unknown) => {
+            const request = parseLoginRequest(payload);
+            if (!request) return;
+            const { providerId, type } = request;
+            if (!user) {
+                socket.emit("provider:login:done", { providerId, ok: false, error: "profile required" });
+                return;
+            }
+            if (login) {
+                socket.emit("provider:login:done", { providerId, ok: false, error: "another login is running" });
+                return;
+            }
+            void runtimeFor(user.id).then((runtime) => {
+                if (!runtime.getProvider(providerId)) {
+                    socket.emit("provider:login:done", { providerId, ok: false, error: `unknown provider ${providerId}` });
+                    return;
+                }
+                const flow = startLogin(runtime, providerId, type, {
+                    notify: (event) => socket.emit("provider:login:event", { providerId, event }),
+                    prompt: (promptId, prompt) => socket.emit("provider:login:prompt", { providerId, promptId, prompt }),
+                    withdraw: (promptId) => socket.emit("provider:login:withdraw", { providerId, promptId }),
+                });
+                login = flow;
+                flow.done
+                    .then(() => socket.emit("provider:login:done", { providerId, ok: true }))
+                    .catch((error: unknown) => {
+                        const message = error instanceof Error ? error.message : String(error);
+                        console.warn(`hrai: login to ${providerId} for ${user.id} failed: ${message}`);
+                        socket.emit("provider:login:done", { providerId, ok: false, error: message });
+                    })
+                    .finally(() => {
+                        if (login === flow) login = null;
+                    });
+            });
+        });
+
+        socket.on("provider:login:answer", (payload: unknown) => {
+            if (typeof payload !== "object" || payload === null || !login) return;
+            const { promptId, value, cancelled } = payload as Record<string, unknown>;
+            if (typeof promptId !== "string") return;
+            if (cancelled === true) login.cancel(promptId);
+            else if (typeof value === "string") login.answer(promptId, value);
+        });
+
+        socket.on("provider:login:cancel", () => {
+            login?.cancel();
+        });
+
+        socket.on("provider:logout", (payload: unknown) => {
+            if (typeof payload !== "object" || payload === null || !user) return;
+            const { providerId } = payload as Record<string, unknown>;
+            if (typeof providerId !== "string" || !/^[a-z0-9-]{1,64}$/.test(providerId)) return;
+            void runtimeFor(user.id)
+                .then((runtime) => runtime.logout(providerId))
+                .then(() => socket.emit("provider:logout:done", { providerId, ok: true }))
+                .catch((error: unknown) => {
+                    const message = error instanceof Error ? error.message : String(error);
+                    socket.emit("provider:logout:done", { providerId, ok: false, error: message });
+                });
+        });
+
         socket.on("disconnect", () => {
             clearInterval(voiceReadinessTimer);
-            stopAgentLog();
+            stopTranscript();
+            tutor?.detach();
+            tutor = null;
+            login?.cancel();
         });
 
         const emitLessonProgress = (): void => {
@@ -264,16 +403,20 @@ async function resolveModelChoice(
         socket.on("gamePlan", (payload: unknown) => {
             const idea = parseGameIdea(payload);
             if (!idea) return;
+            if (!user) {
+                socket.emit("error", { message: SIGN_IN_PROMPT });
+                return;
+            }
             if (modelCallPending) {
                 console.warn("hrai: ignored game-plan request while a model call is pending");
                 return;
             }
             modelCallPending = true;
             socket.emit("thinking", { thinking: true });
-            void resolveModelChoice(session.assistantPreferences)
-                .then(({ backend, model }) => gamePlanner(
+            void resolveModelChoice(user)
+                .then(({ model, options }) => gamePlanner(
                     idea,
-                    (system, user) => chatJson(system, user, model, backend, "plan"),
+                    (system, prompt) => chatJson(system, prompt, model, "plan", options),
                 ))
                 .then((plan) => {
                     session.proposeGamePlan(plan);
@@ -295,16 +438,16 @@ async function resolveModelChoice(
         socket.on("projectTitle", () => {
             const workspace = session.render();
             // Naming an empty stage would only produce a guess about nothing.
-            if (!session.hasWorkspace) return;
+            if (!session.hasWorkspace || !user) return;
             if (modelCallPending) {
                 console.warn("hrai: ignored project-title request while a model call is pending");
                 return;
             }
             modelCallPending = true;
-            void resolveModelChoice(session.assistantPreferences)
-                .then(({ backend, model }) => suggestProjectTitle(
+            void resolveModelChoice(user)
+                .then(({ model, options }) => suggestProjectTitle(
                     workspace,
-                    (system, user) => chat(system, user, model, backend, "title"),
+                    (system, prompt) => chat(system, prompt, model, "title", options),
                 ))
                 .then((title) => socket.emit("projectTitleSuggested", { title }))
                 .catch((error: unknown) => {
@@ -388,7 +531,6 @@ async function resolveModelChoice(
             if (rememberLearner) session.remember("learner", question);
             const render = session.render();
             const rung = session.rung;
-            const history = rememberLearner ? session.history.slice(0, -1) : session.history.slice();
             const context = session.tutorContextFor(rung);
             const progress = session.lessonProgress;
             const gameProgress = session.gameProgress;
@@ -433,38 +575,43 @@ async function resolveModelChoice(
                 return;
             }
 
+            if (!user) {
+                emitCanned(SIGN_IN_PROMPT);
+                return;
+            }
+
             modelCallPending = true;
             socket.emit("thinking", {thinking: true});
 
-            // Buffer the model response so pedagogical constraints can be enforced
-            // before any prose reaches the child. Streaming raw tokens would make a
-            // post-generation safety check cosmetic rather than real.
-            void resolveModelChoice(session.assistantPreferences)
-                .then(({backend, model}) => chat(
-                    [
+            // The child's message is whatever `tell_child` delivered, policed inside the tool,
+            // so nothing streams to the Hrai tab before the pedagogical check has run.
+            void (async () => {
+                const { resolved } = await resolveModelChoice(user);
+                const agent = await openTutor();
+                if (agent.isBusy) throw new Error("hrai: tutor turn already running for this project");
+                await agent.useModel(resolved);
+                const result = await agent.ask({
+                    session,
+                    rung,
+                    question,
+                    systemPrompt: [
                         systemPrompt(rung, context, session.assistantPreferences),
                         ...(stepComplete ? [COMPLETED_STEP_CONTEXT] : []),
+                        TOOL_RULES,
                     ].join("\n"),
-                    userPrompt(render, question, history),
-                    model,
-                    backend,
-                    stepComplete ? "hint" : "answer",
-                ))
-                .then((reply) => {
-                    const policed = enforceTutorPolicy(reply.text, {
-                        rung,
-                        hasGoalContext: Boolean(context),
-                    });
-                    const {text, removed} = stripUnknownAliases(
-                        policed,
-                        (alias) => session.resolveAlias(alias) !== undefined,
-                    );
-                    if (removed.length > 0) {
-                        console.warn(`hrai: answer at rung ${rung} cited unknown block aliases ${removed.join(", ")}`);
-                    }
-                    session.remember("tutor", text);
-                    socket.emit("token", {id, delta: text});
-                    socket.emit("blocks", {id, blocks: blocksNamedIn(text)});
+                    userPrompt: userPrompt(render, question),
+                });
+                if (result.error) throw new Error(result.error);
+                if (!result.message) {
+                    console.warn(`hrai: the tutor ended a turn without tell_child (rung ${rung}); prose: ${result.prose.slice(0, 200)}`);
+                    publish(user.id, { kind: "note", text: "Tah skončil bez tell_child; dítě dostalo náhradní větu." });
+                }
+                return result.message ?? { text: NOTHING_DELIVERED, blocks: [] };
+            })()
+                .then((message) => {
+                    session.remember("tutor", message.text);
+                    socket.emit("token", {id, delta: message.text});
+                    socket.emit("blocks", {id, blocks: blocksNamedIn([message.text, ...message.blocks].join(" "))});
                     socket.emit("done", {id, rung});
                 })
                 .catch((error: unknown) => {

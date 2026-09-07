@@ -120,3 +120,52 @@ describe('HraiPanel container custom game start', () => {
         expect(mockSocket.emit).not.toHaveBeenCalledWith('gamePlan', expect.anything());
     });
 });
+
+describe('HraiPanel container agent session', () => {
+    beforeEach(() => {
+        mockPanelRender.mockClear();
+    });
+
+    test('opens the session and folds history and live events', () => {
+        renderContainer();
+
+        act(() => {
+            socketHandlers.connect();
+        });
+        expect(mockSocket.emit).toHaveBeenCalledWith('session:open', {projectId: '0'});
+
+        act(() => {
+            socketHandlers['session:history']({
+                projectId: '0',
+                events: [
+                    {kind: 'user', turnId: 't1', text: 'Ahoj'},
+                    {kind: 'assistant_delta', turnId: 't1', delta: 'Čau'}
+                ]
+            });
+        });
+        expect(latestPanelProps().transcript).toMatchObject([{
+            kind: 'turn',
+            turnId: 't1',
+            user: 'Ahoj',
+            assistant: 'Čau',
+            running: true
+        }]);
+        expect(latestPanelProps().isAgentRunning).toBe(true);
+
+        act(() => {
+            socketHandlers['session:event']({
+                kind: 'turn_end',
+                turnId: 't1',
+                stopReason: 'stop',
+                model: 'openai-codex/gpt-5.4'
+            });
+        });
+        expect(latestPanelProps().isAgentRunning).toBe(false);
+        expect(latestPanelProps().transcript[0].stopReason).toBe('stop');
+
+        act(() => {
+            latestPanelProps().onAbort();
+        });
+        expect(mockSocket.emit).toHaveBeenCalledWith('session:abort');
+    });
+});

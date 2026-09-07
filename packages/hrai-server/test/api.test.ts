@@ -5,17 +5,27 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { handleApiRequest } from "../src/api.ts";
-import { defaultBackend, EVAL_MODEL } from "../src/model-client.ts";
 import { HraiStore } from "../src/store.ts";
 
+const catalog = {
+    default: "ollama/qwen3:14b",
+    providers: [{
+        id: "openai-codex",
+        name: "OpenAI Codex",
+        configured: true,
+        subscription: true,
+        login: { oauth: true, apiKey: false },
+        models: [{ id: "gpt-5.6-luna", name: "GPT-5.6 Luna", reasoning: true }],
+    }],
+};
+
 vi.mock("../src/model-catalog.ts", () => ({
-    listBackends: vi.fn(() => Promise.resolve([{
-        id: "cursor",
-        label: "Cursor",
-        available: true,
-        freeform: false,
-        models: ["gpt-5.2"],
-    }])),
+    listProviders: vi.fn(() => Promise.resolve(catalog)),
+}));
+
+vi.mock("../src/pi-runtime.ts", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("../src/pi-runtime.ts")>()),
+    runtimeFor: vi.fn(() => Promise.resolve({})),
 }));
 
 let directory: string;
@@ -86,13 +96,13 @@ describe("HRAI self-hosted API", () => {
             assistantPreferences: {
                 assistantName: "Sova",
                 persona: "socratic",
-                modelBackend: "default",
-                modelByBackend: {},
+                model: "default",
+                thinkingLevel: "default",
             },
         });
         const defaultProfile = await api("/api/profile");
         expect(await defaultProfile.json()).toMatchObject({
-            assistantPreferences: { modelBackend: "default", modelByBackend: {} },
+            assistantPreferences: { model: "default", thinkingLevel: "default" },
         });
 
         const withModel = await api("/api/profile/assistant", {
@@ -104,36 +114,29 @@ describe("HRAI self-hosted API", () => {
                 verbosity: "balanced",
                 language: "cs",
                 encouragement: false,
-                modelBackend: "cursor",
-                modelByBackend: { cursor: "gpt-5.2", pi: "local/qwen3:14b" },
+                model: "openai-codex/gpt-5.6-luna",
+                thinkingLevel: "high",
             }),
         });
         expect(withModel.status).toBe(200);
         const profile = await api("/api/profile");
         expect(await profile.json()).toMatchObject({
-            assistantPreferences: {
-                modelBackend: "cursor",
-                modelByBackend: { cursor: "gpt-5.2", pi: "local/qwen3:14b" },
-            },
+            assistantPreferences: { model: "openai-codex/gpt-5.6-luna", thinkingLevel: "high" },
         });
     });
 
-    it("lists the configured default and available model backends", async () => {
+    it("lists the profile's providers and models", async () => {
         const response = await api("/api/models");
         expect(response.status).toBe(200);
-        expect(await response.json()).toEqual({
-            default: { backend: defaultBackend(), model: EVAL_MODEL },
-            backends: [{
-                id: "cursor",
-                label: "Cursor",
-                available: true,
-                freeform: false,
-                models: ["gpt-5.2"],
-            }],
-        });
+        expect(await response.json()).toEqual(catalog);
     });
 
-    it("rejects unknown model backends", async () => {
+    it.each([
+        ["a model without a provider", { model: "gpt-5.2" }],
+        ["a model that starts with a dash", { model: "openai/--dangerously-bypass-approvals-and-sandbox" }],
+        ["a model with shell characters", { model: "openai/rm -rf" }],
+        ["an unknown thinking level", { model: "default", thinkingLevel: "ultra" }],
+    ])("rejects %s", async (_name, fields) => {
         const response = await api("/api/profile/assistant", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -143,89 +146,11 @@ describe("HRAI self-hosted API", () => {
                 verbosity: "balanced",
                 language: "cs",
                 encouragement: false,
-                modelBackend: "rm -rf",
-                modelByBackend: { cursor: "gpt-5.2" },
+                ...fields,
             }),
         });
         expect(response.status).toBe(400);
         expect(await response.json()).toEqual({ error: "invalid_assistant_preferences" });
-    });
-
-    it("rejects model names that start with a dash", async () => {
-        const response = await api("/api/profile/assistant", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                assistantName: "Sova",
-                persona: "socratic",
-                verbosity: "balanced",
-                language: "cs",
-                encouragement: false,
-                modelBackend: "cursor",
-                modelByBackend: { cursor: "--dangerously-bypass-approvals-and-sandbox" },
-            }),
-        });
-        expect(response.status).toBe(400);
-        expect(await response.json()).toEqual({ error: "invalid_assistant_preferences" });
-    });
-
-    it("rejects unknown model backend map keys", async () => {
-        const response = await api("/api/profile/assistant", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                assistantName: "Sova",
-                persona: "socratic",
-                verbosity: "balanced",
-                language: "cs",
-                encouragement: false,
-                modelBackend: "cursor",
-                modelByBackend: { "rm -rf": "x" },
-            }),
-        });
-        expect(response.status).toBe(400);
-        expect(await response.json()).toEqual({ error: "invalid_assistant_preferences" });
-    });
-
-    it("rejects non-object model backend maps", async () => {
-        for (const modelByBackend of [[], "gpt-5.2"]) {
-            const response = await api("/api/profile/assistant", {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    assistantName: "Sova",
-                    persona: "socratic",
-                    verbosity: "balanced",
-                    language: "cs",
-                    encouragement: false,
-                    modelBackend: "cursor",
-                    modelByBackend,
-                }),
-            });
-            expect(response.status).toBe(400);
-            expect(await response.json()).toEqual({ error: "invalid_assistant_preferences" });
-        }
-    });
-
-    it("drops empty model choices", async () => {
-        const response = await api("/api/profile/assistant", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                assistantName: "Sova",
-                persona: "socratic",
-                verbosity: "balanced",
-                language: "cs",
-                encouragement: false,
-                modelBackend: "cursor",
-                modelByBackend: { cursor: "" },
-            }),
-        });
-        expect(response.status).toBe(200);
-        const profile = await api("/api/profile");
-        expect(await profile.json()).toMatchObject({
-            assistantPreferences: { modelBackend: "cursor", modelByBackend: {} },
-        });
     });
 
     it("persists owned projects and rejects unauthenticated access", async () => {
@@ -315,9 +240,54 @@ describe("legacy profiles on disk", () => {
         const user = await legacyStore.userForSession(token);
 
         // resolveModelChoice reads both of these without guarding for a field older profiles lack.
-        expect(user?.assistantPreferences.modelBackend).toBe("default");
-        expect(user?.assistantPreferences.modelByBackend).toEqual({});
+        expect(user?.assistantPreferences.model).toBe("default");
+        expect(user?.assistantPreferences.thinkingLevel).toBe("default");
         expect(user?.assistantPreferences.persona).toBe("patient");
+
+        await rm(legacyDirectory, {recursive: true, force: true});
+    });
+
+    it("carries a model chosen for pi and drops the other backends", async () => {
+        const legacyDirectory = await mkdtemp(join(tmpdir(), "hrai-legacy-"));
+        const token = "legacy-session-token";
+        const profile = (id: string, modelBackend: string, modelByBackend: Record<string, string>) => ({
+            id,
+            username: id,
+            displayName: id,
+            passwordHash: "x",
+            createdAt: new Date().toISOString(),
+            assistantPreferences: {
+                assistantName: "hrai",
+                persona: "patient",
+                verbosity: "concise",
+                language: "cs",
+                encouragement: true,
+                modelBackend,
+                modelByBackend,
+            },
+        });
+        await writeFile(join(legacyDirectory, "store.json"), JSON.stringify({
+            nextProjectId: 1,
+            sessions: {
+                [createHash("sha256").update(token).digest("hex")]: { userId: "pi-kid", expiresAt: Date.now() + 60_000 },
+                [createHash("sha256").update(`${token}2`).digest("hex")]: { userId: "cursor-kid", expiresAt: Date.now() + 60_000 },
+            },
+            projects: [],
+            assets: {},
+            users: [
+                profile("pi-kid", "pi", { pi: "openai-codex/gpt-5.4", cursor: "gpt-5.2" }),
+                profile("cursor-kid", "cursor", { pi: "openai-codex/gpt-5.4", cursor: "gpt-5.2" }),
+            ],
+        }));
+
+        const legacyStore = new HraiStore(legacyDirectory);
+        await legacyStore.load();
+        const piKid = await legacyStore.userForSession(token);
+        const cursorKid = await legacyStore.userForSession(`${token}2`);
+
+        expect(piKid?.assistantPreferences).toMatchObject({ model: "openai-codex/gpt-5.4", thinkingLevel: "default" });
+        expect(cursorKid?.assistantPreferences).toMatchObject({ model: "default" });
+        expect(piKid?.assistantPreferences).not.toHaveProperty("modelBackend");
 
         await rm(legacyDirectory, {recursive: true, force: true});
     });

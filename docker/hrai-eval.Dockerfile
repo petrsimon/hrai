@@ -1,11 +1,11 @@
-FROM node:22-bookworm-slim AS dependencies
+FROM node:24-bookworm-slim AS dependencies
 
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/hrai-server/package.json packages/hrai-server/package.json
 RUN npm ci --workspace=@hrai/server --include-workspace-root=false --ignore-scripts
 
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 
 WORKDIR /app
 ENV NODE_ENV=test
