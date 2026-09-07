@@ -10,7 +10,8 @@ import HraiPanelComponent from '../components/hrai-panel/hrai-panel.jsx';
 import log from '../lib/log.js';
 import {clearGameProgress, loadGameProgress, saveGamePlaytest, saveGameProgress} from '../lib/hrai-game-progress';
 import {loadGameStarter} from '../lib/hrai-game-starter';
-import {addAgentLogEvents} from '../lib/hrai-agent-log.js';
+import {addTranscriptEvents} from '../lib/hrai-transcript.js';
+import {setHraiSocket} from '../lib/hrai-socket.js';
 import lessons from '../lib/hrai-lessons';
 import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
@@ -75,7 +76,7 @@ const HraiPanel = ({
     const intl = useIntl();
     const [chatMessages, setChatMessages] = useState([]);
     const [isThinking, setIsThinking] = useState(false);
-    const [agentRuns, setAgentRuns] = useState([]);
+    const [transcript, setTranscript] = useState([]);
     const [isServerAvailable, setIsServerAvailable] = useState(false);
     const [rung, setRung] = useState(0);
     const [lessonProgress, setLessonProgress] = useState(null);
@@ -124,6 +125,7 @@ const HraiPanel = ({
             timeout: 5000
         });
         socketRef.current = socket;
+        setHraiSocket(socket);
 
         const markUnavailable = () => {
             setIsServerAvailable(false);
@@ -145,6 +147,7 @@ const HraiPanel = ({
             setIsServerAvailable(true);
             setVoiceCapabilities({available: false, languages: []});
             setChatMessages(prev => prev.filter(message => message.id !== HELPER_UNAVAILABLE_ID));
+            socket.emit('session:open', {projectId: projectId ?? null});
             pushWorkspace();
             if (activeLessonId) {
                 const saved = loadLessonProgress(projectId, activeLessonId, projectTitle);
@@ -173,8 +176,8 @@ const HraiPanel = ({
             });
         });
 
-        socket.on('voice:transcript', transcript => {
-            setVoiceTranscript(transcript);
+        socket.on('voice:transcript', payload => {
+            setVoiceTranscript(payload);
             setVoiceErrorCode(null);
         });
 
@@ -185,13 +188,12 @@ const HraiPanel = ({
             });
         });
 
-        socket.on('agent:log:recent', events => {
-            // A reconnected server is possibly a restarted one, whose runs are the only real ones.
-            setAgentRuns(addAgentLogEvents([], Array.isArray(events) ? events : []));
+        socket.on('session:history', payload => {
+            setTranscript(addTranscriptEvents([], Array.isArray(payload?.events) ? payload.events : []));
         });
 
-        socket.on('agent:log', events => {
-            setAgentRuns(prev => addAgentLogEvents(prev, Array.isArray(events) ? events : [events]));
+        socket.on('session:event', event => {
+            setTranscript(prev => addTranscriptEvents(prev, [event]));
         });
 
         socket.on('thinking', ({thinking}) => {
@@ -304,6 +306,8 @@ const HraiPanel = ({
             socket.off('voice:capabilities');
             socket.off('voice:transcript');
             socket.off('voice:failed');
+            socket.off('session:history');
+            socket.off('session:event');
             socket.off('thinking');
             socket.off('token');
             socket.off('blocks');
@@ -318,6 +322,7 @@ const HraiPanel = ({
             socket.off('error');
             socket.disconnect();
             socketRef.current = null;
+            setHraiSocket(null);
         };
     }, [
         activeLessonId,
@@ -329,6 +334,13 @@ const HraiPanel = ({
         projectTitle,
         pushWorkspace
     ]);
+
+    useEffect(() => {
+        setTranscript([]);
+        if (socketRef.current?.connected) {
+            socketRef.current.emit('session:open', {projectId: projectId ?? null});
+        }
+    }, [projectId]);
 
     useEffect(() => {
         setChatMessages([]);
@@ -483,6 +495,10 @@ const HraiPanel = ({
         }
     }, [pushWorkspace]);
 
+    const handleAbort = useCallback(() => {
+        socketRef.current?.emit('session:abort');
+    }, []);
+
     const handleNextGameMilestone = useCallback(() => {
         if (socketRef.current?.connected && gameProgress?.complete) {
             socketRef.current.emit('gameMilestoneNext');
@@ -499,7 +515,9 @@ const HraiPanel = ({
     return (
         <HraiPanelComponent
             gamePlan={gamePlan}
-            agentRuns={agentRuns}
+            isAgentRunning={transcript.some(entry => entry.running)}
+            onAbort={handleAbort}
+            transcript={transcript}
             gamePlaytest={gamePlaytest}
             gameProgress={gameProgress}
             hasProjectContent={hasMeaningfulWorkspace(vm)}

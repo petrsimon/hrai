@@ -1,7 +1,8 @@
 import React from 'react';
-import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {act, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import '@testing-library/jest-dom';
 import hraiSessionHOC from '../../../src/lib/hrai-session-hoc.jsx';
+import {setHraiSocket} from '../../../src/lib/hrai-socket.js';
 
 const USERNAME_RULE = 'Username: 3-32 characters, letters, digits, - or _ only.';
 const PASSWORD_RULE = 'Password: at least 8 characters.';
@@ -36,6 +37,11 @@ describe('HRAI session HOC', () => {
             );
         };
         WrappedComponent = hraiSessionHOC(Component);
+    });
+
+    afterEach(() => {
+        setHraiSocket(null);
+        window.history.replaceState({}, '', '/');
     });
 
     const openDialog = async entryPoint => {
@@ -220,5 +226,238 @@ describe('HRAI session HOC', () => {
             password: 'heslo12345',
             displayName: 'Petr'
         });
+    });
+
+    test('assistant settings pick a provider, model and thinking level', async () => {
+        const user = {
+            username: 'kid',
+            email: '',
+            assistantPreferences: {
+                assistantName: 'hrai',
+                persona: 'patient',
+                verbosity: 'concise',
+                language: 'cs',
+                encouragement: true,
+                model: 'default',
+                thinkingLevel: 'default'
+            }
+        };
+        const catalog = {
+            default: 'openai-codex/gpt-5.4',
+            providers: [
+                {
+                    id: 'openai-codex',
+                    name: 'OpenAI Codex',
+                    configured: true,
+                    subscription: true,
+                    login: {oauth: true, apiKey: false},
+                    models: [
+                        {id: 'gpt-5.4', name: 'GPT-5.4', reasoning: true},
+                        {id: 'gpt-4.1', name: 'GPT-4.1', reasoning: false}
+                    ]
+                },
+                {
+                    id: 'openrouter',
+                    name: 'OpenRouter',
+                    configured: false,
+                    subscription: false,
+                    login: {oauth: false, apiKey: true},
+                    models: [{id: 'some-model', name: 'Some model', reasoning: false}]
+                }
+            ]
+        };
+        global.fetch = jest.fn(url => {
+            const path = String(url);
+            if (path.includes('/api/auth/me')) {
+                return Promise.resolve({ok: true, json: () => Promise.resolve(user)});
+            }
+            if (path.includes('/api/models')) {
+                return Promise.resolve({ok: true, json: () => Promise.resolve(catalog)});
+            }
+            if (path.includes('/api/profile/assistant')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ...user,
+                        assistantPreferences: {
+                            ...user.assistantPreferences,
+                            model: 'openai-codex/gpt-5.4',
+                            thinkingLevel: 'high'
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ok: true, json: () => Promise.resolve(null)});
+        });
+        window.history.replaceState({}, '', '/?hrai-settings=1');
+        render(<WrappedComponent />);
+
+        await waitFor(() => expect(screen.getByText('Assistant settings')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByRole('option', {name: /OpenAI Codex/})).toBeInTheDocument());
+        expect(screen.getByRole('option', {name: 'OpenAI Codex · signed in · subscription'})).toBeInTheDocument();
+        expect(screen.queryByLabelText('Model')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Thinking')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Provider'), {target: {value: 'openai-codex'}});
+        expect(screen.getByLabelText('Model')).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Thinking'), {target: {value: 'high'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Save settings'}));
+
+        await waitFor(() => expect(global.fetch.mock.calls.some(
+            ([requestUrl]) => String(requestUrl).includes('/api/profile/assistant')
+        )).toBe(true));
+        const saveCall = global.fetch.mock.calls.find(
+            ([requestUrl]) => String(requestUrl).includes('/api/profile/assistant')
+        );
+        expect(JSON.parse(saveCall[1].body)).toMatchObject({
+            model: 'openai-codex/gpt-5.4',
+            thinkingLevel: 'high'
+        });
+
+        fireEvent.change(screen.getByLabelText('Provider'), {target: {value: 'openrouter'}});
+        expect(screen.getByText('Sign in first.')).toBeInTheDocument();
+        expect(screen.getByLabelText('Model').disabled).toBe(true);
+        expect(screen.queryByLabelText('Thinking')).not.toBeInTheDocument();
+        window.history.replaceState({}, '', '/');
+    });
+
+    test('provider login dialog follows socket events', async () => {
+        const user = {
+            username: 'kid',
+            email: '',
+            assistantPreferences: {
+                assistantName: 'hrai',
+                persona: 'patient',
+                verbosity: 'concise',
+                language: 'cs',
+                encouragement: true,
+                model: 'default',
+                thinkingLevel: 'default'
+            }
+        };
+        const catalog = {
+            default: 'openai-codex/gpt-5.4',
+            providers: [
+                {
+                    id: 'openai-codex',
+                    name: 'OpenAI Codex',
+                    configured: true,
+                    subscription: true,
+                    login: {oauth: true, apiKey: false},
+                    models: [{id: 'gpt-5.4', name: 'GPT-5.4', reasoning: true}]
+                },
+                {
+                    id: 'openrouter',
+                    name: 'OpenRouter',
+                    configured: false,
+                    subscription: false,
+                    login: {oauth: false, apiKey: true},
+                    models: [{id: 'some-model', name: 'Some model', reasoning: false}]
+                },
+                {
+                    id: 'anthropic',
+                    name: 'Anthropic',
+                    configured: false,
+                    subscription: false,
+                    login: {oauth: true, apiKey: true},
+                    models: [{id: 'claude', name: 'Claude', reasoning: true}]
+                }
+            ]
+        };
+        let modelsBody = catalog;
+        global.fetch = jest.fn(url => {
+            const path = String(url);
+            if (path.includes('/api/auth/me')) {
+                return Promise.resolve({ok: true, json: () => Promise.resolve(user)});
+            }
+            if (path.includes('/api/models')) {
+                return Promise.resolve({ok: true, json: () => Promise.resolve(modelsBody)});
+            }
+            return Promise.resolve({ok: true, json: () => Promise.resolve(null)});
+        });
+        const handlers = {};
+        const mockSocket = {
+            on: jest.fn((event, handler) => {
+                handlers[event] = handler;
+            }),
+            off: jest.fn(),
+            emit: jest.fn()
+        };
+        setHraiSocket(mockSocket);
+        window.history.replaceState({}, '', '/?hrai-settings=1');
+        render(<WrappedComponent />);
+
+        await waitFor(() => expect(screen.getByText('Assistant settings')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByRole('option', {name: /OpenAI Codex/})).toBeInTheDocument());
+
+        fireEvent.change(screen.getByLabelText('Provider'), {target: {value: 'openai-codex'}});
+        expect(screen.getByRole('button', {name: 'Sign out'})).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Provider'), {target: {value: 'anthropic'}});
+        expect(screen.getByRole('button', {name: 'Sign in with account'})).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: 'Enter API key'})).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Provider'), {target: {value: 'openrouter'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Sign in'}));
+        expect(mockSocket.emit).toHaveBeenCalledWith('provider:login', {providerId: 'openrouter', type: 'api_key'});
+        fireEvent.click(screen.getByRole('button', {name: 'Cancel'}));
+        expect(mockSocket.emit).toHaveBeenCalledWith('provider:login:cancel');
+        expect(screen.queryByText('Provider sign-in')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', {name: 'Sign in'}));
+        act(() => {
+            handlers['provider:login:event']({
+                providerId: 'openrouter',
+                event: {
+                    type: 'device_code',
+                    userCode: 'ABCD-EFGH',
+                    verificationUri: 'https://example.com/device'
+                }
+            });
+            handlers['provider:login:prompt']({
+                providerId: 'openrouter',
+                promptId: 'p1',
+                prompt: {type: 'text', message: 'API key', placeholder: 'sk-...'}
+            });
+        });
+        expect(screen.getByText('ABCD-EFGH')).toBeInTheDocument();
+        expect(screen.getByRole('link', {name: 'https://example.com/device'})).toBeInTheDocument();
+        act(() => {
+            handlers['provider:login:withdraw']({providerId: 'openrouter', promptId: 'p1'});
+        });
+        expect(screen.queryByLabelText('API key')).not.toBeInTheDocument();
+        act(() => {
+            handlers['provider:login:prompt']({
+                providerId: 'openrouter',
+                promptId: 'p1',
+                prompt: {type: 'text', message: 'API key', placeholder: 'sk-...'}
+            });
+        });
+        fireEvent.change(screen.getByLabelText('API key'), {target: {value: 'sk-test'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Continue'}));
+        expect(mockSocket.emit).toHaveBeenCalledWith('provider:login:answer', {promptId: 'p1', value: 'sk-test'});
+
+        act(() => {
+            handlers['provider:login:done']({providerId: 'openrouter', ok: false, error: 'denied'});
+        });
+        expect(screen.getByRole('alert')).toHaveTextContent('denied');
+        expect(screen.getByText('Provider sign-in')).toBeInTheDocument();
+
+        modelsBody = {
+            ...catalog,
+            providers: catalog.providers.map(provider => (
+                provider.id === 'openrouter' ? {...provider, configured: true} : provider
+            ))
+        };
+        act(() => {
+            handlers['provider:login:done']({providerId: 'openrouter', ok: true});
+        });
+        await waitFor(() => expect(screen.queryByText('Provider sign-in')).not.toBeInTheDocument());
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Sign out'})).toBeInTheDocument());
+        fireEvent.click(screen.getByRole('button', {name: 'Sign out'}));
+        expect(mockSocket.emit).toHaveBeenCalledWith('provider:logout', {providerId: 'openrouter'});
+
+        setHraiSocket(null);
+        window.history.replaceState({}, '', '/');
     });
 });
