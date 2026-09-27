@@ -17,7 +17,7 @@ const {test, expect} = require('@playwright/test');
 //    in scratch-blocks.
 
 test('backpack highlights when a block is dragged over it', async ({page}) => {
-    await page.goto('index.html?backpack_host=fake');
+    await page.goto('standalone.html?backpack_host=fake');
 
     // Expand the backpack.
     await page.getByText('Backpack', {exact: true}).click();

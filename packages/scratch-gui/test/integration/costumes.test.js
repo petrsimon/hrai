@@ -16,7 +16,7 @@ const {
 // The costumes library is slow to load. Increase the timeout for these tests.
 jest.setTimeout(60_000);
 
-const uri = path.resolve(__dirname, '../../build/index.html');
+const uri = path.resolve(__dirname, '../../build/standalone.html');
 
 let driver;
 
@@ -85,20 +85,18 @@ describe('Working with costumes', () => {
         await loadUri(uri);
         await clickText('Costumes');
 
-        // Convert the first costume to bitmap.
-        await clickText('costume1', scope.costumesTab);
-        await clickText('Convert to Bitmap', scope.costumesTab);
-
-        // Make sure mode switches back to vector for vector costume.
-        await clickText('costume2', scope.costumesTab);
-        await clickText('Convert to Bitmap', scope.costumesTab);
-
-        // Make sure bitmap is saved by switching back and converting to vector.
-        await clickText('Sounds');
-        await clickText('Costumes');
-        await clickText('Convert to Vector', scope.costumesTab); // costume2
+        // Convert the bitmap costumes to vector.
         await clickText('costume1', scope.costumesTab);
         await clickText('Convert to Vector', scope.costumesTab);
+        await clickText('costume2', scope.costumesTab);
+        await clickText('Convert to Vector', scope.costumesTab);
+
+        // Confirm the conversions persist across tabs, then convert back to bitmap.
+        await clickText('Sounds');
+        await clickText('Costumes');
+        await clickText('Convert to Bitmap', scope.costumesTab); // costume2
+        await clickText('costume1', scope.costumesTab);
+        await clickText('Convert to Bitmap', scope.costumesTab);
 
         const logs = await getLogs();
         await expect(logs).toEqual([]);
@@ -108,12 +106,12 @@ describe('Working with costumes', () => {
         await loadUri(uri);
         await clickText('Costumes');
         await clickText('costume1', scope.costumesTab);
-        await clickText('Convert to Bitmap', scope.costumesTab);
+        await clickText('Convert to Vector', scope.costumesTab);
         await clickXpath('//img[@alt="Undo"]');
-        await clickText('Convert to Bitmap', scope.costumesTab);
+        await clickText('Convert to Vector', scope.costumesTab);
         await clickXpath('//img[@alt="Undo"]');
         await clickXpath('//img[@alt="Redo"]');
-        await clickText('Convert to Vector', scope.costumesTab);
+        await clickText('Convert to Bitmap', scope.costumesTab);
         const logs = await getLogs();
         await expect(logs).toEqual([]);
     });

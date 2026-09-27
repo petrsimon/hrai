@@ -200,6 +200,7 @@ describe('Working with the blocks', () => {
         await clickText('Costumes');
         await clickText('costume2', scope.costumesTab);
         const el = await findByXpath("//input[@value='costume2']");
+        await el.clear();
         await el.sendKeys('newname');
         await el.sendKeys(Key.ENTER);
         // wait until the updated costume appears in costume item list panel
@@ -209,7 +210,8 @@ describe('Working with the blocks', () => {
         // Make sure it is updated in the block menu
         await clickText('Code');
         await clickBlocksCategory('Looks');
-        await clickText('newname', scope.blocksTab);
+        await clickText('costume4', scope.blocksTab); // Open the costume dropdown.
+        await findByText('newname', scope.reportedValue);
     });
 
     test('Renaming costume with a special character should not break toolbox', async () => {
@@ -219,6 +221,7 @@ describe('Working with the blocks', () => {
         await clickText('Costumes');
         await clickText('costume2', scope.costumesTab);
         const el = await findByXpath("//input[@value='costume2']");
+        await el.clear();
         await el.sendKeys('<NewCostume>');
         await el.sendKeys(Key.ENTER);
         // wait until the updated costume appears in costume item list panel
@@ -228,7 +231,8 @@ describe('Working with the blocks', () => {
         // Make sure it is updated in the block menu
         await clickText('Code');
         await clickBlocksCategory('Looks');
-        await clickText('<NewCostume>', scope.blocksTab);
+        await clickText('costume4', scope.blocksTab); // Open the costume dropdown.
+        await findByText('<NewCostume>', scope.reportedValue);
 
         await clickBlocksCategory('Sound');
     });
@@ -236,9 +240,10 @@ describe('Working with the blocks', () => {
     test('Adding costumes DOES update the default costume name in the toolbox', async () => {
         await loadUri(uri);
 
-        // By default, costume2 is in the costume tab
+        // Confirm the existing costumes are available from the Looks block.
         await clickBlocksCategory('Looks');
-        await clickText('costume2', scope.blocksTab);
+        await clickText('costume4', scope.blocksTab); // Open the costume dropdown.
+        await findByText('costume2', scope.reportedValue);
 
         // Also check that adding a new costume does update the list
         await clickText('Costumes');
@@ -249,11 +254,13 @@ describe('Working with the blocks', () => {
         await clickXpath('//button[@aria-label="Paint"]');
         // wait until the new costume appears in costume item list panel
         await findByXpath("//div[contains(@class,'sprite-selector-item_is-selected_')]" +
-            "//div[contains(text(), 'costume3')]");
-        await clickText('costume3', scope.costumesTab);
+            "//div[contains(text(), 'costume5')]");
+        await clickText('costume5', scope.costumesTab);
         // Check that the menu has been updated
         await clickText('Code');
-        await clickText('costume3', scope.blocksTab);
+        await clickBlocksCategory('Looks');
+        await clickText('costume5', scope.blocksTab); // Open the costume dropdown.
+        await findByText('costume5', scope.reportedValue);
     });
 
     // Skipped because it was flakey on travis, but seems to run locally ok

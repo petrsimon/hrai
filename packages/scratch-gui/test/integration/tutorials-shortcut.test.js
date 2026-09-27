@@ -8,8 +8,8 @@ const {
     loadUri
 } = new SeleniumHelper();
 
-const uri = path.resolve(__dirname, '../../build/index.html?tutorial=all');
-const uriPrefix = path.resolve(__dirname, '../../build/index.html?tutorial=');
+const uri = path.resolve(__dirname, '../../build/standalone.html?tutorial=all');
+const uriPrefix = path.resolve(__dirname, '../../build/standalone.html?tutorial=');
 
 let driver;
 
