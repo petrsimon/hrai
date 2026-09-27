@@ -459,36 +459,29 @@ describe('HraiPanel custom game planning', () => {
         expect(replies.map(node => node.textContent)).toEqual(['reply from plan', 'reply from title']);
     });
 
-    test('keeps a new idea out of an authored lesson', () => {
-        const {unmount} = renderWithIntl(
+    test('keeps custom game planning out of authored lessons', () => {
+        const onGameIdea = jest.fn();
+        const onSend = jest.fn();
+        renderWithIntl(
             <HraiPanel
                 lesson={{title: 'Bitva vojáků', stages: ['Bojiště', 'Kliknutí']}}
                 lessonProgress={{complete: false, stageIndex: 0, stage: {title: 'Bojiště'}}}
                 messages={[]}
-                onGameIdea={jest.fn()}
+                onGameIdea={onGameIdea}
                 onHint={jest.fn()}
                 onNextStage={jest.fn()}
-                onSend={jest.fn()}
+                onSend={onSend}
             />
         );
-        const button = screen.getByRole('button', {name: 'Nový nápad'});
-        expect(button.getAttribute('aria-disabled')).toBe('true');
-        fireEvent.click(button);
-        expect(button.getAttribute('aria-pressed')).toBe('false');
-        unmount();
 
-        renderWithIntl(
-            <HraiPanel
-                lesson={null}
-                lessonProgress={null}
-                messages={[]}
-                onGameIdea={jest.fn()}
-                onHint={jest.fn()}
-                onNextStage={jest.fn()}
-                onSend={jest.fn()}
-            />
-        );
-        expect(screen.getByRole('button', {name: 'Nový nápad'}).getAttribute('aria-disabled')).toBe('false');
+        expect(screen.queryByRole('button', {name: 'Nový nápad'})).toBeNull();
+        const input = screen.getByLabelText('Zpráva pro HRAI');
+        fireEvent.change(input, {target: {value: 'Jak přidám roveru pohyb?'}});
+        fireEvent.click(screen.getByRole('button', {name: 'Odeslat'}));
+
+        expect(onSend).toHaveBeenCalledWith('Jak přidám roveru pohyb?');
+        expect(onGameIdea).not.toHaveBeenCalled();
+        expect(screen.queryByRole('button', {name: 'Připravit plán hry'})).toBeNull();
     });
 
     test('cancels idea entry without losing the ordinary chat draft', () => {

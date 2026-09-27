@@ -1277,8 +1277,8 @@ const HraiPanel = ({
             return;
         }
 
-        const isGameStart = isEnteringGameIdea ||
-            (!lesson && !gamePlan && !gamePlaytest && !gameProgress && chatMessages.length === 0);
+        const isGameStart = !lesson && (isEnteringGameIdea ||
+            (!gamePlan && !gamePlaytest && !gameProgress && chatMessages.length === 0));
         if (isGameStart && onGameIdea) {
             onGameIdea(trimmed);
         } else {
@@ -1594,7 +1594,7 @@ const HraiPanel = ({
                                 </div>
                             </div>
                         ) : null}
-                        {gameStartPending && gameIdea ? (
+                        {!lesson && gameStartPending && gameIdea ? (
                             <GameStartCard
                                 hasProjectContent={hasProjectContent}
                                 isBusy={isPlanning || isStartingNewProject}
@@ -1610,7 +1610,7 @@ const HraiPanel = ({
                         className={styles.inputArea}
                         onSubmit={handleSubmit}
                     >
-                        {isEnteringGameIdea ? (
+                        {!lesson && isEnteringGameIdea ? (
                             <p
                                 id="hrai-game-idea-prompt"
                                 className={styles.gameHelp}
@@ -1662,18 +1662,20 @@ const HraiPanel = ({
                                 >
                                     <span aria-hidden="true">🙏</span>
                                 </Button>
-                                <Button
-                                    type="button"
-                                    className={styles.newGameButton}
-                                    aria-label={intl.formatMessage(messages.newGameIdea)}
-                                    title={intl.formatMessage(messages.newGameIdea)}
-                                    aria-pressed={isEnteringGameIdea}
-                                    aria-disabled={newGameDisabled}
-                                    disabled={newGameDisabled}
-                                    onClick={handleNewGameIdea}
-                                >
-                                    <span aria-hidden="true">💡</span>
-                                </Button>
+                                {lesson ? null : (
+                                    <Button
+                                        type="button"
+                                        className={styles.newGameButton}
+                                        aria-label={intl.formatMessage(messages.newGameIdea)}
+                                        title={intl.formatMessage(messages.newGameIdea)}
+                                        aria-pressed={isEnteringGameIdea}
+                                        aria-disabled={newGameDisabled}
+                                        disabled={newGameDisabled}
+                                        onClick={handleNewGameIdea}
+                                    >
+                                        <span aria-hidden="true">💡</span>
+                                    </Button>
+                                )}
                             </div>
                             <Button
                                 type="submit"
