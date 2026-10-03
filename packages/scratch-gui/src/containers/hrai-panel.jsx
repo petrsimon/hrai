@@ -124,9 +124,23 @@ const HraiPanel = ({
     const vmRef = useRef(vm);
     // The live socket session belongs to the open project, not its display name.
     const projectTitleRef = useRef(projectTitle);
+    const projectStateRef = useRef({canCreateNew, isShowingWithId, isShowingWithoutId});
 
     vmRef.current = vm;
     projectTitleRef.current = projectTitle;
+    projectStateRef.current = {canCreateNew, isShowingWithId, isShowingWithoutId};
+
+    const clearProjectTutorial = useCallback(() => {
+        clearProjectTutorialProgress(projectId, projectTitleRef.current);
+        pendingProjectTutorialRestoreRef.current = null;
+        projectTutorialStartedInNewProjectRef.current = false;
+        projectTutorialRestorePendingRef.current = false;
+        createSourceBeforeRebuildRef.current = false;
+        setProjectTutorialProposal(null);
+        setProjectTutorialProgress(null);
+        setProjectTutorialNeedsNewProject(false);
+        setProjectTutorialError(null);
+    }, [projectId]);
 
     const emitPendingGamePlan = useCallback(() => {
         const socket = socketRef.current;
@@ -191,7 +205,8 @@ const HraiPanel = ({
                 const pendingRestore = pendingProjectTutorialRestoreRef.current;
                 const savedTutorial = pendingRestore || loadProjectTutorialProgress(projectId, projectTitleRef.current);
                 if (savedTutorial) {
-                    const isProjectReady = isShowingWithId || isShowingWithoutId;
+                    const state = projectStateRef.current;
+                    const isProjectReady = state.isShowingWithId || state.isShowingWithoutId;
                     const isPendingTarget = pendingRestore?.newProjectStarted &&
                         !createSourceBeforeRebuildRef.current &&
                         String(projectId) !== String(pendingRestore.sourceProjectId);
@@ -334,13 +349,15 @@ const HraiPanel = ({
                 const isPendingTarget = pendingRestore?.newProjectStarted &&
                     !createSourceBeforeRebuildRef.current &&
                     String(projectId) !== String(pendingRestore.sourceProjectId);
-                const isProjectReady = isShowingWithId || isShowingWithoutId;
+                const state = projectStateRef.current;
+                const isProjectReady = state.isShowingWithId || state.isShowingWithoutId;
                 const transferComplete = isPendingTarget && isProjectReady &&
-                    (!canCreateNew || String(projectId) !== String(defaultProjectId));
+                    (!state.canCreateNew || String(projectId) !== String(defaultProjectId));
                 if (transferComplete || !pendingRestore) pendingProjectTutorialRestoreRef.current = null;
                 projectTutorialRestorePendingRef.current = false;
             }
             const startedInNewProject = projectTutorialStartedInNewProjectRef.current;
+            clearGameProgress(projectId, projectTitleRef.current);
             saveProjectTutorialProgress(projectId, progress, projectTitleRef.current, startedInNewProject);
             setProjectTutorialProposal(null);
             setProjectTutorialProgress(progress);
@@ -416,9 +433,6 @@ const HraiPanel = ({
         debouncedPushWorkspace,
         helperUnavailableText,
         emitPendingGamePlan,
-        canCreateNew,
-        isShowingWithId,
-        isShowingWithoutId,
         projectId,
         pushWorkspace
     ]);
@@ -469,6 +483,21 @@ const HraiPanel = ({
             onRequestNewProject(true);
         }
     }, [isShowingWithId, onRequestNewProject, projectId]);
+
+    useEffect(() => {
+        const pendingRestore = pendingProjectTutorialRestoreRef.current;
+        if (!pendingRestore?.newProjectStarted || createSourceBeforeRebuildRef.current ||
+            String(projectId) === String(pendingRestore.sourceProjectId) ||
+            (!isShowingWithId && !isShowingWithoutId) || !socketRef.current?.connected) return;
+        projectTutorialStartedInNewProjectRef.current = true;
+        projectTutorialRestorePendingRef.current = true;
+        pushWorkspace();
+        socketRef.current.emit('projectTutorialRestore', {
+            plan: pendingRestore.plan,
+            stepIndex: pendingRestore.stepIndex,
+            needsNewProject: false
+        });
+    }, [isShowingWithId, isShowingWithoutId, projectId, pushWorkspace]);
 
     useEffect(() => {
         const onWorkspaceChange = () => {
@@ -558,12 +587,13 @@ const HraiPanel = ({
 
     const handleGamePlanRequest = useCallback(text => {
         if (socketRef.current?.connected) {
+            clearProjectTutorial();
             pendingNewGameIdeaRef.current = null;
             setGamePlan(null);
             setIsPlanning(true);
             socketRef.current.emit('gamePlan', {text});
         }
-    }, []);
+    }, [clearProjectTutorial]);
 
     const handleProjectTutorialRequest = useCallback(mode => {
         if (!socketRef.current?.connected) return;
@@ -628,11 +658,12 @@ const HraiPanel = ({
     const handleStartNewProject = useCallback(text => {
         // eslint-disable-next-line no-alert -- replacing the current project needs explicit confirmation
         if (!window.confirm(intl.formatMessage(messages.newProjectConfirmation))) return;
+        clearProjectTutorial();
         clearGameProgress(projectId, projectTitle);
         pendingNewGameIdeaRef.current = text;
         setIsStartingNewProject(true);
         onCreateProject();
-    }, [intl, onCreateProject, projectId, projectTitle]);
+    }, [clearProjectTutorial, intl, onCreateProject, projectId, projectTitle]);
 
     const handleGamePlanAccept = useCallback(() => {
         if (socketRef.current?.connected && gamePlan && !isPlanning) {

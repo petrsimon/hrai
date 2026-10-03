@@ -1894,7 +1894,7 @@ const HraiPanel = ({
                                 </div>
                             </div>
                         ) : null}
-                        {isInitialProjectState && hasProjectContent ? (
+                        {hasProjectContent && !lesson && !hasGuide && !gameStartPending && !isEnteringGameIdea ? (
                             <ProjectTutorialStartCard
                                 isBusy={isPlanning || isStartingNewProject}
                                 onStart={onProjectTutorialRequest}

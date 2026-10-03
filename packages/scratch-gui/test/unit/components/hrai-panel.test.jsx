@@ -881,3 +881,28 @@ describe('HraiPanel custom game planning', () => {
         expect(onStartProjectTutorialRebuild).toHaveBeenCalledTimes(1);
     });
 });
+
+
+test('keeps tutorial generation available after a failed request adds a chat error', () => {
+    const onProjectTutorialRequest = jest.fn();
+    const panel = messages => (
+        <IntlProvider
+            locale="cs"
+            messages={{}}
+        >
+            <HraiPanel
+                hasProjectContent
+                messages={messages}
+                onHint={jest.fn()}
+                onSend={jest.fn()}
+                onProjectTutorialRequest={onProjectTutorialRequest}
+            />
+        </IntlProvider>
+    );
+    const {rerender} = render(panel([]));
+    fireEvent.click(screen.getByRole('button', {name: 'Prozkoumat tuto hru'}));
+    rerender(panel([{id: 'error-1', role: 'tutor', text: 'Návod se nepodařilo připravit. Zkus to znovu.'}]));
+    fireEvent.click(screen.getByRole('button', {name: 'Prozkoumat tuto hru'}));
+    expect(screen.getByRole('button', {name: 'Postavit podobnou hru v novém projektu'})).toBeTruthy();
+    expect(onProjectTutorialRequest).toHaveBeenCalledTimes(2);
+});

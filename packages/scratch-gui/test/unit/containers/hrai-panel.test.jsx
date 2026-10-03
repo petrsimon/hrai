@@ -10,6 +10,7 @@ import {loadGameProgress} from '../../../src/lib/hrai-game-progress';
 import {loadGameStarter} from '../../../src/lib/hrai-game-starter';
 import {
     clearProjectTutorialProgress,
+    loadProjectTutorialProgress,
     saveProjectTutorialProgress
 } from '../../../src/lib/hrai-project-tutorial-progress';
 import {LoadingState} from '../../../src/reducers/project-state';
@@ -420,5 +421,85 @@ describe('HraiPanel container agent session', () => {
             latestPanelProps().onAbort();
         });
         expect(mockSocket.emit).toHaveBeenCalledWith('session:abort');
+    });
+});
+
+
+describe('HraiPanel tutorial lifecycle regressions', () => {
+    const plan = {
+        mode: 'rebuild',
+        title: 'Maze',
+        overview: 'Build a maze.',
+        steps: [{id: 'tutorial-step-1', title: 'Start', goal: 'Start', instruction: 'Add a flag.', success: 'Starts.'}]
+    };
+    const progress = {
+        plan,
+        stepIndex: 0,
+        step: plan.steps[0],
+        stepComplete: false,
+        complete: false,
+        needsNewProject: true
+    };
+
+    beforeEach(() => {
+        mockPanelRender.mockClear();
+        window.localStorage.clear();
+        window.confirm = jest.fn(() => true);
+    });
+
+    test.each([LoadingState.AUTO_UPDATING, LoadingState.MANUAL_UPDATING])(
+        'keeps generation connected while saving in %s', loadingState => {
+            const {updateScratchGui} = renderContainer({
+                projectId: '42',
+                projectState: {loadingState: LoadingState.SHOWING_WITH_ID}
+            });
+            act(() => latestPanelProps().onProjectTutorialRequest('rebuild'));
+            act(() => updateScratchGui({projectState: {loadingState}}));
+            act(() => updateScratchGui({projectState: {loadingState: LoadingState.SHOWING_WITH_ID}}));
+
+            expect(mockSocket.disconnect).not.toHaveBeenCalled();
+            act(() => socketHandlers.projectTutorialProposed(plan));
+            expect(latestPanelProps().projectTutorialProposal).toEqual(plan);
+            expect(latestPanelProps().isPlanning).toBe(false);
+        }
+    );
+
+    test.each(['current project', 'new project'])('clears the tutorial when planning a game in %s', target => {
+        renderContainer({projectId: '42', canSave: true});
+        act(() => socketHandlers.projectTutorialProgress(progress));
+        expect(loadProjectTutorialProgress('42')).not.toBeNull();
+        act(() => {
+            if (target === 'current project') latestPanelProps().onGamePlanRequest('A dragon maze');
+            else latestPanelProps().onStartNewProject('A dragon maze');
+        });
+
+        expect(latestPanelProps().projectTutorialProposal).toBeNull();
+        expect(latestPanelProps().projectTutorialProgress).toBeNull();
+        expect(loadProjectTutorialProgress('42')).toBeNull();
+        mockSocket.emit.mockClear();
+        act(() => socketHandlers.connect());
+        expect(mockSocket.emit).not.toHaveBeenCalledWith('projectTutorialRestore', expect.anything());
+    });
+
+    test('ungates rebuilding when the blank project finishes loading without another socket connection', () => {
+        const {updateScratchGui} = renderContainer({
+            canSave: true,
+            projectId: '42',
+            projectState: {loadingState: LoadingState.SHOWING_WITH_ID}
+        });
+        act(() => socketHandlers.projectTutorialProgress(progress));
+        act(() => latestPanelProps().onStartProjectTutorialRebuild());
+        act(() => updateScratchGui({projectState: {
+            projectId: '0', loadingState: LoadingState.FETCHING_NEW_DEFAULT
+        }}));
+        act(() => socketHandlers.connect());
+        mockSocket.emit.mockClear();
+        mockSocket.disconnect.mockClear();
+        act(() => updateScratchGui({projectState: {loadingState: LoadingState.SHOWING_WITHOUT_ID}}));
+
+        expect(mockSocket.disconnect).not.toHaveBeenCalled();
+        expect(mockSocket.emit).toHaveBeenCalledWith('projectTutorialRestore', {
+            plan, stepIndex: 0, needsNewProject: false
+        });
     });
 });
