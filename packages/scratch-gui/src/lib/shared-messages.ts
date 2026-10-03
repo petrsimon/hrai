@@ -30,6 +30,11 @@ const reactIntlMessages = defineMessages({
         id: 'gui.sharedMessages.loadFromComputerTitle',
         defaultMessage: 'Load from your computer',
         description: 'Title for uploading a project from your computer'
+    },
+    loadFromScratchTitle: {
+        id: 'gui.sharedMessages.loadFromScratchTitle',
+        defaultMessage: 'Load from Scratch',
+        description: 'Title for importing a shared Scratch project by URL'
     }
 });
 

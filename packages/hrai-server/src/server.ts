@@ -18,6 +18,12 @@ import { startLogin, type LoginFlow } from "./provider-login.ts";
 import { TOOL_RULES } from "./tutor-tools.ts";
 import { tutorSessionFor, type TutorSession } from "./tutor-session.ts";
 import { planGame } from "./game-planner.ts";
+import {
+    parseProjectTutorial,
+    planProjectTutorial,
+    type ProjectTutorial,
+    type ProjectTutorialMode,
+} from "./project-tutorial.ts";
 import { MAX_GAME_IDEA_LENGTH } from "./game-plan.ts";
 import { parseGameRestore } from "./game-restore.ts";
 import { suggestProjectTitle } from "./project-title.ts";
@@ -71,6 +77,12 @@ function parseGameIdea(payload: unknown): string | null {
     return idea && idea.length <= MAX_GAME_IDEA_LENGTH ? idea : null;
 }
 
+function parseProjectTutorialMode(payload: unknown): ProjectTutorialMode | null {
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return null;
+    const {mode} = payload as Record<string, unknown>;
+    return mode === "explore" || mode === "rebuild" ? mode : null;
+}
+
 interface VoiceSubmission {
     requestId: string;
     mimeType: string;
@@ -109,6 +121,7 @@ function parseVoiceSubmission(payload: unknown): VoiceSubmission | { code: strin
 interface ServerOptions {
     speechToText?: SpeechToText;
     gamePlanner?: typeof planGame;
+    projectTutorialPlanner?: typeof planProjectTutorial;
     store?: HraiStore;
 }
 
@@ -208,6 +221,7 @@ export function startServer(port = PORT, options: ServerOptions = {}) {
     });
     const speechToText = options.speechToText ?? new WhisperSpeechToText();
     const gamePlanner = options.gamePlanner ?? planGame;
+    const projectTutorialPlanner = options.projectTutorialPlanner ?? planProjectTutorial;
 
 /**
  * Resolves whose credentials and which model a profile's tutor calls use.
@@ -422,6 +436,88 @@ function parseProjectId(payload: unknown): string | null {
             }
         };
 
+        const emitProjectTutorialProgress = (): void => {
+            const progress = session.projectTutorialProgress;
+            if (progress) socket.emit("projectTutorialProgress", progress);
+        };
+
+        const evaluateProjectTutorialProgress = (): void => {
+            const progress = session.projectTutorialProgress;
+            if (progress?.plan.mode !== "rebuild") return;
+            const wasComplete = progress.stepComplete;
+            const isComplete = session.evaluateProjectTutorialStep();
+            if (isComplete !== wasComplete) emitProjectTutorialProgress();
+        };
+
+        socket.on("projectTutorialPlan", (payload: unknown) => {
+            const mode = parseProjectTutorialMode(payload);
+            if (!mode || !session.hasWorkspace) return;
+            if (!user) {
+                socket.emit("error", {message: SIGN_IN_PROMPT});
+                return;
+            }
+            if (modelCallPending) {
+                console.warn("hrai: ignored project-tutorial request while a model call is pending");
+                return;
+            }
+            const project = session.render();
+            modelCallPending = true;
+            socket.emit("thinking", {thinking: true});
+            void resolveModelChoice(user)
+                .then(({model, options}) => projectTutorialPlanner(
+                    mode,
+                    project,
+                    (system, prompt) => chatJson(system, prompt, model, "plan", options),
+                ))
+                .then((plan) => {
+                    session.proposeProjectTutorial(plan);
+                    socket.emit("projectTutorialProposed", plan);
+                })
+                .catch((error: unknown) => {
+                    console.error("hrai: project tutorial planning failed", error);
+                    socket.emit("error", {
+                        message: "Návod z tohoto projektu se mi nepodařilo připravit. Zkus to prosím znovu.",
+                    });
+                })
+                .finally(() => {
+                    modelCallPending = false;
+                    socket.emit("thinking", {thinking: false});
+                });
+        });
+
+        socket.on("projectTutorialAccept", () => {
+            if (!session.acceptProjectTutorial()) return;
+            emitProjectTutorialProgress();
+        });
+
+        socket.on("projectTutorialCancel", () => {
+            session.cancelProposedProjectTutorial();
+        });
+
+        socket.on("projectTutorialRestore", (payload: unknown) => {
+            if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return;
+            const {plan: rawPlan, stepIndex, needsNewProject: rawNeedsNewProject} = payload as Record<string, unknown>;
+            if (typeof stepIndex !== "number" || !Number.isInteger(stepIndex) ||
+                typeof rawPlan !== "object" || rawPlan === null || Array.isArray(rawPlan)) return;
+            const planRecord = rawPlan as Partial<ProjectTutorial>;
+            if (planRecord.mode !== "explore" && planRecord.mode !== "rebuild") return;
+            let plan: ProjectTutorial;
+            try {
+                plan = parseProjectTutorial(planRecord.mode, JSON.stringify(rawPlan));
+            } catch (error) {
+                console.warn("hrai: rejected invalid restored project tutorial", error);
+                return;
+            }
+            const needsNewProject = plan.mode === "rebuild" && rawNeedsNewProject !== false;
+            if (session.restoreProjectTutorial(plan, stepIndex, needsNewProject)) emitProjectTutorialProgress();
+        });
+
+        socket.on("projectTutorialNext", () => {
+            if (!session.projectTutorialProgress) return;
+            session.nextProjectTutorialStep();
+            emitProjectTutorialProgress();
+        });
+
         socket.on("gamePlan", (payload: unknown) => {
             const idea = parseGameIdea(payload);
             if (!idea) return;
@@ -536,6 +632,7 @@ function parseProjectId(payload: unknown): string | null {
                 socket.emit("stageComplete", session.lessonProgress);
             }
             evaluateGameProgress();
+            evaluateProjectTutorialProgress();
         });
 
         /**
@@ -556,7 +653,8 @@ function parseProjectId(payload: unknown): string | null {
             const context = session.tutorContextFor(rung);
             const progress = session.lessonProgress;
             const gameProgress = session.gameProgress;
-            const stepComplete = Boolean(progress?.complete ?? gameProgress?.complete);
+            const tutorialProgress = session.projectTutorialProgress;
+            const stepComplete = Boolean(progress?.complete ?? gameProgress?.complete ?? tutorialProgress?.stepComplete);
             const completionRequest = isCompletionClaim(question) || COMPLETION_FOLLOW_UP.test(question.trim());
 
             const emitCanned = (text: string): void => {
@@ -564,6 +662,11 @@ function parseProjectId(payload: unknown): string | null {
                 socket.emit("blocks", {id, blocks: {}});
                 socket.emit("done", {id, rung});
             };
+
+            if (tutorialProgress?.needsNewProject) {
+                emitCanned("Nejdřív klikni na Otevřít nový projekt. Původní hra zůstane uložená beze změny.");
+                return;
+            }
 
             if (progress?.complete && completionRequest) {
                 emitCanned(`Tento krok je hotový: ${progress.stage.success} Klikni na Další krok a budeme pokračovat.`);
@@ -580,6 +683,16 @@ function parseProjectId(payload: unknown): string | null {
                 return;
             }
 
+            if (tutorialProgress?.complete && completionRequest) {
+                emitCanned("Skvěle, dokončil jsi celý návod!");
+                return;
+            }
+
+            if (tutorialProgress?.plan.mode === "rebuild" && tutorialProgress.stepComplete && completionRequest) {
+                emitCanned(`Tento krok je hotový: ${tutorialProgress.step.success} Klikni na Další krok a budeme pokračovat.`);
+                return;
+            }
+
             if (progress && !progress.complete && isCompletionClaim(question)) {
                 emitCanned(`Editor zatím nevidí splněnou podmínku: ${progress.stage.success} ` +
                     "Nemusíš mi psát „hotovo“ — Další krok se objeví automaticky, jakmile ji projekt splní.");
@@ -589,6 +702,12 @@ function parseProjectId(payload: unknown): string | null {
             if (gameProgress && !gameProgress.complete && isCompletionClaim(question)) {
                 emitCanned(`Editor zatím nevidí důkazy pro milník: ${gameProgress.milestone.doneWhen} ` +
                     "Nemusíš mi psát „hotovo“ — dokončení se objeví automaticky, jakmile je projekt splní.");
+                return;
+            }
+
+            if (tutorialProgress?.plan.mode === "rebuild" && !tutorialProgress.stepComplete && isCompletionClaim(question)) {
+                emitCanned(`Editor zatím nevidí splněnou podmínku: ${tutorialProgress.step.success} ` +
+                    "Nemusíš mi psát „hotovo“ — další krok se objeví, až ji projekt splní.");
                 return;
             }
 

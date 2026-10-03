@@ -416,6 +416,8 @@ class MenuBar extends React.Component {
                         />)}
                         {(this.props.canManageFiles) && (<FileMenu
                             onStartSelectingFileUpload={this.props.onStartSelectingFileUpload}
+                            onStartSelectingScratchProject={this.props.hraiLogo ?
+                                this.props.onStartSelectingScratchProject : null}
                             onClickNew={this.handleClickNew}
                             onClickRemix={this.props.onClickRemix}
                             onClickSave={this.handleClickSave}
@@ -774,6 +776,7 @@ MenuBar.propTypes = {
     onSetTimeTravelMode: PropTypes.func,
     onShare: PropTypes.func,
     onStartSelectingFileUpload: PropTypes.func,
+    onStartSelectingScratchProject: PropTypes.func,
     onToggleLoginOpen: PropTypes.func,
     platform: PropTypes.oneOf(Object.keys(PLATFORM)),
     projectTitle: PropTypes.string,

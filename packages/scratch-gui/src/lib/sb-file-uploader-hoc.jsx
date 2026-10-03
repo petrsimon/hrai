@@ -2,6 +2,8 @@ import bindAll from 'lodash.bindall';
 import React from 'react';
 import PropTypes from 'prop-types';
 import {defineMessages, injectIntl} from 'react-intl';
+import Button from '../components/button/button.jsx';
+import Modal from '../components/modal/modal.jsx';
 import intlShape from './intlShape';
 import {connect} from 'react-redux';
 import log from '../lib/log';
@@ -20,12 +22,66 @@ import {
     closeLoadingProject
 } from '../reducers/modals';
 import {getProjectTitleFromFilename} from './sb-file-uploader-utils';
+import {getScratchProjectId} from './scratch-project-url';
+
+const HRAI_SERVER_URL = process.env.HRAI_SERVER_URL ||
+    (typeof window === 'object' ? window.location.origin : 'http://localhost:8791');
 
 const messages = defineMessages({
     loadError: {
         id: 'gui.projectLoader.loadError',
         defaultMessage: 'The project file that was selected failed to load.',
         description: 'An error that displays when a local project file fails to load.'
+    },
+    scratchProjectTitle: {
+        id: 'gui.projectLoader.scratchProjectTitle',
+        defaultMessage: 'Load from Scratch',
+        description: 'Title of the Scratch project URL import dialog'
+    },
+    scratchProjectUrlLabel: {
+        id: 'gui.projectLoader.scratchProjectUrlLabel',
+        defaultMessage: 'Scratch project URL or ID',
+        description: 'Label for the public Scratch project URL input'
+    },
+    scratchProjectUrlHelp: {
+        id: 'gui.projectLoader.scratchProjectUrlHelp',
+        defaultMessage: 'Paste a link to a shared Scratch project. Private projects need an .sb3 file.',
+        description: 'Help text explaining that URL import is for public Scratch projects'
+    },
+    scratchProjectInvalidUrl: {
+        id: 'gui.projectLoader.scratchProjectInvalidUrl',
+        defaultMessage: 'Enter a Scratch project link or numeric project ID.',
+        description: 'Error shown for an invalid Scratch project URL'
+    },
+    scratchProjectNotPublic: {
+        id: 'gui.projectLoader.scratchProjectNotPublic',
+        defaultMessage: 'That project is not shared publicly. Download its .sb3 file and load it from your computer.',
+        description: 'Error shown when a Scratch project cannot be imported publicly'
+    },
+    scratchProjectUnavailable: {
+        id: 'gui.projectLoader.scratchProjectUnavailable',
+        defaultMessage: 'Could not download that Scratch project. Try again or load an .sb3 file.',
+        description: 'Error shown when a Scratch project download fails'
+    },
+    scratchProjectTooLarge: {
+        id: 'gui.projectLoader.scratchProjectTooLarge',
+        defaultMessage: 'That Scratch project is too large to import here.',
+        description: 'Error shown when a Scratch project exceeds the import size limit'
+    },
+    scratchProjectImport: {
+        id: 'gui.projectLoader.scratchProjectImport',
+        defaultMessage: 'Load project',
+        description: 'Submit button for the Scratch project URL dialog'
+    },
+    scratchProjectLoading: {
+        id: 'gui.projectLoader.scratchProjectLoading',
+        defaultMessage: 'Loading…',
+        description: 'Button label while a Scratch project is downloading'
+    },
+    scratchProjectCancel: {
+        id: 'gui.projectLoader.scratchProjectCancel',
+        defaultMessage: 'Cancel',
+        description: 'Cancel button for the Scratch project URL dialog'
     }
 });
 
@@ -42,11 +98,23 @@ const SBFileUploaderHOC = function (WrappedComponent) {
     class SBFileUploaderComponent extends React.Component {
         constructor (props) {
             super(props);
+            this.state = {
+                scratchProjectDialogOpen: false,
+                scratchProjectUrl: '',
+                scratchProjectError: null,
+                scratchProjectImporting: false
+            };
+            this.projectDataToLoad = null;
             bindAll(this, [
                 'createFileObjects',
                 'handleFinishedLoadingUpload',
                 'handleStartSelectingFileUpload',
+                'handleStartSelectingScratchProject',
+                'handleScratchProjectUrlChange',
+                'handleScratchProjectSubmit',
+                'handleCloseScratchProjectDialog',
                 'handleChange',
+                'loadProjectData',
                 'onload',
                 'removeFileObjects'
             ]);
@@ -62,6 +130,65 @@ const SBFileUploaderHOC = function (WrappedComponent) {
         // step 1: this is where the upload process begins
         handleStartSelectingFileUpload () {
             this.createFileObjects(); // go to step 2
+        }
+        handleStartSelectingScratchProject () {
+            this.setState({
+                scratchProjectDialogOpen: true,
+                scratchProjectUrl: '',
+                scratchProjectError: null,
+                scratchProjectImporting: false
+            });
+        }
+        handleScratchProjectUrlChange (event) {
+            this.setState({scratchProjectUrl: event.target.value, scratchProjectError: null});
+        }
+        async handleScratchProjectSubmit (event) {
+            event.preventDefault();
+            if (this.state.scratchProjectImporting) return;
+
+            let projectId;
+            try {
+                projectId = getScratchProjectId(this.state.scratchProjectUrl);
+            } catch {
+                this.setState({scratchProjectError: messages.scratchProjectInvalidUrl});
+                return;
+            }
+
+            if (this.props.projectChanged || this.props.userOwnsProject) {
+                const replaceProject = confirm( // eslint-disable-line no-alert
+                    this.props.intl.formatMessage(sharedMessages.replaceProjectWarning)
+                );
+                if (!replaceProject) return;
+            }
+
+            this.setState({scratchProjectImporting: true, scratchProjectError: null});
+            try {
+                const response = await fetch(`${HRAI_SERVER_URL}/api/scratch/projects/${projectId}`);
+                if (!response.ok) {
+                    const result = await response.json().catch(() => ({}));
+                    throw new Error(result.error || 'scratch_project_unavailable');
+                }
+                this.projectDataToLoad = {
+                    data: await response.arrayBuffer(),
+                    title: `Scratch project ${projectId}`,
+                    fromScratchUrl: true
+                };
+                this.props.requestProjectUpload(this.props.loadingState);
+            } catch (error) {
+                log.warn('hrai: Scratch project import failed', {projectId, error});
+                const code = error instanceof Error ? error.message : '';
+                let scratchProjectError = messages.scratchProjectUnavailable;
+                if (code === 'scratch_project_not_public' || code === 'scratch_project_not_found') {
+                    scratchProjectError = messages.scratchProjectNotPublic;
+                } else if (code === 'scratch_project_too_large') {
+                    scratchProjectError = messages.scratchProjectTooLarge;
+                }
+                this.setState({scratchProjectImporting: false, scratchProjectError});
+            }
+        }
+        handleCloseScratchProjectDialog () {
+            if (this.state.scratchProjectImporting) return;
+            this.setState({scratchProjectDialogOpen: false});
         }
         // step 2: create a FileReader and an <input> element, and issue a
         // pseudo-click to it. That will open the file chooser dialog.
@@ -120,7 +247,11 @@ const SBFileUploaderHOC = function (WrappedComponent) {
         // step 5: called from componentDidUpdate when project state shows
         // that project data has finished "uploading" into the browser
         handleFinishedLoadingUpload () {
-            if (this.fileToUpload && this.fileReader) {
+            if (this.projectDataToLoad) {
+                const project = this.projectDataToLoad;
+                this.projectDataToLoad = null;
+                this.loadProjectData(project.data, project.title, project.fromScratchUrl);
+            } else if (this.fileToUpload && this.fileReader) {
                 // begin to read data from the file. When finished,
                 // cues step 6 using the reader's onload callback
                 this.fileReader.readAsArrayBuffer(this.fileToUpload);
@@ -134,28 +265,37 @@ const SBFileUploaderHOC = function (WrappedComponent) {
         // file upload raw data is available in the reader
         onload () {
             if (this.fileReader) {
-                this.props.onLoadingStarted();
                 const filename = this.fileToUpload && this.fileToUpload.name;
-                let loadingSuccess = false;
-                this.props.vm.loadProject(this.fileReader.result)
-                    .then(() => {
-                        if (filename) {
-                            const uploadedProjectTitle = getProjectTitleFromFilename(filename);
-                            this.props.onSetProjectTitle(uploadedProjectTitle);
-                        }
-                        loadingSuccess = true;
-                    })
-                    .catch(error => {
-                        log.warn(error);
-                        alert(this.props.intl.formatMessage(messages.loadError)); // eslint-disable-line no-alert
-                    })
-                    .then(() => {
-                        this.props.onLoadingFinished(this.props.loadingState, loadingSuccess);
-                        // go back to step 7: whether project loading succeeded
-                        // or failed, reset file objects
-                        this.removeFileObjects();
-                    });
+                const title = filename ? getProjectTitleFromFilename(filename) : null;
+                this.loadProjectData(this.fileReader.result, title);
             }
+        }
+        loadProjectData (data, title, fromScratchUrl = false) {
+            this.props.onLoadingStarted();
+            let loadingSuccess = false;
+            this.props.vm.loadProject(data)
+                .then(() => {
+                    if (title) this.props.onSetProjectTitle(title);
+                    loadingSuccess = true;
+                })
+                .catch(error => {
+                    log.warn(error);
+                    if (fromScratchUrl) {
+                        this.setState({scratchProjectError: messages.loadError});
+                    } else {
+                        alert(this.props.intl.formatMessage(messages.loadError)); // eslint-disable-line no-alert
+                    }
+                })
+                .then(() => {
+                    this.props.onLoadingFinished(this.props.loadingState, loadingSuccess);
+                    this.removeFileObjects();
+                    if (fromScratchUrl) {
+                        this.setState({
+                            scratchProjectDialogOpen: !loadingSuccess,
+                            scratchProjectImporting: false
+                        });
+                    }
+                });
         }
         // step 7: remove the <input> element from the DOM and clear reader and
         // fileToUpload reference, so those objects can be garbage collected
@@ -167,6 +307,7 @@ const SBFileUploaderHOC = function (WrappedComponent) {
             this.inputElement = null;
             this.fileReader = null;
             this.fileToUpload = null;
+            this.projectDataToLoad = null;
         }
         render () {
             const {
@@ -191,8 +332,58 @@ const SBFileUploaderHOC = function (WrappedComponent) {
                 <React.Fragment>
                     <WrappedComponent
                         onStartSelectingFileUpload={this.handleStartSelectingFileUpload}
+                        onStartSelectingScratchProject={this.handleStartSelectingScratchProject}
                         {...componentProps}
                     />
+                    {this.state.scratchProjectDialogOpen ? (
+                        <Modal
+                            contentLabel={this.props.intl.formatMessage(messages.scratchProjectTitle)}
+                            onRequestClose={this.handleCloseScratchProjectDialog}
+                        >
+                            <form
+                                aria-busy={this.state.scratchProjectImporting}
+                                onSubmit={this.handleScratchProjectSubmit}
+                                style={{display: 'grid', gap: '0.75rem', padding: '1rem'}}
+                            >
+                                <label htmlFor="scratch-project-url">
+                                    {this.props.intl.formatMessage(messages.scratchProjectUrlLabel)}
+                                </label>
+                                <input
+                                    autoFocus
+                                    id="scratch-project-url"
+                                    type="text"
+                                    value={this.state.scratchProjectUrl}
+                                    onChange={this.handleScratchProjectUrlChange}
+                                    aria-describedby="scratch-project-url-help"
+                                    disabled={this.state.scratchProjectImporting}
+                                />
+                                <p id="scratch-project-url-help">
+                                    {this.props.intl.formatMessage(messages.scratchProjectUrlHelp)}
+                                </p>
+                                {this.state.scratchProjectError ? (
+                                    <p role="alert">
+                                        {this.props.intl.formatMessage(this.state.scratchProjectError)}
+                                    </p>
+                                ) : null}
+                                <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'flex-end'}}>
+                                    <Button
+                                        type="button"
+                                        disabled={this.state.scratchProjectImporting}
+                                        onClick={this.handleCloseScratchProjectDialog}
+                                    >
+                                        {this.props.intl.formatMessage(messages.scratchProjectCancel)}
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={this.state.scratchProjectImporting}
+                                    >
+                                        {this.props.intl.formatMessage(this.state.scratchProjectImporting ?
+                                            messages.scratchProjectLoading : messages.scratchProjectImport)}
+                                    </Button>
+                                </div>
+                            </form>
+                        </Modal>
+                    ) : null}
                 </React.Fragment>
             );
         }

@@ -5,6 +5,17 @@ import {IntlProvider} from 'react-intl';
 import HraiPanel from '../../../src/components/hrai-panel/hrai-panel.jsx';
 import {renderWithIntl} from '../../helpers/intl-helpers.jsx';
 
+const PROJECT_TUTORIAL = {
+    mode: 'explore',
+    title: 'Explore the maze',
+    overview: 'Find how the maze game works.',
+    steps: [
+        {id: 'tutorial-step-1', title: 'Start', goal: 'See what starts the game.', instruction: 'Click the green flag.', success: 'Explain what starts the game.'},
+        {id: 'tutorial-step-2', title: 'Move', goal: 'See how the player moves.', instruction: 'Try the arrow keys.', success: 'Explain how the player moves.'},
+        {id: 'tutorial-step-3', title: 'Reach the goal', goal: 'Find how the game ends.', instruction: 'Play to the goal.', success: 'Explain how the game ends.'}
+    ]
+};
+
 const GAME_PLAN = {
     title: 'Dračí bludiště',
     originalGoal: 'Drak najde poklad v bludišti.',
@@ -806,5 +817,67 @@ describe('HraiPanel custom game planning', () => {
 
         expect(screen.getByText('Dokončil jsi plán své hry!')).toBeTruthy();
         expect(screen.queryByRole('button', {name: 'Další milník'})).toBeNull();
+    });
+
+    test('offers both tutorial modes for an imported project', () => {
+        const onProjectTutorialRequest = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                hasProjectContent
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onProjectTutorialRequest={onProjectTutorialRequest}
+                onSend={jest.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', {name: 'Prozkoumat tuto hru'}));
+        fireEvent.click(screen.getByRole('button', {name: 'Postavit podobnou hru v novém projektu'}));
+        expect(onProjectTutorialRequest.mock.calls).toEqual([['explore'], ['rebuild']]);
+    });
+
+    test('shows a generated project tutorial and accepts it explicitly', () => {
+        const onProjectTutorialAccept = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onProjectTutorialAccept={onProjectTutorialAccept}
+                onSend={jest.fn()}
+                projectTutorialProposal={PROJECT_TUTORIAL}
+            />
+        );
+
+        expect(screen.getByText('Find how the maze game works.')).toBeTruthy();
+        expect(screen.getByText('Start')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', {name: 'Začít tento návod'}));
+        expect(onProjectTutorialAccept).toHaveBeenCalledTimes(1);
+    });
+
+    test('shows source preservation before starting a rebuild tutorial', () => {
+        const onStartProjectTutorialRebuild = jest.fn();
+        renderWithIntl(
+            <HraiPanel
+                messages={[]}
+                onHint={jest.fn()}
+                onNextStage={jest.fn()}
+                onSend={jest.fn()}
+                onStartProjectTutorialRebuild={onStartProjectTutorialRebuild}
+                projectTutorialNeedsNewProject
+                projectTutorialProgress={{
+                    plan: {...PROJECT_TUTORIAL, mode: 'rebuild'},
+                    stepIndex: 0,
+                    step: PROJECT_TUTORIAL.steps[0],
+                    stepComplete: false,
+                    complete: false
+                }}
+            />
+        );
+
+        expect(screen.getByText('Původní projekt se uloží a zůstane beze změny.')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', {name: 'Otevřít nový projekt'}));
+        expect(onStartProjectTutorialRebuild).toHaveBeenCalledTimes(1);
     });
 });

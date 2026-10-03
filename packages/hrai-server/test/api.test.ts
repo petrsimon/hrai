@@ -66,6 +66,32 @@ describe("HRAI self-hosted API", () => {
         expect(await response.json()).toEqual({ error: "authentication_required" });
     });
 
+    it("imports a shared Scratch project without HRAI or Scratch account credentials", async () => {
+        cookie = "";
+        const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+        const nativeFetch = globalThis.fetch;
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+            const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+            if (url.startsWith(baseUrl)) return nativeFetch(input, init);
+            if (url === "https://api.scratch.mit.edu/projects/65347738") {
+                return new Response(JSON.stringify({public: true, project_token: "public-token"}), {status: 200});
+            }
+            if (url === "https://projects.scratch.mit.edu/65347738?token=public-token") {
+                return new Response(bytes, {status: 200, headers: {"Content-Type": "application/octet-stream"}});
+            }
+            throw new Error(`Unexpected request: ${url}`);
+        });
+
+        try {
+            const response = await api("/api/scratch/projects/65347738");
+            expect(response.status).toBe(200);
+            expect(response.headers.get("content-type")).toMatch(/application\/octet-stream/);
+            expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
+        } finally {
+            fetchSpy.mockRestore();
+        }
+    });
+
     it("registers and authenticates a profile with assistant preferences", async () => {
         const response = await api("/api/auth/register", {
             method: "POST",

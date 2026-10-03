@@ -9,13 +9,25 @@ import VM from '@scratch/scratch-vm';
 import HraiPanelComponent from '../components/hrai-panel/hrai-panel.jsx';
 import log from '../lib/log.js';
 import {clearGameProgress, loadGameProgress, saveGamePlaytest, saveGameProgress} from '../lib/hrai-game-progress';
+import {
+    clearProjectTutorialProgress,
+    loadProjectTutorialProgress,
+    saveProjectTutorialProgress
+} from '../lib/hrai-project-tutorial-progress';
 import {loadGameStarter} from '../lib/hrai-game-starter';
 import {addTranscriptEvents} from '../lib/hrai-transcript.js';
 import {setHraiSocket} from '../lib/hrai-socket.js';
 import lessons from '../lib/hrai-lessons';
 import {loadLessonProgress, saveLessonProgress} from '../lib/hrai-lessons/progress';
 import {nextHraiStage} from '../reducers/hrai-lesson';
-import {createProject, getIsShowingWithId, manualUpdateProject} from '../reducers/project-state';
+import {
+    createProject,
+    defaultProjectId,
+    getIsShowingWithId,
+    getIsShowingWithoutId,
+    manualUpdateProject,
+    requestNewProject
+} from '../reducers/project-state';
 import {setProjectTitle} from '../reducers/project-title';
 
 const HRAI_SERVER_URL = process.env.HRAI_SERVER_URL ||
@@ -33,6 +45,11 @@ const messages = defineMessages({
         defaultMessage: 'Tím nahradíš právě otevřený projekt novým. Současný projekt se nejdřív ' +
             'uloží, pokud je potřeba. Pokračovat?',
         description: 'confirmation before replacing the current project with a new custom game project'
+    },
+    projectTutorialSaveRequired: {
+        id: 'gui.hrai.projectTutorialSaveRequired',
+        defaultMessage: 'Nejdřív se přihlas nebo ulož projekt do počítače. Původní hra musí zůstat zachovaná.',
+        description: 'error when a rebuild tutorial cannot safely preserve the original project'
     }
 });
 
@@ -64,9 +81,13 @@ const hasMeaningfulWorkspace = vm => vm.runtime.targets.some(target => {
 const HraiPanel = ({
     activeLessonId,
     assistantPreferences,
+    canCreateNew,
+    canSave,
     onCreateProject,
     onNextStage,
     isShowingWithId,
+    isShowingWithoutId,
+    onRequestNewProject,
     onSaveProject,
     onSetProjectTitle,
     projectId,
@@ -83,9 +104,17 @@ const HraiPanel = ({
     const [gamePlan, setGamePlan] = useState(null);
     const [gamePlaytest, setGamePlaytest] = useState(null);
     const [gameProgress, setGameProgress] = useState(null);
+    const [projectTutorialProposal, setProjectTutorialProposal] = useState(null);
+    const [projectTutorialProgress, setProjectTutorialProgress] = useState(null);
+    const [projectTutorialNeedsNewProject, setProjectTutorialNeedsNewProject] = useState(false);
+    const [projectTutorialError, setProjectTutorialError] = useState(null);
     const [isPlanning, setIsPlanning] = useState(false);
     const [isStartingNewProject, setIsStartingNewProject] = useState(false);
     const pendingNewGameIdeaRef = useRef(null);
+    const pendingProjectTutorialRestoreRef = useRef(null);
+    const projectTutorialStartedInNewProjectRef = useRef(false);
+    const projectTutorialRestorePendingRef = useRef(false);
+    const createSourceBeforeRebuildRef = useRef(false);
     const [voiceCapabilities, setVoiceCapabilities] = useState({available: false, languages: []});
     const [voiceTranscript, setVoiceTranscript] = useState(null);
     const [voiceErrorCode, setVoiceErrorCode] = useState(null);
@@ -159,8 +188,27 @@ const HraiPanel = ({
                     stageIndex: saved?.stageIndex || 0
                 });
             } else {
-                const saved = loadGameProgress(projectId, projectTitleRef.current);
-                if (saved) socket.emit('gameRestore', saved);
+                const pendingRestore = pendingProjectTutorialRestoreRef.current;
+                const savedTutorial = pendingRestore || loadProjectTutorialProgress(projectId, projectTitleRef.current);
+                if (savedTutorial) {
+                    const isProjectReady = isShowingWithId || isShowingWithoutId;
+                    const isPendingTarget = pendingRestore?.newProjectStarted &&
+                        !createSourceBeforeRebuildRef.current &&
+                        String(projectId) !== String(pendingRestore.sourceProjectId);
+                    const startedInNewProject = pendingRestore ?
+                        Boolean(isPendingTarget && isProjectReady) :
+                        savedTutorial.newProjectStarted === true;
+                    projectTutorialStartedInNewProjectRef.current = startedInNewProject;
+                    projectTutorialRestorePendingRef.current = true;
+                    socket.emit('projectTutorialRestore', {
+                        plan: savedTutorial.plan,
+                        stepIndex: savedTutorial.stepIndex,
+                        needsNewProject: savedTutorial.plan.mode === 'rebuild' && !startedInNewProject
+                    });
+                } else {
+                    const saved = loadGameProgress(projectId, projectTitleRef.current);
+                    if (saved) socket.emit('gameRestore', saved);
+                }
             }
             emitPendingGamePlan();
         });
@@ -272,6 +320,39 @@ const HraiPanel = ({
             setIsStartingNewProject(false);
         });
 
+        socket.on('projectTutorialProposed', plan => {
+            setProjectTutorialProposal(plan);
+            setProjectTutorialProgress(null);
+            setProjectTutorialNeedsNewProject(false);
+            setProjectTutorialError(null);
+            setIsPlanning(false);
+        });
+
+        socket.on('projectTutorialProgress', progress => {
+            if (projectTutorialRestorePendingRef.current) {
+                const pendingRestore = pendingProjectTutorialRestoreRef.current;
+                const isPendingTarget = pendingRestore?.newProjectStarted &&
+                    !createSourceBeforeRebuildRef.current &&
+                    String(projectId) !== String(pendingRestore.sourceProjectId);
+                const isProjectReady = isShowingWithId || isShowingWithoutId;
+                const transferComplete = isPendingTarget && isProjectReady &&
+                    (!canCreateNew || String(projectId) !== String(defaultProjectId));
+                if (transferComplete || !pendingRestore) pendingProjectTutorialRestoreRef.current = null;
+                projectTutorialRestorePendingRef.current = false;
+            }
+            const startedInNewProject = projectTutorialStartedInNewProjectRef.current;
+            saveProjectTutorialProgress(projectId, progress, projectTitleRef.current, startedInNewProject);
+            setProjectTutorialProposal(null);
+            setProjectTutorialProgress(progress);
+            setProjectTutorialNeedsNewProject(progress.plan.mode === 'rebuild' && progress.needsNewProject);
+            setProjectTutorialError(null);
+            setGamePlan(null);
+            setGamePlaytest(null);
+            setGameProgress(null);
+            setIsPlanning(false);
+            setIsStartingNewProject(false);
+        });
+
         socket.on('gameMilestoneComplete', progress => {
             setGameProgress(progress);
         });
@@ -320,6 +401,8 @@ const HraiPanel = ({
             socket.off('gamePlaytest');
             socket.off('gameProgress');
             socket.off('gameMilestoneComplete');
+            socket.off('projectTutorialProposed');
+            socket.off('projectTutorialProgress');
             socket.off('lessonProgress');
             socket.off('stageComplete');
             socket.off('error');
@@ -333,6 +416,9 @@ const HraiPanel = ({
         debouncedPushWorkspace,
         helperUnavailableText,
         emitPendingGamePlan,
+        canCreateNew,
+        isShowingWithId,
+        isShowingWithoutId,
         projectId,
         pushWorkspace
     ]);
@@ -351,9 +437,16 @@ const HraiPanel = ({
         setGamePlan(null);
         setGamePlaytest(null);
         setGameProgress(null);
+        setProjectTutorialProposal(null);
         setIsPlanning(false);
-        const saved = activeLessonId ?
-            loadLessonProgress(projectId, activeLessonId, projectTitleRef.current) : null;
+        const savedTutorial = pendingProjectTutorialRestoreRef.current ||
+            loadProjectTutorialProgress(projectId, projectTitleRef.current);
+        if (activeLessonId || !savedTutorial) {
+            setProjectTutorialProgress(null);
+            setProjectTutorialNeedsNewProject(false);
+        }
+        if (activeLessonId) clearProjectTutorialProgress(projectId, projectTitleRef.current);
+        const saved = activeLessonId ? loadLessonProgress(projectId, activeLessonId, projectTitleRef.current) : null;
         setLessonProgress(saved ? {stageIndex: saved.stageIndex, complete: false} : null);
         if (activeLessonId) {
             clearGameProgress(projectId, projectTitleRef.current);
@@ -365,6 +458,17 @@ const HraiPanel = ({
             });
         }
     }, [activeLessonId, projectId]);
+
+    useEffect(() => {
+        if (createSourceBeforeRebuildRef.current && isShowingWithId) {
+            createSourceBeforeRebuildRef.current = false;
+            if (pendingProjectTutorialRestoreRef.current) {
+                pendingProjectTutorialRestoreRef.current.sourceProjectId = String(projectId);
+                pendingProjectTutorialRestoreRef.current.newProjectStarted = true;
+            }
+            onRequestNewProject(true);
+        }
+    }, [isShowingWithId, onRequestNewProject, projectId]);
 
     useEffect(() => {
         const onWorkspaceChange = () => {
@@ -444,11 +548,13 @@ const HraiPanel = ({
     useEffect(() => {
         const isNamed = projectTitle && projectTitle !== defaultProjectTitle;
         if (isShowingWithId && !hadProjectIdRef.current &&
-            !gamePlan && !gamePlaytest && !gameProgress && !isNamed) {
+            !gamePlan && !gamePlaytest && !gameProgress && !projectTutorialProposal &&
+            !projectTutorialProgress && !isNamed) {
             socketRef.current?.emit('projectTitle');
         }
         hadProjectIdRef.current = isShowingWithId;
-    }, [defaultProjectTitle, gamePlan, gamePlaytest, gameProgress, isShowingWithId, projectTitle]);
+    }, [defaultProjectTitle, gamePlan, gamePlaytest, gameProgress, isShowingWithId, projectTitle,
+        projectTutorialProposal, projectTutorialProgress]);
 
     const handleGamePlanRequest = useCallback(text => {
         if (socketRef.current?.connected) {
@@ -458,6 +564,66 @@ const HraiPanel = ({
             socketRef.current.emit('gamePlan', {text});
         }
     }, []);
+
+    const handleProjectTutorialRequest = useCallback(mode => {
+        if (!socketRef.current?.connected) return;
+        pendingProjectTutorialRestoreRef.current = null;
+        projectTutorialStartedInNewProjectRef.current = false;
+        projectTutorialRestorePendingRef.current = false;
+        setProjectTutorialProposal(null);
+        setProjectTutorialProgress(null);
+        setProjectTutorialNeedsNewProject(false);
+        setProjectTutorialError(null);
+        setIsPlanning(true);
+        socketRef.current.emit('projectTutorialPlan', {mode});
+    }, []);
+
+    const handleProjectTutorialAccept = useCallback(() => {
+        if (socketRef.current?.connected && projectTutorialProposal && !isPlanning) {
+            setIsPlanning(true);
+            socketRef.current.emit('projectTutorialAccept');
+        }
+    }, [isPlanning, projectTutorialProposal]);
+
+    const handleProjectTutorialCancel = useCallback(() => {
+        socketRef.current?.emit('projectTutorialCancel');
+        setProjectTutorialProposal(null);
+        setIsPlanning(false);
+    }, []);
+
+    const handleProjectTutorialNext = useCallback(() => {
+        if (!socketRef.current?.connected || !projectTutorialProgress) return;
+        if (projectTutorialProgress.plan.mode === 'rebuild' && !projectTutorialProgress.stepComplete) return;
+        socketRef.current.emit('projectTutorialNext');
+    }, [projectTutorialProgress]);
+
+    const handleStartProjectTutorialRebuild = useCallback(() => {
+        if (!projectTutorialProgress || projectTutorialProgress.plan.mode !== 'rebuild' ||
+            isPlanning || isStartingNewProject) return;
+        if (!canSave) {
+            setProjectTutorialError(intl.formatMessage(messages.projectTutorialSaveRequired));
+            return;
+        }
+        if (!isShowingWithId && !isShowingWithoutId) return;
+        // eslint-disable-next-line no-alert -- the rebuild must preserve the imported source project
+        if (!window.confirm(intl.formatMessage(messages.newProjectConfirmation))) return;
+
+        pendingProjectTutorialRestoreRef.current = {
+            plan: projectTutorialProgress.plan,
+            stepIndex: projectTutorialProgress.stepIndex,
+            newProjectStarted: true,
+            sourceProjectId: String(projectId)
+        };
+        setProjectTutorialError(null);
+        setIsStartingNewProject(true);
+        if (isShowingWithId) {
+            onRequestNewProject(true);
+        } else {
+            createSourceBeforeRebuildRef.current = true;
+            onCreateProject();
+        }
+    }, [canSave, intl, isPlanning, isShowingWithId, isShowingWithoutId,
+        isStartingNewProject, onCreateProject, onRequestNewProject, projectId, projectTutorialProgress]);
 
     const handleStartNewProject = useCallback(text => {
         // eslint-disable-next-line no-alert -- replacing the current project needs explicit confirmation
@@ -523,6 +689,10 @@ const HraiPanel = ({
             transcript={transcript}
             gamePlaytest={gamePlaytest}
             gameProgress={gameProgress}
+            projectTutorialProposal={projectTutorialProposal}
+            projectTutorialProgress={projectTutorialProgress}
+            projectTutorialNeedsNewProject={projectTutorialNeedsNewProject}
+            projectTutorialError={projectTutorialError}
             hasProjectContent={hasMeaningfulWorkspace(vm)}
             isPlanning={isPlanning}
             isStartingNewProject={isStartingNewProject}
@@ -532,6 +702,11 @@ const HraiPanel = ({
             onGamePlanRequest={handleGamePlanRequest}
             onGamePlaytestComplete={handleGamePlaytestComplete}
             onGameIdea={handleGameIdea}
+            onProjectTutorialRequest={handleProjectTutorialRequest}
+            onProjectTutorialAccept={handleProjectTutorialAccept}
+            onProjectTutorialCancel={handleProjectTutorialCancel}
+            onProjectTutorialNext={handleProjectTutorialNext}
+            onStartProjectTutorialRebuild={handleStartProjectTutorialRebuild}
             onStartNewProject={handleStartNewProject}
             onSend={handleSend}
             onHint={handleHint}
@@ -552,9 +727,13 @@ const HraiPanel = ({
 HraiPanel.propTypes = {
     activeLessonId: PropTypes.string,
     assistantPreferences: PropTypes.object,
+    canCreateNew: PropTypes.bool,
+    canSave: PropTypes.bool,
     onCreateProject: PropTypes.func.isRequired,
     onNextStage: PropTypes.func.isRequired,
     isShowingWithId: PropTypes.bool,
+    isShowingWithoutId: PropTypes.bool,
+    onRequestNewProject: PropTypes.func.isRequired,
     onSaveProject: PropTypes.func.isRequired,
     onSetProjectTitle: PropTypes.func.isRequired,
     projectId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -569,6 +748,7 @@ HraiPanel.defaultProps = {
 const mapStateToProps = state => ({
     activeLessonId: state.scratchGui.hraiLesson.lessonId,
     isShowingWithId: getIsShowingWithId(state.scratchGui.projectState.loadingState),
+    isShowingWithoutId: getIsShowingWithoutId(state.scratchGui.projectState.loadingState),
     projectId: state.scratchGui.projectState.projectId,
     projectTitle: state.scratchGui.projectTitle,
     vm: state.scratchGui.vm
@@ -576,6 +756,7 @@ const mapStateToProps = state => ({
 
 const mapDispatchToProps = dispatch => ({
     onCreateProject: () => dispatch(createProject()),
+    onRequestNewProject: needSave => dispatch(requestNewProject(needSave)),
     onSaveProject: () => dispatch(manualUpdateProject()),
     onSetProjectTitle: title => dispatch(setProjectTitle(title)),
     onNextStage: () => dispatch(nextHraiStage())

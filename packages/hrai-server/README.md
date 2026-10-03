@@ -285,6 +285,26 @@ HRAI_EVAL_MODEL=llama/Qwen3.5-27B \
 npm run eval:game-design --workspace=packages/hrai-server
 ```
 
+## Tutorials from imported Scratch projects
+
+The HRAI File menu can load `.sb`, `.sb2`, and `.sb3` files from the computer, or a public Scratch project by URL or numeric ID. URL import works only for publicly shared projects; a private project must be downloaded from Scratch and loaded as an `.sb3` file. Public downloads use Scratch's public project token without a Scratch account credential.
+
+With a meaningful project open, the HRAI panel offers two generated tutorials:
+
+- **Explore this game** explains the imported project in place. Steps ask the child to run and inspect existing behavior; progress is advanced manually, and the project is not edited.
+- **Rebuild it in a new project** uses the imported game only as a reference. The editor saves the source project first, opens a separate blank project, and checks each rebuild step against validated Scratch-block evidence. This mode is unavailable when the source cannot be saved, so it is never silently discarded.
+
+Both modes require an accepted proposal before tutoring starts. Rebuild progress is stored per editor project and recomputed from the current workspace after reconnect; walkthrough progress is manual. Project text is sent to the profile's configured model provider under the same rules as normal tutoring.
+
+Socket events:
+
+- `projectTutorialPlan` `{mode: "explore" | "rebuild"}` → `projectTutorialProposed` with a validated plan
+- `projectTutorialAccept` / `projectTutorialCancel` → activate or dismiss the pending proposal
+- `projectTutorialRestore` with a browser-saved plan, step index, and `needsNewProject` gate →
+  revalidate and restore progress; rebuild restores stay gated until the separate project is ready
+- workspace evidence → `projectTutorialProgress` when a rebuild step changes completion state
+- `projectTutorialNext` → advance a walkthrough step, or a completed rebuild step
+
 ## Lesson bundle prototype
 
 The first game-specific bundle lives at `content/lessons/11-soldier-battle/`. It contains

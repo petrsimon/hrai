@@ -1,6 +1,7 @@
 import 'web-audio-test-api';
 
 import React from 'react';
+import {fireEvent, screen, waitFor} from '@testing-library/react';
 import configureStore from 'redux-mock-store';
 import {renderWithIntl} from '../../helpers/intl-helpers.jsx';
 import {LoadingState} from '../../../src/reducers/project-state';
@@ -97,5 +98,56 @@ describe('SBFileUploaderHOC', () => {
             </IntlProvider>
         );
         expect(mockedCancelFileUpload).toHaveBeenCalled();
+    });
+
+    test('loads a shared Scratch URL through the HRAI server before replacing the project', async () => {
+        const requestUpload = jest.fn();
+        const originalFetch = global.fetch;
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            arrayBuffer: jest.fn().mockResolvedValue(new ArrayBuffer(8))
+        });
+        const Component = ({onStartSelectingScratchProject}) => (
+            <button
+                type="button"
+                onClick={onStartSelectingScratchProject}
+            >
+                Load Scratch URL
+            </button>
+        );
+        const WrappedComponent = SBFileUploaderHOC(Component);
+        const wrapper = renderWithIntl(
+            <WrappedComponent
+                canSave={false}
+                cancelFileUpload={jest.fn()}
+                closeFileMenu={jest.fn()}
+                isLoadingUpload={false}
+                loadingState={LoadingState.SHOWING_WITHOUT_ID}
+                projectChanged={false}
+                requestProjectUpload={requestUpload}
+                store={store}
+                userOwnsProject={false}
+                vm={{loadProject: jest.fn().mockResolvedValue()}}
+                onLoadingFinished={jest.fn()}
+                onLoadingStarted={jest.fn()}
+                onSetProjectTitle={jest.fn()}
+            />
+        );
+
+        try {
+            fireEvent.click(screen.getByRole('button', {name: 'Load Scratch URL'}));
+            fireEvent.change(screen.getByLabelText('Scratch project URL or ID'), {
+                target: {value: 'https://scratch.mit.edu/projects/65347738/'}
+            });
+            fireEvent.click(screen.getByRole('button', {name: 'Load project'}));
+
+            await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+                expect.stringContaining('/api/scratch/projects/65347738')
+            ));
+            expect(requestUpload).toHaveBeenCalledWith(LoadingState.SHOWING_WITHOUT_ID);
+        } finally {
+            wrapper.unmount();
+            global.fetch = originalFetch;
+        }
     });
 });

@@ -16,6 +16,7 @@ import {
 import {describeAssessment, evaluateGameAssessment} from "./game-assessor.ts";
 import type { GameMilestone, GamePlan } from "./game-plan.ts";
 import { createGameStarter, type GameStarter } from "./game-starter.ts";
+import type {ProjectTutorial, ProjectTutorialStep} from "./project-tutorial.ts";
 import type { AssistantPreferences } from "./store.ts";
 import type { Turn, TutorPromptContext } from "./prompt.ts";
 
@@ -24,6 +25,15 @@ export type GamePhase = "playtest" | "guided";
 /** The gentlest rung, and the most specific one the tutor will ever go to. */
 export const FIRST_RUNG = 1;
 export const LAST_RUNG = 5;
+
+export interface ProjectTutorialProgress {
+    plan: ProjectTutorial;
+    stepIndex: number;
+    step: ProjectTutorialStep;
+    stepComplete: boolean;
+    complete: boolean;
+    needsNewProject: boolean;
+}
 
 export class Session {
     readonly assistantPreferences?: AssistantPreferences;
@@ -42,6 +52,12 @@ export class Session {
     private gameFeedback = "";
     private activeGameMilestoneIndex = 0;
     private gameMilestoneComplete = false;
+    private pendingProjectTutorial: ProjectTutorial | null = null;
+    private activeProjectTutorial: ProjectTutorial | null = null;
+    private projectTutorialStepIndex = 0;
+    private projectTutorialStepComplete = false;
+    private projectTutorialComplete = false;
+    private projectTutorialNeedsNewProject = false;
     readonly history: Turn[] = [];
 
     constructor(assistantPreferences?: AssistantPreferences) {
@@ -78,6 +94,100 @@ export class Session {
         this.currentRung = FIRST_RUNG;
     }
 
+    get proposedProjectTutorial(): ProjectTutorial | null {
+        return this.pendingProjectTutorial;
+    }
+
+    proposeProjectTutorial(plan: ProjectTutorial): void {
+        this.pendingProjectTutorial = plan;
+    }
+
+    cancelProposedProjectTutorial(): void {
+        this.pendingProjectTutorial = null;
+    }
+
+    private activateProjectTutorial(
+        plan: ProjectTutorial,
+        stepIndex: number,
+        needsNewProject = false,
+    ): ProjectTutorial {
+        this.pendingProjectTutorial = null;
+        this.activeProjectTutorial = plan;
+        this.projectTutorialStepIndex = stepIndex;
+        this.projectTutorialStepComplete = false;
+        this.projectTutorialComplete = false;
+        this.projectTutorialNeedsNewProject = needsNewProject;
+        this.activeLessonId = null;
+        this.stageComplete = false;
+        this.activeGamePlan = null;
+        this.activeGameStarter = null;
+        this.pendingGamePlan = null;
+        this.pendingGameStarter = null;
+        this.gamePhase = null;
+        this.gameFeedback = "";
+        this.gameMilestoneComplete = false;
+        this.history.length = 0;
+        this.resetRung();
+        return plan;
+    }
+
+    acceptProjectTutorial(): ProjectTutorial | null {
+        if (!this.pendingProjectTutorial) return null;
+        const plan = this.pendingProjectTutorial;
+        return this.activateProjectTutorial(plan, 0, plan.mode === "rebuild");
+    }
+
+    restoreProjectTutorial(
+        plan: ProjectTutorial,
+        stepIndex: number,
+        needsNewProject = plan.mode === "rebuild",
+    ): ProjectTutorial | null {
+        if (!Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex >= plan.steps.length) return null;
+        const restored = this.activateProjectTutorial(plan, stepIndex, needsNewProject);
+        if (plan.mode === "rebuild" && !needsNewProject) this.evaluateProjectTutorialStep();
+        return restored;
+    }
+
+    get projectTutorialProgress(): ProjectTutorialProgress | null {
+        if (!this.activeProjectTutorial) return null;
+        const step = this.activeProjectTutorial.steps[this.projectTutorialStepIndex];
+        if (!step) return null;
+        return {
+            plan: this.activeProjectTutorial,
+            stepIndex: this.projectTutorialStepIndex,
+            step,
+            stepComplete: this.projectTutorialStepComplete,
+            complete: this.projectTutorialComplete,
+            needsNewProject: this.projectTutorialNeedsNewProject,
+        };
+    }
+
+    evaluateProjectTutorialStep(): boolean {
+        const progress = this.projectTutorialProgress;
+        if (progress?.plan.mode !== "rebuild" || progress.needsNewProject || !progress.step.assessment) return false;
+        this.projectTutorialStepComplete = evaluateGameAssessment(progress.step.assessment, this.targets);
+        this.projectTutorialComplete = this.projectTutorialStepComplete &&
+            progress.stepIndex === progress.plan.steps.length - 1;
+        return this.projectTutorialStepComplete;
+    }
+
+    nextProjectTutorialStep(): ProjectTutorialStep | null {
+        const progress = this.projectTutorialProgress;
+        if (!progress || progress.complete || progress.needsNewProject) return null;
+        if (progress.plan.mode === "rebuild" && !progress.stepComplete) return null;
+        const nextIndex = this.projectTutorialStepIndex + 1;
+        if (nextIndex >= progress.plan.steps.length) {
+            this.projectTutorialComplete = true;
+            return null;
+        }
+        this.projectTutorialStepIndex = nextIndex;
+        this.projectTutorialStepComplete = false;
+        if (progress.plan.mode === "rebuild") this.evaluateProjectTutorialStep();
+        this.history.length = 0;
+        this.resetRung();
+        return progress.plan.steps[nextIndex] ?? null;
+    }
+
     /**
      * Plan waiting for the child to approve it.
      * @returns Pending proposal, or null.
@@ -104,6 +214,11 @@ export class Session {
         starter: GameStarter,
         feedback = "",
     ): GamePlan {
+        this.pendingProjectTutorial = null;
+        this.activeProjectTutorial = null;
+        this.projectTutorialStepIndex = 0;
+        this.projectTutorialStepComplete = false;
+        this.projectTutorialComplete = false;
         this.activeGamePlan = plan;
         this.activeGameStarter = starter;
         this.pendingGamePlan = null;
@@ -241,6 +356,24 @@ export class Session {
             };
         }
 
+        const tutorial = this.projectTutorialProgress;
+        if (tutorial && !tutorial.needsNewProject) {
+            const assessment = tutorial.step.assessment;
+            const opcodes = assessment ? [...new Set(assessment.allOf.flatMap((criterion) => (
+                "opcodes" in criterion ? criterion.opcodes : []
+            )))] : [];
+            return {
+                title: tutorial.step.title,
+                goal: tutorial.step.goal,
+                instruction: tutorial.step.instruction,
+                success: tutorial.step.success,
+                opcodes,
+                evidence: tutorial.plan.mode === "rebuild" && assessment
+                    ? describeAssessment(assessment, this.targets, rung)
+                    : ["Prozkoumej původní projekt; jeho kód neměň."],
+            };
+        }
+
         const game = this.gameProgress;
         if (!game) return undefined;
         const opcodes = [...new Set(game.milestone.assessment.allOf.flatMap((criterion) => (
@@ -267,6 +400,11 @@ export class Session {
         this.activeLessonId = lessonId;
         this.activeStageIndex = stageIndex;
         this.stageComplete = false;
+        this.pendingProjectTutorial = null;
+        this.activeProjectTutorial = null;
+        this.projectTutorialStepIndex = 0;
+        this.projectTutorialStepComplete = false;
+        this.projectTutorialComplete = false;
         this.activeGamePlan = null;
         this.activeGameStarter = null;
         this.pendingGamePlan = null;

@@ -44,6 +44,96 @@ const messages = defineMessages({
         defaultMessage: 'Your game plan will appear here.',
         description: 'empty state shown before a game plan has been prepared'
     },
+    projectTutorialHeading: {
+        id: 'gui.hrai.projectTutorialHeading',
+        defaultMessage: 'Vytvořit návod z tohoto projektu',
+        description: 'heading for generating a tutorial from an imported Scratch project'
+    },
+    projectTutorialExplore: {
+        id: 'gui.hrai.projectTutorialExplore',
+        defaultMessage: 'Prozkoumat tuto hru',
+        description: 'button to generate a walkthrough of the existing game'
+    },
+    projectTutorialRebuild: {
+        id: 'gui.hrai.projectTutorialRebuild',
+        defaultMessage: 'Postavit podobnou hru v novém projektu',
+        description: 'button to generate a tutorial for rebuilding the game in a separate project'
+    },
+    projectTutorialPlanning: {
+        id: 'gui.hrai.projectTutorialPlanning',
+        defaultMessage: 'Připravuji návod z tohoto projektu…',
+        description: 'status shown while a project tutorial is generated'
+    },
+    projectTutorialProposal: {
+        id: 'gui.hrai.projectTutorialProposal',
+        defaultMessage: 'Návod: {title}',
+        description: 'heading for a proposed project tutorial'
+    },
+    projectTutorialOverview: {
+        id: 'gui.hrai.projectTutorialOverview',
+        defaultMessage: 'Co se naučíš',
+        description: 'heading for the project tutorial overview'
+    },
+    projectTutorialSteps: {
+        id: 'gui.hrai.projectTutorialSteps',
+        defaultMessage: 'Kroky',
+        description: 'heading for the project tutorial steps'
+    },
+    projectTutorialAccept: {
+        id: 'gui.hrai.projectTutorialAccept',
+        defaultMessage: 'Začít tento návod',
+        description: 'button to accept a generated project tutorial'
+    },
+    projectTutorialCancel: {
+        id: 'gui.hrai.projectTutorialCancel',
+        defaultMessage: 'Zrušit',
+        description: 'button to dismiss a generated project tutorial'
+    },
+    projectTutorialStepCount: {
+        id: 'gui.hrai.projectTutorialStepCount',
+        defaultMessage: 'Krok {current} z {total}',
+        description: 'current step and total steps in a project tutorial'
+    },
+    projectTutorialGoal: {
+        id: 'gui.hrai.projectTutorialGoal',
+        defaultMessage: 'Cíl',
+        description: 'heading for the goal of a project tutorial step'
+    },
+    projectTutorialAction: {
+        id: 'gui.hrai.projectTutorialAction',
+        defaultMessage: 'Zkus to',
+        description: 'heading for the instruction in a project tutorial step'
+    },
+    projectTutorialNext: {
+        id: 'gui.hrai.projectTutorialNext',
+        defaultMessage: 'Další krok',
+        description: 'button to move to the next project tutorial step'
+    },
+    projectTutorialFinish: {
+        id: 'gui.hrai.projectTutorialFinish',
+        defaultMessage: 'Dokončit návod',
+        description: 'button to finish the last walkthrough step'
+    },
+    projectTutorialComplete: {
+        id: 'gui.hrai.projectTutorialComplete',
+        defaultMessage: 'Výborně! Dokončil jsi návod.',
+        description: 'completion message for a project tutorial'
+    },
+    projectTutorialStartRebuild: {
+        id: 'gui.hrai.projectTutorialStartRebuild',
+        defaultMessage: 'Otevřít nový projekt',
+        description: 'button to start rebuilding in a separate project'
+    },
+    projectTutorialPreserved: {
+        id: 'gui.hrai.projectTutorialPreserved',
+        defaultMessage: 'Původní projekt se uloží a zůstane beze změny.',
+        description: 'explains source-project preservation for rebuild tutorials'
+    },
+    projectTutorialSaving: {
+        id: 'gui.hrai.projectTutorialSaving',
+        defaultMessage: 'Ukládám původní projekt a otevírám nový…',
+        description: 'status shown while switching to a separate rebuild project'
+    },
     messageListLabel: {
         id: 'gui.hrai.messageListLabel',
         defaultMessage: 'Konverzace s HRAI',
@@ -609,6 +699,30 @@ const gamePlanShape = PropTypes.shape({
     title: PropTypes.string.isRequired
 });
 
+const projectTutorialStepShape = PropTypes.shape({
+    goal: PropTypes.string.isRequired,
+    id: PropTypes.string.isRequired,
+    instruction: PropTypes.string.isRequired,
+    success: PropTypes.string.isRequired,
+    title: PropTypes.string.isRequired
+});
+
+const projectTutorialShape = PropTypes.shape({
+    mode: PropTypes.oneOf(['explore', 'rebuild']).isRequired,
+    overview: PropTypes.string.isRequired,
+    steps: PropTypes.arrayOf(projectTutorialStepShape).isRequired,
+    title: PropTypes.string.isRequired
+});
+
+const projectTutorialProgressShape = PropTypes.shape({
+    complete: PropTypes.bool.isRequired,
+    needsNewProject: PropTypes.bool,
+    plan: projectTutorialShape.isRequired,
+    step: projectTutorialStepShape.isRequired,
+    stepComplete: PropTypes.bool.isRequired,
+    stepIndex: PropTypes.number.isRequired
+});
+
 const formatToolArgs = args => {
     try {
         return JSON.stringify(args, null, 2);
@@ -995,10 +1109,186 @@ GameProgressCard.propTypes = {
     }).isRequired
 };
 
+const ProjectTutorialStartCard = ({isBusy, onStart}) => {
+    const handleExplore = useCallback(() => onStart('explore'), [onStart]);
+    const handleRebuild = useCallback(() => onStart('rebuild'), [onStart]);
+
+    return (
+        <section className={styles.gameCard}>
+            <h3 className={styles.gameCardTitle}>
+                <FormattedMessage {...messages.projectTutorialHeading} />
+            </h3>
+            <div className={styles.gameActions}>
+                <Button
+                    type="button"
+                    className={styles.gamePrimaryButton}
+                    disabled={isBusy}
+                    onClick={handleExplore}
+                >
+                    <FormattedMessage {...messages.projectTutorialExplore} />
+                </Button>
+                <Button
+                    type="button"
+                    className={styles.gameSecondaryButton}
+                    disabled={isBusy}
+                    onClick={handleRebuild}
+                >
+                    <FormattedMessage {...messages.projectTutorialRebuild} />
+                </Button>
+            </div>
+            {isBusy ? (
+                <p
+                    className={styles.gamePlanning}
+                    aria-live="polite"
+                >
+                    <FormattedMessage {...messages.projectTutorialPlanning} />
+                </p>
+            ) : null}
+        </section>
+    );
+};
+
+ProjectTutorialStartCard.propTypes = {
+    isBusy: PropTypes.bool.isRequired,
+    onStart: PropTypes.func.isRequired
+};
+
+const ProjectTutorialProposalCard = ({isAccepting, onAccept, onCancel, plan}) => (
+    <section className={styles.gameCard}>
+        <h3 className={styles.gameCardTitle}>
+            <FormattedMessage
+                {...messages.projectTutorialProposal}
+                values={{title: plan.title}}
+            />
+        </h3>
+        <strong><FormattedMessage {...messages.projectTutorialOverview} /></strong>
+        <p>{plan.overview}</p>
+        <strong><FormattedMessage {...messages.projectTutorialSteps} /></strong>
+        <ol className={styles.milestoneList}>
+            {plan.steps.map(step => (
+                <li key={step.id}>
+                    <strong>{step.title}</strong>
+                    <span>{step.goal}</span>
+                </li>
+            ))}
+        </ol>
+        <div className={styles.gameActions}>
+            <Button
+                type="button"
+                className={styles.gamePrimaryButton}
+                disabled={isAccepting}
+                onClick={onAccept}
+            >
+                <FormattedMessage {...messages.projectTutorialAccept} />
+            </Button>
+            <Button
+                type="button"
+                className={styles.gameSecondaryButton}
+                disabled={isAccepting}
+                onClick={onCancel}
+            >
+                <FormattedMessage {...messages.projectTutorialCancel} />
+            </Button>
+        </div>
+    </section>
+);
+
+ProjectTutorialProposalCard.propTypes = {
+    isAccepting: PropTypes.bool.isRequired,
+    onAccept: PropTypes.func.isRequired,
+    onCancel: PropTypes.func.isRequired,
+    plan: projectTutorialShape.isRequired
+};
+
+const ProjectTutorialProgressCard = ({
+    error,
+    isStartingNewProject,
+    needsNewProject,
+    onNext,
+    onStartNewProject,
+    progress
+}) => {
+    const {complete, plan, step, stepComplete, stepIndex} = progress;
+    const isLastStep = stepIndex === plan.steps.length - 1;
+
+    return (
+        <section className={styles.gameCard}>
+            <h3 className={styles.gameCardTitle}>{plan.title}</h3>
+            <p>{plan.overview}</p>
+            {needsNewProject ? (
+                <>
+                    <p className={styles.gameHelp}>
+                        <FormattedMessage {...messages.projectTutorialPreserved} />
+                    </p>
+                    {error ? <p role="alert">{error}</p> : null}
+                    <Button
+                        type="button"
+                        className={styles.gamePrimaryButton}
+                        disabled={isStartingNewProject}
+                        onClick={onStartNewProject}
+                    >
+                        <FormattedMessage
+                            {...(isStartingNewProject ?
+                                messages.projectTutorialSaving : messages.projectTutorialStartRebuild)}
+                        />
+                    </Button>
+                </>
+            ) : complete ? (
+                <p role="status"><FormattedMessage {...messages.projectTutorialComplete} /></p>
+            ) : (
+                <>
+                    <span className={styles.milestoneCounter}>
+                        <FormattedMessage
+                            {...messages.projectTutorialStepCount}
+                            values={{current: stepIndex + 1, total: plan.steps.length}}
+                        />
+                    </span>
+                    <h4 className={styles.currentMilestoneTitle}>{step.title}</h4>
+                    <strong><FormattedMessage {...messages.projectTutorialGoal} /></strong>
+                    <p>{step.goal}</p>
+                    <div className={styles.milestoneDetail}>
+                        <strong><FormattedMessage {...messages.projectTutorialAction} /></strong>
+                        <p>{step.instruction}</p>
+                    </div>
+                    <div className={styles.milestoneDone}>
+                        <strong><FormattedMessage {...messages.stageSuccess} /></strong>
+                        <p>{step.success}</p>
+                    </div>
+                    {plan.mode === 'explore' || stepComplete ? (
+                        <Button
+                            type="button"
+                            className={styles.nextStageButton}
+                            onClick={onNext}
+                        >
+                            <FormattedMessage
+                                {...(isLastStep && plan.mode === 'explore' ?
+                                    messages.projectTutorialFinish : messages.projectTutorialNext)}
+                            />
+                        </Button>
+                    ) : null}
+                </>
+            )}
+        </section>
+    );
+};
+
+ProjectTutorialProgressCard.propTypes = {
+    error: PropTypes.string,
+    isStartingNewProject: PropTypes.bool.isRequired,
+    needsNewProject: PropTypes.bool.isRequired,
+    onNext: PropTypes.func.isRequired,
+    onStartNewProject: PropTypes.func.isRequired,
+    progress: projectTutorialProgressShape.isRequired
+};
+
 const HraiPanel = ({
     gamePlan,
     gamePlaytest,
     gameProgress,
+    projectTutorialProposal,
+    projectTutorialProgress,
+    projectTutorialNeedsNewProject,
+    projectTutorialError,
     hasProjectContent,
     isAgentRunning,
     isPlanning,
@@ -1010,6 +1300,11 @@ const HraiPanel = ({
     onGamePlanRequest,
     onGamePlaytestComplete,
     onGameIdea,
+    onProjectTutorialRequest,
+    onProjectTutorialAccept,
+    onProjectTutorialCancel,
+    onProjectTutorialNext,
+    onStartProjectTutorialRebuild,
     onStartNewProject,
     onSend,
     onHint,
@@ -1027,8 +1322,12 @@ const HraiPanel = ({
     voiceTranscript
 }) => {
     const intl = useIntl();
-    const hasGameGuide = Boolean(gamePlan || gamePlaytest || gameProgress);
-    const [activeTab, setActiveTab] = useState(hasGameGuide ? 'plan' : 'hrai');
+    const hasGuide = Boolean(
+        gamePlan || gamePlaytest || gameProgress || projectTutorialProposal || projectTutorialProgress
+    );
+    const isInitialProjectState = chatMessages.length === 0 && !lesson && !gamePlan && !gamePlaytest &&
+        !gameProgress && !projectTutorialProposal && !projectTutorialProgress;
+    const [activeTab, setActiveTab] = useState(hasGuide ? 'plan' : 'hrai');
     const [draft, setDraft] = useState('');
     const [gameIdea, setGameIdea] = useState(null);
     const [gameStartPending, setGameStartPending] = useState(false);
@@ -1050,26 +1349,26 @@ const HraiPanel = ({
     const recordingStartedAtRef = useRef(0);
     const recordingDurationRef = useRef(0);
     const recordingTimerRef = useRef(null);
-    const hadGameGuideRef = useRef(hasGameGuide);
+    const hadGuideRef = useRef(hasGuide);
 
     useEffect(() => {
         if (isEnteringGameIdea) draftInputRef.current?.focus();
     }, [isEnteringGameIdea]);
 
     useEffect(() => {
-        if (hasGameGuide && !hadGameGuideRef.current) {
+        if (hasGuide && !hadGuideRef.current) {
             setActiveTab('plan');
-        } else if (!hasGameGuide && hadGameGuideRef.current) {
+        } else if (!hasGuide && hadGuideRef.current) {
             setActiveTab('hrai');
         }
-        hadGameGuideRef.current = hasGameGuide;
-    }, [hasGameGuide]);
+        hadGuideRef.current = hasGuide;
+    }, [hasGuide]);
 
     useEffect(() => {
-        if (gamePlan || gameProgress) {
+        if (gamePlan || gameProgress || projectTutorialProposal || projectTutorialProgress) {
             setGameStartPending(false);
         }
-    }, [gamePlan, gameProgress]);
+    }, [gamePlan, gameProgress, projectTutorialProposal, projectTutorialProgress]);
 
     useEffect(() => {
         if (lesson) {
@@ -1278,7 +1577,8 @@ const HraiPanel = ({
         }
 
         const isGameStart = !lesson && (isEnteringGameIdea ||
-            (!gamePlan && !gamePlaytest && !gameProgress && chatMessages.length === 0));
+            (!gamePlan && !gamePlaytest && !gameProgress &&
+                !projectTutorialProposal && !projectTutorialProgress && chatMessages.length === 0));
         if (isGameStart && onGameIdea) {
             onGameIdea(trimmed);
         } else {
@@ -1292,7 +1592,7 @@ const HraiPanel = ({
         setDraft('');
         resetVoice();
     }, [chatMessages.length, draft, gamePlan, gamePlaytest, gameProgress, isEnteringGameIdea,
-        isThinking, lesson, onGameIdea, onSend, resetVoice]);
+        isThinking, lesson, onGameIdea, onSend, projectTutorialProposal, projectTutorialProgress, resetVoice]);
 
     const handleNewGameIdea = useCallback(() => {
         setIsEnteringGameIdea(entering => !entering);
@@ -1587,12 +1887,18 @@ const HraiPanel = ({
                                 formatBlockOpcode={formatBlockOpcode}
                             />
                         ))}
-                        {chatMessages.length === 0 && !lesson && !gamePlan && !gameProgress ? (
+                        {isInitialProjectState ? (
                             <div className={styles.messageTutor}>
                                 <div className={styles.messageBubble}>
                                     <FormattedMessage {...messages.gameStartPrompt} />
                                 </div>
                             </div>
+                        ) : null}
+                        {isInitialProjectState && hasProjectContent ? (
+                            <ProjectTutorialStartCard
+                                isBusy={isPlanning || isStartingNewProject}
+                                onStart={onProjectTutorialRequest}
+                            />
                         ) : null}
                         {!lesson && gameStartPending && gameIdea ? (
                             <GameStartCard
@@ -1775,7 +2081,23 @@ const HraiPanel = ({
                     role="tabpanel"
                     aria-labelledby="hrai-plan-tab"
                 >
-                    {gamePlaytest ? (
+                    {projectTutorialProposal ? (
+                        <ProjectTutorialProposalCard
+                            isAccepting={isPlanning}
+                            plan={projectTutorialProposal}
+                            onAccept={onProjectTutorialAccept}
+                            onCancel={onProjectTutorialCancel}
+                        />
+                    ) : projectTutorialProgress ? (
+                        <ProjectTutorialProgressCard
+                            progress={projectTutorialProgress}
+                            error={projectTutorialError}
+                            needsNewProject={projectTutorialNeedsNewProject}
+                            isStartingNewProject={isStartingNewProject}
+                            onNext={onProjectTutorialNext}
+                            onStartNewProject={onStartProjectTutorialRebuild}
+                        />
+                    ) : gamePlaytest ? (
                         <GamePlaytestCard
                             isStarting={isPlanning}
                             playtest={gamePlaytest}
@@ -1806,6 +2128,10 @@ const HraiPanel = ({
 
 HraiPanel.propTypes = {
     gamePlan: gamePlanShape,
+    projectTutorialProposal: projectTutorialShape,
+    projectTutorialProgress: projectTutorialProgressShape,
+    projectTutorialNeedsNewProject: PropTypes.bool,
+    projectTutorialError: PropTypes.string,
     gamePlaytest: PropTypes.shape({
         plan: gamePlanShape.isRequired
     }),
@@ -1849,6 +2175,11 @@ HraiPanel.propTypes = {
     onGamePlanRequest: PropTypes.func,
     onGamePlaytestComplete: PropTypes.func,
     onGameIdea: PropTypes.func,
+    onProjectTutorialRequest: PropTypes.func,
+    onProjectTutorialAccept: PropTypes.func,
+    onProjectTutorialCancel: PropTypes.func,
+    onProjectTutorialNext: PropTypes.func,
+    onStartProjectTutorialRebuild: PropTypes.func,
     onStartNewProject: PropTypes.func,
     onHint: PropTypes.func.isRequired,
     onAbort: PropTypes.func,
@@ -1879,6 +2210,10 @@ HraiPanel.defaultProps = {
     gamePlan: null,
     gamePlaytest: null,
     gameProgress: null,
+    projectTutorialProposal: null,
+    projectTutorialProgress: null,
+    projectTutorialNeedsNewProject: false,
+    projectTutorialError: null,
     hasProjectContent: false,
     isAgentRunning: false,
     isPlanning: false,
@@ -1893,6 +2228,11 @@ HraiPanel.defaultProps = {
     onGamePlanRequest: () => {},
     onGamePlaytestComplete: () => {},
     onGameIdea: null,
+    onProjectTutorialRequest: () => {},
+    onProjectTutorialAccept: () => {},
+    onProjectTutorialCancel: () => {},
+    onProjectTutorialNext: () => {},
+    onStartProjectTutorialRebuild: () => {},
     onStartNewProject: () => {},
     onNextGameMilestone: () => {},
     onVoiceSubmit: () => {},

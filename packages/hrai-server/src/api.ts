@@ -3,6 +3,7 @@ import { listProviders } from "./model-catalog.ts";
 import { runtimeFor } from "./pi-runtime.ts";
 import { sendPasswordReset } from "./mailer.ts";
 import { parseCookies, HraiStore, SESSION_COOKIE, type AuthenticatedUser } from "./store.ts";
+import {downloadPublicScratchProject} from "./scratch-project.ts";
 
 const MAX_JSON_BYTES = 32 * 1024 * 1024;
 const MAX_ASSET_BYTES = 16 * 1024 * 1024;
@@ -209,6 +210,23 @@ export async function handleApiRequest(
 
         if (request.method === "GET" && url.pathname === "/api/auth/me") {
             sendJson(response, 200, userResponse(user));
+            return;
+        }
+
+        const scratchProjectMatch = /^\/api\/scratch\/projects\/([^/]+)$/.exec(url.pathname);
+        if (request.method === "GET" && scratchProjectMatch?.[1]) {
+            const projectId = scratchProjectMatch[1];
+            try {
+                const project = await downloadPublicScratchProject(projectId);
+                sendBinary(response, 200, project, "application/octet-stream");
+            } catch (error) {
+                const code = error instanceof Error ? error.message : "scratch_project_unavailable";
+                const status = code === "invalid_scratch_project_id" ? 400 :
+                    code === "scratch_project_too_large" ? 413 :
+                        code === "scratch_project_not_public" || code === "scratch_project_not_found" ? 404 : 502;
+                if (status === 502) console.warn(`hrai: could not import public Scratch project ${projectId}`, error);
+                sendError(response, status, code);
+            }
             return;
         }
 

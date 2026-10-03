@@ -8,6 +8,11 @@ import {renderWithIntl} from '../../helpers/intl-helpers.jsx';
 import HraiPanel from '../../../src/containers/hrai-panel.jsx';
 import {loadGameProgress} from '../../../src/lib/hrai-game-progress';
 import {loadGameStarter} from '../../../src/lib/hrai-game-starter';
+import {
+    clearProjectTutorialProgress,
+    saveProjectTutorialProgress
+} from '../../../src/lib/hrai-project-tutorial-progress';
+import {LoadingState} from '../../../src/reducers/project-state';
 
 const mockPanelRender = jest.fn();
 let mockSocket;
@@ -64,16 +69,19 @@ const makeVm = () => ({
     removeListener: jest.fn()
 });
 
-const panelTree = store => (
+const panelTree = (store, props = {}) => (
     <Provider store={store}>
-        <HraiPanel />
+        <HraiPanel {...props} />
     </Provider>
 );
 
 const renderContainer = ({
     lessonId = null,
     projectId = '0',
-    projectTitle = 'Untitled'
+    projectTitle = 'Untitled',
+    canCreateNew = false,
+    canSave = false,
+    projectState = {}
 } = {}) => {
     socketHandlers = {};
     mockSocket = {
@@ -88,7 +96,7 @@ const renderContainer = ({
     let state = {
         scratchGui: {
             hraiLesson: {lessonId},
-            projectState: {projectId},
+            projectState: {loadingState: LoadingState.SHOWING_WITHOUT_ID, projectId, ...projectState},
             projectTitle,
             vm: makeVm()
         }
@@ -106,7 +114,7 @@ const renderContainer = ({
         }
         return dispatch(action);
     };
-    const view = renderWithIntl(panelTree(store));
+    const view = renderWithIntl(panelTree(store, {canCreateNew, canSave}));
     const updateScratchGui = patch => {
         state = {
             scratchGui: {
@@ -243,9 +251,132 @@ describe('HraiPanel container custom game start', () => {
     });
 });
 
-describe('HraiPanel container agent session', () => {
+describe('HraiPanel container project tutorial rebuild', () => {
+    const progress = {
+        plan: {
+            mode: 'rebuild',
+            title: 'Rebuild the maze',
+            overview: 'Create a similar game in a new project.',
+            steps: [{
+                id: 'tutorial-step-1',
+                title: 'Start',
+                goal: 'Start the game.',
+                instruction: 'Add the green flag event.',
+                success: 'The game starts from the green flag.'
+            }]
+        },
+        stepIndex: 0,
+        step: {
+            id: 'tutorial-step-1',
+            title: 'Start',
+            goal: 'Start the game.',
+            instruction: 'Add the green flag event.',
+            success: 'The game starts from the green flag.'
+        },
+        stepComplete: false,
+        complete: false,
+        needsNewProject: true
+    };
+
     beforeEach(() => {
         mockPanelRender.mockClear();
+        window.confirm = jest.fn(() => true);
+    });
+
+    test('saves a loaded source before opening the new rebuild project', () => {
+        const {store} = renderContainer({
+            canSave: true,
+            projectState: {loadingState: LoadingState.SHOWING_WITH_ID, projectId: '42'}
+        });
+        act(() => socketHandlers.projectTutorialProgress(progress));
+        act(() => latestPanelProps().onStartProjectTutorialRebuild());
+
+        expect(window.confirm).toHaveBeenCalledTimes(1);
+        expect(store.getActions()).toContainEqual({
+            type: 'scratch-gui/project-state/START_UPDATING_BEFORE_CREATING_NEW'
+        });
+        expect(store.getActions()).not.toContainEqual({
+            type: 'scratch-gui/project-state/START_FETCHING_NEW'
+        });
+    });
+
+    test('creates a saved source copy before replacing an unsaved imported project', () => {
+        const {store} = renderContainer({
+            canSave: true,
+            projectState: {loadingState: LoadingState.SHOWING_WITHOUT_ID, projectId: '0'}
+        });
+        act(() => socketHandlers.projectTutorialProgress(progress));
+        act(() => latestPanelProps().onStartProjectTutorialRebuild());
+
+        expect(store.getActions()).toContainEqual({
+            type: 'scratch-gui/project-state/START_CREATING_NEW'
+        });
+        expect(store.getActions()).not.toContainEqual({
+            type: 'scratch-gui/project-state/START_FETCHING_NEW'
+        });
+    });
+
+    test('refuses rebuild when the original cannot be saved', () => {
+        const {store} = renderContainer({
+            canSave: false,
+            projectState: {loadingState: LoadingState.SHOWING_WITH_ID, projectId: '42'}
+        });
+        act(() => socketHandlers.projectTutorialProgress(progress));
+        act(() => latestPanelProps().onStartProjectTutorialRebuild());
+
+        expect(store.getActions()).toEqual([]);
+        expect(window.confirm).not.toHaveBeenCalled();
+        expect(latestPanelProps().projectTutorialError).toMatch(/přihlas/i);
+    });
+});
+
+describe('HraiPanel container agent session', () => {
+    const savedRebuildProgress = {
+        plan: {
+            mode: 'rebuild',
+            title: 'Rebuild the maze',
+            overview: 'Create a similar game in a new project.',
+            steps: []
+        },
+        stepIndex: 0
+    };
+
+    beforeEach(() => {
+        mockPanelRender.mockClear();
+        clearProjectTutorialProgress('0', 'Untitled');
+        clearProjectTutorialProgress('42', 'Untitled');
+    });
+
+    test('restores a rebuild on its source with the new-project gate active', () => {
+        saveProjectTutorialProgress('42', savedRebuildProgress, 'Untitled');
+        renderContainer({
+            canSave: true,
+            projectState: {loadingState: LoadingState.SHOWING_WITH_ID, projectId: '42'}
+        });
+
+        act(() => socketHandlers.connect());
+
+        expect(mockSocket.emit).toHaveBeenCalledWith('projectTutorialRestore', {
+            plan: savedRebuildProgress.plan,
+            stepIndex: 0,
+            needsNewProject: true
+        });
+    });
+
+    test('restores a rebuild in its separate project with the gate cleared', () => {
+        saveProjectTutorialProgress('42', savedRebuildProgress, 'Untitled', true);
+        renderContainer({
+            canSave: true,
+            projectState: {loadingState: LoadingState.SHOWING_WITH_ID, projectId: '42'}
+        });
+
+        act(() => socketHandlers.connect());
+
+        expect(mockSocket.emit).toHaveBeenCalledWith('projectTutorialRestore', {
+            plan: savedRebuildProgress.plan,
+            stepIndex: 0,
+            needsNewProject: false
+        });
     });
 
     test('opens the session and folds history and live events', () => {

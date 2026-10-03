@@ -34,6 +34,7 @@ const FileMenu = ({
     onClickSaveAsCopy,
     onClickRemix,
     onStartSelectingFileUpload,
+    onStartSelectingScratchProject,
     getSaveToComputerHandler,
     remixMessage,
     depth
@@ -148,6 +149,15 @@ const FileMenu = ({
                     >
                         {intl.formatMessage(sharedMessages.loadFromComputerTitle)}
                     </MenuItem>
+                    {onStartSelectingScratchProject ? (
+                        <MenuItem
+                            onClick={onStartSelectingScratchProject}
+                            isDataMenuItem
+                            onParentKeyDown={handleKeyDownOpenMenu}
+                        >
+                            {intl.formatMessage(sharedMessages.loadFromScratchTitle)}
+                        </MenuItem>
+                    ) : null}
                     <SB3Downloader>{(className, downloadProjectCallback) => (
                         <MenuItem
                             className={className}
@@ -174,6 +184,7 @@ FileMenu.propTypes = {
     canCreateCopy: PropTypes.bool.isRequired,
     canRemix: PropTypes.bool.isRequired,
     onStartSelectingFileUpload: PropTypes.func.isRequired,
+    onStartSelectingScratchProject: PropTypes.func,
     onClickSave: PropTypes.func,
     onClickSaveAsCopy: PropTypes.func,
     onClickRemix: PropTypes.func,

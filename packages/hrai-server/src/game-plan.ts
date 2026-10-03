@@ -177,6 +177,10 @@ function assessmentValue(value: unknown, field: string): GameAssessment {
     };
 }
 
+export function parseGameAssessment(value: unknown, field = "assessment"): GameAssessment {
+    return assessmentValue(value, field);
+}
+
 /**
  * Parses and validates model output at the trust boundary.
  *

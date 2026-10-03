@@ -4,7 +4,7 @@ import MenuBar from '../../../src/components/menu-bar/menu-bar';
 import {menuInitialState} from '../../../src/reducers/menus';
 import {LoadingState} from '../../../src/reducers/project-state';
 import {DEFAULT_MODE} from '../../../src/lib/settings/color-mode';
-import {fireEvent} from '@testing-library/react';
+import {fireEvent, screen} from '@testing-library/react';
 
 import {PLATFORM} from '../../../src/lib/platform';
 
@@ -80,6 +80,26 @@ describe('MenuBar Component', () => {
             type: 'scratch-gui/modals/OPEN_MODAL',
             modal: 'hraiLessons'
         });
+    });
+
+    test('shows public Scratch import only in HRAI mode', () => {
+        const onStartSelectingScratchProject = jest.fn();
+        const firstView = renderWithIntl(getComponent({
+            canManageFiles: true,
+            onStartSelectingScratchProject
+        }));
+        fireEvent.click(screen.getByRole('button', {name: 'File menu'}));
+        expect(screen.queryByText('Load from Scratch')).toBeNull();
+        firstView.unmount();
+
+        renderWithIntl(getComponent({
+            canManageFiles: true,
+            hraiLogo: true,
+            onStartSelectingScratchProject
+        }));
+        fireEvent.click(screen.getByRole('button', {name: 'File menu'}));
+        fireEvent.click(screen.getByText('Load from Scratch'));
+        expect(onStartSelectingScratchProject).toHaveBeenCalledTimes(1);
     });
 
     describe('triggering About button handler', () => {

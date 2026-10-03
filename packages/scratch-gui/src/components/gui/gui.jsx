@@ -190,6 +190,7 @@ const GUIComponent = props => {
         onShare,
         onShowPrivacyPolicy,
         onStartSelectingFileUpload,
+        onStartSelectingScratchProject,
         onTelemetryModalCancel,
         onTelemetryModalOptIn,
         onTelemetryModalOptOut,
@@ -385,6 +386,7 @@ const GUIComponent = props => {
                             onSeeCommunity={onSeeCommunity}
                             onShare={onShare}
                             onStartSelectingFileUpload={onStartSelectingFileUpload}
+                            onStartSelectingScratchProject={onStartSelectingScratchProject}
                             onToggleLoginOpen={onToggleLoginOpen}
                             userOwnsProject={userOwnsProject}
                             username={username}
@@ -594,7 +596,11 @@ const GUIComponent = props => {
                         {/* Hidden in fullscreen: .stage-wrapper.full-screen is position:fixed
                             over the viewport, so the panel would render underneath it. */}
                         {hraiAssistantVisible && !isFullScreen ? (
-                            <HraiPanel assistantPreferences={assistantPreferences} />
+                            <HraiPanel
+                                assistantPreferences={assistantPreferences}
+                                canCreateNew={canCreateNew}
+                                canSave={canSave}
+                            />
                         ) : null}
                     </Box>
                     <DragLayer />
@@ -669,6 +675,7 @@ GUIComponent.propTypes = {
     onShare: PropTypes.func,
     onShowPrivacyPolicy: PropTypes.func,
     onStartSelectingFileUpload: PropTypes.func,
+    onStartSelectingScratchProject: PropTypes.func,
     onTabSelect: PropTypes.func,
     onTelemetryModalCancel: PropTypes.func,
     onTelemetryModalOptIn: PropTypes.func,
