@@ -26,8 +26,8 @@
     "packages/scratch-media-lib-scripts"
   ],
   "scripts": {
-    "build": "cross-env NODE_ENV=production npm run --workspaces build",
-    "clean": "npm run --workspaces clean",
+    "build": "cross-env NODE_ENV=production npm run --workspaces --if-present build",
+    "clean": "npm run --workspaces --if-present clean",
     "prepare": "husky install",
     "refresh-gh-workflow": "ts-node scripts/update-gha-workflows.ts",
     "start": "npm --workspace @scratch/scratch-gui start",
